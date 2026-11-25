@@ -2,49 +2,68 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>しょぼん風ミニアクション - 初見殺しステージ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D キャラコン鬼ごっこ - Parkour Tag Prototype</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <header class="hud">
-      <div class="title">(´・ω・｀) しょぼん風アクション</div>
-      <div class="stats">
-        <span>死亡回数: <strong id="death-count">0</strong></span>
-        <span>タイム: <strong id="timer">0.0</strong>s</span>
-        <button id="retry-btn" type="button">リトライ (R)</button>
-        <button id="mute-btn" type="button">音: ON</button>
+  <div id="hud">
+    <div class="hud-top">
+      <div class="panel">
+        <div>生存時間: <strong id="time-display">0.0</strong>s</div>
+        <div>ベスト: <strong id="best-display">0.0</strong>s</div>
       </div>
-    </header>
-
-    <div class="canvas-wrapper">
-      <canvas id="gameCanvas" width="800" height="480"></canvas>
-      <div id="overlay" class="overlay hidden">
-        <div class="overlay-box">
-          <h2 id="overlay-title">STAGE CLEAR!</h2>
-          <p id="overlay-message"></p>
-          <button id="restart-all-btn" type="button">最初からもう一回遊ぶ</button>
+      <div class="panel center-panel">
+        <div id="state-badge">RUN</div>
+        <div class="speed-wrap">
+          <span id="speed-display">0</span> <small>m/s</small>
         </div>
       </div>
-    </div>
-
-    <div class="controls-info">
-      <span>移動: <strong>← →</strong> / <strong>A D</strong></span>
-      <span>ジャンプ: <strong>Space</strong> / <strong>↑</strong> / <strong>W</strong></span>
-      <span>即リトライ: <strong>R</strong></span>
-    </div>
-
-    <!-- スマホ・タブレット用タッチ操作 -->
-    <div class="touch-controls">
-      <div class="touch-left-group">
-        <button id="btn-left" class="touch-btn" type="button">◀</button>
-        <button id="btn-right" class="touch-btn" type="button">▶</button>
+      <div class="panel right-panel">
+        <div>鬼との距離: <strong id="dist-display">--</strong>m</div>
+        <div>ニアミス: <strong id="nearmiss-display">0</strong></div>
       </div>
-      <button id="btn-jump" class="touch-btn jump-btn" type="button">JUMP</button>
+    </div>
+
+    <div id="crosshair"></div>
+    <div id="trick-feed"></div>
+
+    <div class="hud-bottom">
+      <span><strong>WASD</strong> 移動</span>
+      <span><strong>Space</strong> ジャンプ / 壁キック</span>
+      <span><strong>Shift / C</strong> スライディング</span>
+      <span><strong>壁際+空中</strong> ウォールラン</span>
+      <span><strong>R</strong> 即リトライ</span>
     </div>
   </div>
 
-  <script src="game.js"></script>
+  <!-- スタート / ポーズ / ゲームオーバー画面 -->
+  <div id="overlay">
+    <div class="modal">
+      <h1 id="modal-title">3D キャラコン鬼ごっこ</h1>
+      <p id="modal-desc">
+        スライディング・バニホ・ウォールランを駆使して鬼から逃げ切れ！<br />
+        画面をクリックするとマウス操作（FPS視点）が始まります。
+      </p>
+      <div class="controls-box">
+        <div><strong>WASD</strong>：移動　/　<strong>マウス</strong>：視点</div>
+        <div><strong>Space</strong>：ジャンプ（着地即ジャンプでバニホ加速）</div>
+        <div><strong>Shift または C</strong>：スライディング（高速移動＆加速）</div>
+        <div><strong>空中で壁に近づく</strong>：ウォールラン → <strong>Space</strong> で壁キック</div>
+        <div><strong>黄緑のパッド</strong>：大ジャンプパッド</div>
+      </div>
+      <button id="start-btn" type="button">プレイ開始（クリック）</button>
+    </div>
+  </div>
+
+  <!-- Three.js (CDN) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>

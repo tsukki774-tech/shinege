@@ -1,873 +1,765 @@
-(() => {
-  const canvas = document.getElementById("gameCanvas");
-  const ctx = canvas.getContext("2d");
+import * as THREE from "three";
 
-  const deathCountEl = document.getElementById("death-count");
-  const timerEl = document.getElementById("timer");
-  const retryBtn = document.getElementById("retry-btn");
-  const muteBtn = document.getElementById("mute-btn");
-  const overlayEl = document.getElementById("overlay");
-  const overlayTitleEl = document.getElementById("overlay-title");
-  const overlayMessageEl = document.getElementById("overlay-message");
-  const restartAllBtn = document.getElementById("restart-all-btn");
+// ==========================================
+// DOM要素
+// ==========================================
+const overlay = document.getElementById("overlay");
+const modalTitle = document.getElementById("modal-title");
+const modalDesc = document.getElementById("modal-desc");
+const startBtn = document.getElementById("start-btn");
 
-  // ==========================================
-  // 基本設定（ここをいじると操作感が変わります）
-  // ==========================================
-  const TILE = 40;
-  const WORLD_WIDTH = 2640;
-  const WORLD_HEIGHT = 480;
-  const GRAVITY = 0.6;
-  const MOVE_SPEED = 4.5;
-  const JUMP_FORCE = -12.6;
-  const MAX_FALL_SPEED = 14;
+const timeDisplay = document.getElementById("time-display");
+const bestDisplay = document.getElementById("best-display");
+const speedDisplay = document.getElementById("speed-display");
+const distDisplay = document.getElementById("dist-display");
+const nearmissDisplay = document.getElementById("nearmiss-display");
+const stateBadge = document.getElementById("state-badge");
+const trickFeed = document.getElementById("trick-feed");
 
-  // 簡易Web Audio効果音（外部ファイル不要）
-  let audioCtx = null;
-  let muted = false;
+// ==========================================
+// キャラコン調整パラメータ（ここをいじると操作感が激変します！）
+// ==========================================
+const CONFIG = {
+  gravity: 28,
+  baseSpeed: 10.5,
+  maxSpeed: 24.0,
+  groundAccel: 75,
+  airAccel: 22,
+  groundFriction: 9.0,
+  slideFriction: 1.6,
+  jumpForce: 11.2,
+  slideBoost: 16.5,
+  slideDuration: 0.72,
+  slideCooldown: 0.45,
+  wallRunGravity: 4.5,
+  wallRunSpeed: 13.5,
+  wallJumpUp: 11.5,
+  wallJumpPush: 13.0,
+  jumpPadForce: 21.0,
+  playerRadius: 0.55,
+  standHeight: 1.8,
+  slideHeight: 0.95,
+  mouseSensitivity: 0.0022,
+};
 
-  function playSound(type) {
-    if (muted) return;
-    if (!audioCtx) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) audioCtx = new AudioContext();
-    }
-    if (!audioCtx) return;
-    if (audioCtx.state === "suspended") audioCtx.resume();
-
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    const now = audioCtx.currentTime;
-
-    if (type === "jump") {
-      osc.type = "square";
-      osc.frequency.setValueAtTime(260, now);
-      osc.frequency.exponentialRampToValueAtTime(580, now + 0.12);
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
-      osc.start(now);
-      osc.stop(now + 0.13);
-    } else if (type === "die") {
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(320, now);
-      osc.frequency.linearRampToValueAtTime(90, now + 0.28);
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-      osc.start(now);
-      osc.stop(now + 0.3);
-    } else if (type === "trap") {
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(620, now);
-      osc.frequency.setValueAtTime(420, now + 0.05);
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-      osc.start(now);
-      osc.stop(now + 0.12);
-    } else if (type === "checkpoint") {
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(523, now);
-      osc.frequency.setValueAtTime(659, now + 0.08);
-      osc.frequency.setValueAtTime(784, now + 0.16);
-      gain.gain.setValueAtTime(0.1, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-      osc.start(now);
-      osc.stop(now + 0.3);
-    } else if (type === "clear") {
-      osc.type = "square";
-      const notes = [523, 659, 784, 1046];
-      notes.forEach((freq, i) => {
-        osc.frequency.setValueAtTime(freq, now + i * 0.1);
-      });
-      gain.gain.setValueAtTime(0.09, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-      osc.start(now);
-      osc.stop(now + 0.5);
-    }
+// ==========================================
+// 効果音（Web Audio API・外部ファイル不要）
+// ==========================================
+let audioCtx = null;
+function playSfx(type) {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
   }
+  if (!audioCtx) return;
+  if (audioCtx.state === "suspended") audioCtx.resume();
 
-  // 入力管理
-  const keys = { left: false, right: false, jump: false, jumpPressed: false };
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  const t = audioCtx.currentTime;
 
-  window.addEventListener("keydown", (e) => {
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space", " "].includes(e.key)) {
-      e.preventDefault();
-    }
-    if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") keys.left = true;
-    if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") keys.right = true;
-    if (e.key === "ArrowUp" || e.key === "w" || e.key === "W" || e.key === " ") {
-      if (!keys.jump) keys.jumpPressed = true;
-      keys.jump = true;
-    }
-    if (e.key === "r" || e.key === "R") {
-      if (!gameState.cleared) respawn();
-    }
+  if (type === "jump") {
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(480, t + 0.1);
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+    osc.start(t);
+    osc.stop(t + 0.11);
+  } else if (type === "walljump") {
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(340, t);
+    osc.frequency.exponentialRampToValueAtTime(760, t + 0.14);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  } else if (type === "slide") {
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(140, t);
+    osc.frequency.exponentialRampToValueAtTime(70, t + 0.16);
+    gain.gain.setValueAtTime(0.06, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
+    osc.start(t);
+    osc.stop(t + 0.17);
+  } else if (type === "pad") {
+    osc.type = "square";
+    osc.frequency.setValueAtTime(280, t);
+    osc.frequency.exponentialRampToValueAtTime(920, t + 0.22);
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+    osc.start(t);
+    osc.stop(t + 0.24);
+  } else if (type === "caught") {
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.linearRampToValueAtTime(65, t + 0.35);
+    gain.gain.setValueAtTime(0.14, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.36);
+    osc.start(t);
+    osc.stop(t + 0.36);
+  }
+}
+
+let trickTimer = 0;
+function showTrick(text) {
+  trickFeed.textContent = text;
+  trickFeed.classList.add("show");
+  trickTimer = 1.1;
+}
+
+// ==========================================
+// Three.js シーン構築
+// ==========================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1220);
+scene.fog = new THREE.Fog(0x0b1220, 35, 115);
+
+const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// ライト
+const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.9);
+scene.add(hemiLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
+dirLight.position.set(28, 48, 22);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.left = -55;
+dirLight.shadow.camera.right = 55;
+dirLight.shadow.camera.top = 55;
+dirLight.shadow.camera.bottom = -55;
+scene.add(dirLight);
+
+// ==========================================
+// マップ構築（AABBコライダー付き）
+// ==========================================
+const colliders = []; // { minX, maxX, minY, maxY, minZ, maxZ, isWallRun }
+const jumpPads = [];  // { x, y, z, radius }
+
+function addBox(x, y, z, w, h, d, color, options = {}) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const mat = new THREE.MeshStandardMaterial({
+    color,
+    roughness: options.roughness ?? 0.65,
+    metalness: options.metalness ?? 0.15,
   });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  mesh.receiveShadow = true;
+  mesh.castShadow = !options.noCast;
+  scene.add(mesh);
 
-  window.addEventListener("keyup", (e) => {
-    if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") keys.left = false;
-    if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") keys.right = false;
-    if (e.key === "ArrowUp" || e.key === "w" || e.key === "W" || e.key === " ") keys.jump = false;
+  colliders.push({
+    minX: x - w / 2,
+    maxX: x + w / 2,
+    minY: y - h / 2,
+    maxY: y + h / 2,
+    minZ: z - d / 2,
+    maxZ: z + d / 2,
+    isWallRun: Boolean(options.wallRun),
   });
+  return mesh;
+}
 
-  // タッチ操作バインド
-  function bindTouch(id, onDown, onUp) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      onDown();
-    });
-    const end = (e) => {
-      e.preventDefault();
-      onUp();
-    };
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointerleave", end);
-    el.addEventListener("pointercancel", end);
-  }
-  bindTouch("btn-left", () => (keys.left = true), () => (keys.left = false));
-  bindTouch("btn-right", () => (keys.right = true), () => (keys.right = false));
-  bindTouch(
-    "btn-jump",
-    () => {
-      if (!keys.jump) keys.jumpPressed = true;
-      keys.jump = true;
-    },
-    () => (keys.jump = false)
-  );
-
-  retryBtn.addEventListener("click", () => {
-    if (!gameState.cleared) respawn();
+function addJumpPad(x, y, z) {
+  const geo = new THREE.CylinderGeometry(1.7, 1.9, 0.25, 24);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x22c55e,
+    emissive: 0x15803d,
+    emissiveIntensity: 0.7,
   });
+  const pad = new THREE.Mesh(geo, mat);
+  pad.position.set(x, y + 0.12, z);
+  scene.add(pad);
+  jumpPads.push({ x, y: y + 0.12, z, radius: 1.85 });
+}
 
-  muteBtn.addEventListener("click", () => {
-    muted = !muted;
-    muteBtn.textContent = muted ? "音: OFF" : "音: ON";
-  });
+function buildArena() {
+  // 床（グリッド付き）
+  addBox(0, -0.5, 0, 90, 1, 90, 0x1e293b, { noCast: true, roughness: 0.85 });
+  const grid = new THREE.GridHelper(90, 45, 0x38bdf8, 0x334155);
+  grid.position.y = 0.02;
+  scene.add(grid);
 
-  restartAllBtn.addEventListener("click", () => {
-    resetAll();
-  });
+  // 外周の壁
+  addBox(0, 6, -45, 90, 12, 1, 0x334155, { wallRun: true });
+  addBox(0, 6, 45, 90, 12, 1, 0x334155, { wallRun: true });
+  addBox(-45, 6, 0, 1, 12, 90, 0x334155, { wallRun: true });
+  addBox(45, 6, 0, 1, 12, 90, 0x334155, { wallRun: true });
 
-  // ==========================================
-  // ゲーム状態とステージ構築
-  // ==========================================
-  const gameState = {
-    deaths: 0,
-    startTime: performance.now(),
-    elapsed: 0,
-    cleared: false,
-    checkpointReached: false,
-    spawnX: 80,
-    spawnY: 360,
-    cameraX: 0,
-    message: "",
-    messageTimer: 0,
-    deathTimer: 0,
-    confetti: [],
-  };
+  // 中央タワー＆周囲の高台
+  addBox(0, 2.5, 0, 8, 5, 8, 0x475569, { wallRun: true });
+  addBox(0, 6.2, 0, 4, 2.4, 4, 0x64748b, { wallRun: true });
 
-  let player = null;
-  let blocks = [];
-  let enemies = [];
-  let spikes = [];
-  let clouds = [];
-  let checkpoint = null;
-  let goal = null;
+  // ウォールラン用の紫の大型パネル（4方向に配置）
+  addBox(-16, 4.5, -14, 1.2, 9, 20, 0x7e22ce, { wallRun: true });
+  addBox(16, 4.5, 14, 1.2, 9, 20, 0x7e22ce, { wallRun: true });
+  addBox(14, 4.5, -18, 20, 9, 1.2, 0x7e22ce, { wallRun: true });
+  addBox(-14, 4.5, 18, 20, 9, 1.2, 0x7e22ce, { wallRun: true });
 
-  function showMessage(text, frames = 110) {
-    gameState.message = text;
-    gameState.messageTimer = frames;
+  // アスレチック足場（段差ジャンプ＆バニホ用）
+  const platforms = [
+    [-12, 1.2, 0, 6, 2.4, 6, 0x0284c7],
+    [12, 1.2, 0, 6, 2.4, 6, 0x0284c7],
+    [0, 1.2, -12, 6, 2.4, 6, 0x0284c7],
+    [0, 1.2, 12, 6, 2.4, 6, 0x0284c7],
+
+    [-26, 2.5, -24, 8, 5, 8, 0x3b82f6],
+    [26, 2.5, 24, 8, 5, 8, 0x3b82f6],
+    [26, 2.5, -24, 8, 5, 8, 0x3b82f6],
+    [-26, 2.5, 24, 8, 5, 8, 0x3b82f6],
+
+    // 空中ブリッジ
+    [-26, 5.2, 0, 5, 0.8, 16, 0x0ea5e9],
+    [26, 5.2, 0, 5, 0.8, 16, 0x0ea5e9],
+    [0, 5.2, -26, 16, 0.8, 5, 0x0ea5e9],
+    [0, 5.2, 26, 16, 0.8, 5, 0x0ea5e9],
+
+    // スライディングでくぐれるゲート
+    [-8, 3.0, -26, 1.5, 3.4, 6, 0xf59e0b],
+    [8, 3.0, 26, 1.5, 3.4, 6, 0xf59e0b],
+  ];
+
+  for (const [x, y, z, w, h, d, color] of platforms) {
+    addBox(x, y, z, w, h, d, color, { wallRun: true });
   }
 
-  function addGround(startTile, endTile, yTile = 10) {
-    for (let tx = startTile; tx <= endTile; tx++) {
-      blocks.push({
-        x: tx * TILE,
-        y: yTile * TILE,
-        w: TILE,
-        h: TILE * 2,
-        type: "ground",
-        solid: true,
-        visible: true,
-      });
+  // ジャンプパッド（4隅＋中央付近）
+  addJumpPad(-10, 0, -10);
+  addJumpPad(10, 0, 10);
+  addJumpPad(10, 0, -10);
+  addJumpPad(-10, 0, 10);
+  addJumpPad(-32, 0, 0);
+  addJumpPad(32, 0, 0);
+}
+
+buildArena();
+
+// ==========================================
+// 鬼（AIボット）の作成
+// ==========================================
+const oniGroup = new THREE.Group();
+const oniBody = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.6, 1.1, 8, 16),
+  new THREE.MeshStandardMaterial({
+    color: 0xef4444,
+    emissive: 0x991b1b,
+    emissiveIntensity: 0.6,
+  })
+);
+oniBody.position.y = 1.15;
+oniBody.castShadow = true;
+oniGroup.add(oniBody);
+
+// 鬼の目（光る）
+const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), eyeMat);
+leftEye.position.set(-0.22, 1.55, 0.52);
+const rightEye = leftEye.clone();
+rightEye.position.x = 0.22;
+oniGroup.add(leftEye, rightEye);
+
+scene.add(oniGroup);
+
+const oni = {
+  pos: new THREE.Vector3(0, 1, -34),
+  vel: new THREE.Vector3(),
+  onGround: false,
+  baseSpeed: 9.2,
+  jumpCooldown: 0,
+};
+
+// ==========================================
+// プレイヤー状態＆入力
+// ==========================================
+const player = {
+  pos: new THREE.Vector3(0, 2, 32),
+  vel: new THREE.Vector3(),
+  yaw: 0,
+  pitch: 0,
+  onGround: false,
+  currentHeight: CONFIG.standHeight,
+  isSliding: false,
+  slideTimer: 0,
+  slideCooldown: 0,
+  isWallRunning: false,
+  wallNormal: new THREE.Vector3(),
+  wallTilt: 0,
+  jumpBuffer: 0,
+  coyoteTimer: 0,
+};
+
+const game = {
+  active: false,
+  over: false,
+  elapsed: 0,
+  best: Number(localStorage.getItem("parkour_tag_best") || 0),
+  nearMissCount: 0,
+  nearMissCooldown: 0,
+};
+bestDisplay.textContent = game.best.toFixed(1);
+
+const keys = {};
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (e.code === "Space") {
+    player.jumpBuffer = 0.14;
+  }
+  if (e.code === "KeyR" && (game.active || game.over)) {
+    resetMatch();
+  }
+});
+window.addEventListener("keyup", (e) => {
+  keys[e.code] = false;
+});
+
+// PointerLock（FPS視点）
+startBtn.addEventListener("click", () => {
+  if (game.over) {
+    resetMatch();
+  }
+  document.body.requestPointerLock();
+});
+
+document.addEventListener("pointerlockchange", () => {
+  const locked = document.pointerLockElement === document.body;
+  if (locked) {
+    overlay.classList.add("hidden");
+    game.active = true;
+  } else {
+    game.active = false;
+    if (!game.over) {
+      modalTitle.textContent = "一時停止";
+      modalDesc.innerHTML = "クリックすると再開します。<br />Rキーでいつでもリトライできます。";
+      startBtn.textContent = "再開する";
+      overlay.classList.remove("hidden");
     }
   }
+});
 
-  function buildStage() {
-    blocks = [];
-    enemies = [];
-    spikes = [];
-    clouds = [];
+document.addEventListener("mousemove", (e) => {
+  if (!game.active) return;
+  player.yaw -= e.movementX * CONFIG.mouseSensitivity;
+  player.pitch -= e.movementY * CONFIG.mouseSensitivity;
+  player.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, player.pitch));
+});
 
-    // 地面セクション（穴の場所はあえて空ける）
-    addGround(0, 7);    // スタート〜穴1の手前 (0〜320)
-    addGround(11, 20);  // 穴1の後〜落ちる床の手前 (440〜840)
-    addGround(28, 45);  // 中間〜穴2の手前 (1120〜1840)
-    addGround(49, 65);  // ゴールエリア (1960〜2640)
+function resetMatch() {
+  player.pos.set(0, 2, 32);
+  player.vel.set(0, 0, 0);
+  player.yaw = 0;
+  player.pitch = 0;
+  player.isSliding = false;
+  player.slideTimer = 0;
+  player.slideCooldown = 0;
+  player.isWallRunning = false;
 
-    // --- 罠1: 最初の穴の手前にある「見えないブロック（孔明の罠）」 ---
-    blocks.push({
-      x: 320,
-      y: 280,
-      w: TILE,
-      h: TILE,
-      type: "hidden",
-      solid: false,
-      visible: false,
-      revealed: false,
-    });
+  oni.pos.set(0, 1, -34);
+  oni.vel.set(0, 0, 0);
+  oni.jumpCooldown = 0;
 
-    // --- 罠2: 叩くとドクロが出てくる「？」ブロック ---
-    blocks.push({
-      x: 560,
-      y: 280,
-      w: TILE,
-      h: TILE,
-      type: "question",
-      solid: true,
-      visible: true,
-      used: false,
-    });
+  game.elapsed = 0;
+  game.over = false;
+  game.nearMissCount = 0;
+  game.nearMissCooldown = 0;
+  nearmissDisplay.textContent = "0";
+}
 
-    // 普通の敵（踏めば倒せる）
-    enemies.push({
-      x: 740,
-      y: 368,
-      w: 32,
-      h: 32,
-      vx: -1.6,
-      vy: 0,
-      type: "walker",
-      alive: true,
-    });
+// ==========================================
+// 衝突判定＆移動解決（AABB）
+// ==========================================
+function resolveCollisions(pos, vel, radius, height) {
+  let onGround = false;
+  let hitWallNormal = null;
 
-    // --- 罠3: 踏むとすぐ落ちる床（2枚×2セット） ---
-    const fallingPositions = [880, 920, 1000, 1040];
-    fallingPositions.forEach((fx) => {
-      blocks.push({
-        x: fx,
-        y: 400,
-        w: TILE,
-        h: 24,
-        type: "falling",
-        solid: true,
-        visible: true,
-        triggered: false,
-        delay: 8,
-        vy: 0,
-      });
-    });
+  for (const c of colliders) {
+    // Y軸重なりチェック
+    const minY = pos.y;
+    const maxY = pos.y + height;
+    if (maxY <= c.minY || minY >= c.maxY) continue;
 
-    // 中間チェックポイント（本物）
-    checkpoint = {
-      x: 1240,
-      y: 320,
-      w: 24,
-      h: 80,
-      activated: gameState.checkpointReached,
-    };
+    // XZ軸の最寄り点
+    const closestX = Math.max(c.minX, Math.min(pos.x, c.maxX));
+    const closestZ = Math.max(c.minZ, Math.min(pos.z, c.maxZ));
+    const dx = pos.x - closestX;
+    const dz = pos.z - closestZ;
+    const distSq = dx * dx + dz * dz;
 
-    // --- 罠4: チェックポイント直後の「地面から飛び出す隠しトゲ」 ---
-    spikes.push({
-      x: 1360,
-      y: 400,
-      baseY: 400,
-      targetY: 368,
-      w: 36,
-      h: 32,
-      triggerX: 1300,
-      triggered: false,
-      active: false,
-    });
-
-    // --- 罠5: 背景の雲がニヤッと笑って落下してくる ---
-    clouds.push(
-      { x: 220, y: 80, w: 72, h: 42, isTrap: false },
-      { x: 960, y: 70, w: 72, h: 42, isTrap: false },
-      {
-        x: 1580,
-        y: 95,
-        w: 72,
-        h: 44,
-        isTrap: true,
-        triggerX: 1515,
-        triggered: false,
-        vy: 0,
-      },
-      { x: 2120, y: 75, w: 72, h: 42, isTrap: false }
-    );
-
-    // ちょっとした高台（x=1720〜1800）
-    blocks.push(
-      { x: 1720, y: 320, w: TILE, h: TILE, type: "brick", solid: true, visible: true },
-      { x: 1760, y: 320, w: TILE, h: TILE, type: "brick", solid: true, visible: true }
-    );
-
-    // --- 罠6: 2個目の「見えないブロック」 ---
-    blocks.push({
-      x: 1880,
-      y: 260,
-      w: TILE,
-      h: TILE,
-      type: "hidden",
-      solid: false,
-      visible: false,
-      revealed: false,
-    });
-
-    // --- 罠7: 近づくと右へ逃げるゴールポール＆元の位置にトゲ出現 ---
-    goal = {
-      x: 2320,
-      y: 200,
-      w: 16,
-      h: 200,
-      escaped: false,
-      escaping: false,
-      targetX: 2470,
-      triggerX: 2245,
-    };
-
-    spikes.push({
-      x: 2310,
-      y: 400,
-      baseY: 400,
-      targetY: 368,
-      w: 36,
-      h: 32,
-      triggerX: 2245,
-      triggered: false,
-      active: false,
-    });
-
-    player = {
-      x: gameState.spawnX,
-      y: gameState.spawnY,
-      w: 30,
-      h: 34,
-      vx: 0,
-      vy: 0,
-      onGround: false,
-      facing: 1,
-      dead: false,
-    };
-  }
-
-  function respawn() {
-    gameState.deathTimer = 0;
-    buildStage();
-    keys.jumpPressed = false;
-  }
-
-  function resetAll() {
-    gameState.deaths = 0;
-    gameState.cleared = false;
-    gameState.checkpointReached = false;
-    gameState.spawnX = 80;
-    gameState.spawnY = 360;
-    gameState.startTime = performance.now();
-    gameState.elapsed = 0;
-    gameState.confetti = [];
-    deathCountEl.textContent = "0";
-    overlayEl.classList.add("hidden");
-    respawn();
-  }
-
-  function killPlayer(reasonText) {
-    if (player.dead || gameState.cleared) return;
-    player.dead = true;
-    player.vy = -10;
-    player.vx = 0;
-    gameState.deaths += 1;
-    deathCountEl.textContent = String(gameState.deaths);
-    gameState.deathTimer = 42;
-    playSound("die");
-    if (reasonText) showMessage(reasonText, 65);
-  }
-
-  function triggerClear() {
-    if (gameState.cleared) return;
-    gameState.cleared = true;
-    playSound("clear");
-    for (let i = 0; i < 80; i++) {
-      gameState.confetti.push({
-        x: Math.random() * canvas.width,
-        y: -Math.random() * 200,
-        vx: (Math.random() - 0.5) * 3,
-        vy: 2 + Math.random() * 3,
-        color: ["#ffd166", "#06d6a0", "#ef476f", "#118ab2", "#ffffff"][i % 5],
-        size: 5 + Math.random() * 6,
-      });
-    }
-    overlayTitleEl.textContent = "STAGE CLEAR!!";
-    overlayMessageEl.textContent =
-      `クリアタイム: ${gameState.elapsed.toFixed(1)} 秒\n` +
-      `死亡回数: ${gameState.deaths} 回\n\n` +
-      (gameState.deaths === 0
-        ? "まさかのノーミス！？ 達人すぎる！"
-        : gameState.deaths <= 5
-        ? "なかなかの反射神経！"
-        : "たくさんの罠に引っかかってくれてありがとう！");
-    overlayEl.classList.remove("hidden");
-  }
-
-  // 矩形当たり判定
-  function overlap(a, b) {
-    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-  }
-
-  // ==========================================
-  // 更新処理（毎フレーム実行）
-  // ==========================================
-  function update() {
-    if (!gameState.cleared) {
-      gameState.elapsed = (performance.now() - gameState.startTime) / 1000;
-      timerEl.textContent = gameState.elapsed.toFixed(1);
-    } else {
-      gameState.confetti.forEach((c) => {
-        c.x += c.vx;
-        c.y += c.vy;
-        if (c.y > canvas.height) c.y = -10;
-      });
-      return;
-    }
-
-    if (gameState.messageTimer > 0) gameState.messageTimer--;
-
-    // 死亡アニメーション後の自動爆速リトライ
-    if (player.dead) {
-      player.vy += GRAVITY;
-      player.y += player.vy;
-      gameState.deathTimer--;
-      if (gameState.deathTimer <= 0) {
-        respawn();
+    if (distSq < radius * radius) {
+      // 上面への着地判定
+      const prevBottom = pos.y - vel.y * 0.016;
+      if (vel.y <= 0 && pos.y >= c.maxY - 0.45 && prevBottom >= c.maxY - 0.55) {
+        pos.y = c.maxY;
+        vel.y = 0;
+        onGround = true;
+        continue;
       }
-      return;
-    }
-
-    // 左右移動
-    if (keys.left && !keys.right) {
-      player.vx = -MOVE_SPEED;
-      player.facing = -1;
-    } else if (keys.right && !keys.left) {
-      player.vx = MOVE_SPEED;
-      player.facing = 1;
-    } else {
-      player.vx = 0;
-    }
-
-    // ジャンプ
-    if (keys.jumpPressed && player.onGround) {
-      player.vy = JUMP_FORCE;
-      player.onGround = false;
-      playSound("jump");
-    }
-    keys.jumpPressed = false;
-
-    // 重力
-    player.vy = Math.min(player.vy + GRAVITY, MAX_FALL_SPEED);
-
-    // X方向移動＆衝突判定
-    player.x += player.vx;
-    if (player.x < 0) player.x = 0;
-    if (player.x + player.w > WORLD_WIDTH) player.x = WORLD_WIDTH - player.w;
-
-    for (const b of blocks) {
-      if (!b.solid) continue;
-      if (overlap(player, b)) {
-        if (player.vx > 0) player.x = b.x - player.w;
-        else if (player.vx < 0) player.x = b.x + b.w;
+      // 天井への衝突
+      if (vel.y > 0 && maxY <= c.minY + 0.4) {
+        pos.y = c.minY - height;
+        vel.y = 0;
+        continue;
       }
-    }
 
-    // Y方向移動＆衝突判定
-    const prevY = player.y;
-    player.y += player.vy;
-    player.onGround = false;
-
-    for (const b of blocks) {
-      // 隠しブロック（下から頭をぶつけた瞬間だけ出現！）
-      if (b.type === "hidden" && !b.revealed) {
-        if (
-          player.vy < 0 &&
-          prevY >= b.y + b.h - 6 &&
-          overlap(player, b)
-        ) {
-          b.revealed = true;
-          b.solid = true;
-          b.visible = true;
-          player.y = b.y + b.h;
-          player.vy = 1.5;
-          playSound("trap");
-          showMessage("孔明の罠だ！！", 70);
-          continue;
+      // 横方向の押し出し
+      const dist = Math.sqrt(distSq);
+      if (dist > 0.0001) {
+        const overlap = radius - dist;
+        const nx = dx / dist;
+        const nz = dz / dist;
+        pos.x += nx * overlap;
+        pos.z += nz * overlap;
+        if (c.isWallRun) {
+          hitWallNormal = new THREE.Vector3(nx, 0, nz);
         }
-      }
-
-      if (!b.solid) continue;
-      if (overlap(player, b)) {
-        if (player.vy > 0) {
-          player.y = b.y - player.h;
-          player.vy = 0;
-          player.onGround = true;
-
-          // 落ちる床を踏んだ！
-          if (b.type === "falling" && !b.triggered) {
-            b.triggered = true;
-            playSound("trap");
-          }
-        } else if (player.vy < 0) {
-          player.y = b.y + b.h;
-          player.vy = 0;
-
-          // 「？」ブロックを叩いた！
-          if (b.type === "question" && !b.used) {
-            b.used = true;
-            playSound("trap");
-            showMessage("アイテムだと思った？ 残念ドクロでした！", 90);
-            enemies.push({
-              x: b.x + 4,
-              y: b.y - 34,
-              w: 32,
-              h: 32,
-              vx: -3.2,
-              vy: -5,
-              type: "skull",
-              alive: true,
-            });
-          }
-        }
-      }
-    }
-
-    // 落ちる床の更新
-    for (const b of blocks) {
-      if (b.type === "falling" && b.triggered) {
-        if (b.delay > 0) {
-          b.delay--;
-        } else {
-          b.vy += 0.55;
-          b.y += b.vy;
-        }
-      }
-    }
-
-    // 奈落への落下チェック
-    if (player.y > WORLD_HEIGHT + 40) {
-      killPlayer("穴に落ちた…");
-      return;
-    }
-
-    // チェックポイント判定
-    if (!checkpoint.activated && overlap(player, checkpoint)) {
-      checkpoint.activated = true;
-      gameState.checkpointReached = true;
-      gameState.spawnX = checkpoint.x - 10;
-      gameState.spawnY = 360;
-      playSound("checkpoint");
-      showMessage("CHECKPOINT!（ここは本当に安全）", 90);
-    }
-
-    // 隠しトゲの更新＆判定
-    for (const s of spikes) {
-      if (!s.triggered && player.x + player.w > s.triggerX) {
-        s.triggered = true;
-        s.active = true;
-        playSound("trap");
-      }
-      if (s.triggered && s.y > s.targetY) {
-        s.y = Math.max(s.targetY, s.y - 7);
-      }
-      if (s.active && overlap(player, { x: s.x + 4, y: s.y + 4, w: s.w - 8, h: s.h - 4 })) {
-        killPlayer("地面からトゲが！！");
-        return;
-      }
-    }
-
-    // 落下雲の更新＆判定
-    for (const c of clouds) {
-      if (!c.isTrap) continue;
-      if (!c.triggered && player.x + player.w > c.triggerX) {
-        c.triggered = true;
-        playSound("trap");
-        showMessage("雲が落ちてきた！？", 70);
-      }
-      if (c.triggered) {
-        c.vy = Math.min(c.vy + 0.65, 11);
-        c.y += c.vy;
-        if (overlap(player, { x: c.x + 6, y: c.y + 6, w: c.w - 12, h: c.h - 10 })) {
-          killPlayer("背景の雲にやられた！");
-          return;
-        }
-      }
-    }
-
-    // 敵の更新＆判定
-    for (const e of enemies) {
-      if (!e.alive) continue;
-      e.vy = Math.min(e.vy + GRAVITY, MAX_FALL_SPEED);
-      e.x += e.vx;
-      e.y += e.vy;
-
-      for (const b of blocks) {
-        if (!b.solid) continue;
-        if (overlap(e, b)) {
-          if (e.vy > 0 && e.y + e.h - e.vy <= b.y + 10) {
-            e.y = b.y - e.h;
-            e.vy = 0;
-          } else {
-            e.vx *= -1;
-          }
-        }
-      }
-
-      if (overlap(player, e)) {
-        // 普通の敵は上から踏めば倒せる、ドクロは踏んでも死ぬ！
-        if (e.type === "walker" && player.vy > 0 && player.y + player.h - player.vy <= e.y + 14) {
-          e.alive = false;
-          player.vy = -9;
-          playSound("jump");
-        } else {
-          killPlayer(e.type === "skull" ? "ドクロは踏んでもダメ！" : "敵にぶつかった！");
-          return;
-        }
-      }
-    }
-
-    // 逃げるゴールポールの更新＆クリア判定
-    if (!goal.escaped && player.x + player.w > goal.triggerX) {
-      goal.escaped = true;
-      goal.escaping = true;
-      playSound("trap");
-      showMessage("ゴールが逃げた！？", 80);
-    }
-    if (goal.escaping) {
-      goal.x += 9;
-      if (goal.x >= goal.targetX) {
-        goal.x = goal.targetX;
-        goal.escaping = false;
-      }
-    }
-    if (overlap(player, { x: goal.x - 4, y: goal.y, w: goal.w + 8, h: goal.h })) {
-      triggerClear();
-    }
-
-    // カメラ追従
-    const targetCamX = player.x - canvas.width * 0.35;
-    gameState.cameraX = Math.max(0, Math.min(WORLD_WIDTH - canvas.width, targetCamX));
-  }
-
-  // ==========================================
-  // 描画処理
-  // ==========================================
-  function draw() {
-    // 空の背景
-    ctx.fillStyle = "#7ec8ff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.save();
-    ctx.translate(-Math.floor(gameState.cameraX), 0);
-
-    // 遠景の丘
-    ctx.fillStyle = "#8ce08a";
-    for (let x = 100; x < WORLD_WIDTH; x += 480) {
-      ctx.beginPath();
-      ctx.arc(x, 420, 120, Math.PI, 0);
-      ctx.fill();
-    }
-
-    // 雲（普通の雲と罠の雲）
-    for (const c of clouds) {
-      drawCloud(c);
-    }
-
-    // チェックポイント旗
-    ctx.fillStyle = "#e2e8f0";
-    ctx.fillRect(checkpoint.x + 8, checkpoint.y, 6, checkpoint.h);
-    ctx.fillStyle = checkpoint.activated ? "#06d6a0" : "#94a3b8";
-    ctx.beginPath();
-    ctx.moveTo(checkpoint.x + 14, checkpoint.y + 4);
-    ctx.lineTo(checkpoint.x + 48, checkpoint.y + 18);
-    ctx.lineTo(checkpoint.x + 14, checkpoint.y + 32);
-    ctx.closePath();
-    ctx.fill();
-
-    // ゴールポール
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
-    ctx.fillStyle = "#ffd166";
-    ctx.beginPath();
-    ctx.arc(goal.x + goal.w / 2, goal.y, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#ef476f";
-    ctx.beginPath();
-    ctx.moveTo(goal.x + goal.w, goal.y + 14);
-    ctx.lineTo(goal.x + goal.w + 46, goal.y + 30);
-    ctx.lineTo(goal.x + goal.w, goal.y + 46);
-    ctx.closePath();
-    ctx.fill();
-
-    // トゲ
-    for (const s of spikes) {
-      if (!s.active) continue;
-      ctx.fillStyle = "#d90429";
-      const count = 3;
-      const sw = s.w / count;
-      for (let i = 0; i < count; i++) {
-        ctx.beginPath();
-        ctx.moveTo(s.x + i * sw, s.y + s.h);
-        ctx.lineTo(s.x + i * sw + sw / 2, s.y);
-        ctx.lineTo(s.x + (i + 1) * sw, s.y + s.h);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-
-    // ブロック
-    for (const b of blocks) {
-      if (!b.visible) continue;
-      if (b.type === "ground") {
-        ctx.fillStyle = "#8d5524";
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.fillStyle = "#38b000";
-        ctx.fillRect(b.x, b.y, b.w, 10);
-        ctx.strokeStyle = "#6c3f19";
-        ctx.strokeRect(b.x, b.y, b.w, b.h);
-      } else if (b.type === "question") {
-        ctx.fillStyle = b.used ? "#8b8c89" : "#ffb703";
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.strokeStyle = "#333";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(b.x, b.y, b.w, b.h);
-        if (!b.used) {
-          ctx.fillStyle = "#111";
-          ctx.font = "bold 24px sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText("?", b.x + b.w / 2, b.y + 29);
-        }
-      } else if (b.type === "hidden") {
-        ctx.fillStyle = "#e0fbfc";
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.strokeStyle = "#3d5a80";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(b.x, b.y, b.w, b.h);
-      } else if (b.type === "falling") {
-        ctx.fillStyle = b.triggered ? "#f4a261" : "#c97b63";
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.strokeStyle = "#5c3317";
-        ctx.strokeRect(b.x, b.y, b.w, b.h);
       } else {
-        ctx.fillStyle = "#bc6c25";
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.strokeStyle = "#5c3317";
-        ctx.strokeRect(b.x, b.y, b.w, b.h);
-      }
-    }
-
-    // 敵
-    for (const e of enemies) {
-      if (!e.alive) continue;
-      if (e.type === "walker") {
-        ctx.fillStyle = "#9d4edd";
-        ctx.beginPath();
-        ctx.arc(e.x + e.w / 2, e.y + e.h / 2, e.w / 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(e.x + 7, e.y + 9, 6, 6);
-        ctx.fillRect(e.x + 19, e.y + 9, 6, 6);
-        ctx.fillStyle = "#000";
-        ctx.fillRect(e.x + 8, e.y + 11, 3, 3);
-        ctx.fillRect(e.x + 20, e.y + 11, 3, 3);
-      } else if (e.type === "skull") {
-        ctx.fillStyle = "#e63946";
-        ctx.beginPath();
-        ctx.arc(e.x + e.w / 2, e.y + e.h / 2, e.w / 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 18px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("×", e.x + e.w / 2, e.y + 22);
-      }
-    }
-
-    // プレイヤー（しょぼん風キャラ）
-    drawPlayer(player);
-
-    ctx.restore();
-
-    // 画面上部のツッコミメッセージ
-    if (gameState.messageTimer > 0 && gameState.message) {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-      ctx.fillRect(canvas.width / 2 - 210, 16, 420, 36);
-      ctx.fillStyle = "#ffd166";
-      ctx.font = "bold 16px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(gameState.message, canvas.width / 2, 40);
-    }
-
-    // クリア時の紙吹雪
-    if (gameState.cleared) {
-      for (const c of gameState.confetti) {
-        ctx.fillStyle = c.color;
-        ctx.fillRect(c.x, c.y, c.size, c.size);
+        // 完全にめり込んだ場合の簡易押し出し
+        pos.y = c.maxY;
+        vel.y = 0;
+        onGround = true;
       }
     }
   }
 
-  function drawCloud(c) {
-    ctx.fillStyle = c.triggered ? "#ffd6e0" : "#ffffff";
-    ctx.beginPath();
-    ctx.arc(c.x + 18, c.y + 24, 16, 0, Math.PI * 2);
-    ctx.arc(c.x + 36, c.y + 18, 20, 0, Math.PI * 2);
-    ctx.arc(c.x + 54, c.y + 24, 16, 0, Math.PI * 2);
-    ctx.fill();
+  return { onGround, hitWallNormal };
+}
 
-    // 罠が発動したら怖い顔になる
-    if (c.triggered) {
-      ctx.fillStyle = "#d90429";
-      ctx.font = "bold 16px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(">皿<", c.x + 36, c.y + 28);
+function detectNearbyWall(pos, radius, height) {
+  const probe = radius + 0.35;
+  for (const c of colliders) {
+    if (!c.isWallRun) continue;
+    if (pos.y + height <= c.minY + 0.2 || pos.y >= c.maxY - 0.2) continue;
+    const closestX = Math.max(c.minX, Math.min(pos.x, c.maxX));
+    const closestZ = Math.max(c.minZ, Math.min(pos.z, c.maxZ));
+    const dx = pos.x - closestX;
+    const dz = pos.z - closestZ;
+    const distSq = dx * dx + dz * dz;
+    if (distSq < probe * probe && distSq > 0.0001) {
+      const dist = Math.sqrt(distSq);
+      return new THREE.Vector3(dx / dist, 0, dz / dist);
+    }
+  }
+  return null;
+}
+
+// ==========================================
+// プレイヤー更新（キャラコンの心臓部）
+// ==========================================
+function updatePlayer(dt) {
+  // 入力方向ベクトル
+  const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+  const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+
+  const wishDir = new THREE.Vector3();
+  if (keys["KeyW"]) wishDir.add(forward);
+  if (keys["KeyS"]) wishDir.sub(forward);
+  if (keys["KeyD"]) wishDir.add(right);
+  if (keys["KeyA"]) wishDir.sub(right);
+  if (wishDir.lengthSq() > 0) wishDir.normalize();
+
+  // クールタイム更新
+  if (player.slideCooldown > 0) player.slideCooldown -= dt;
+  if (player.jumpBuffer > 0) player.jumpBuffer -= dt;
+  if (player.onGround) player.coyoteTimer = 0.12;
+  else player.coyoteTimer -= dt;
+
+  // スライディング開始
+  const slideKey = keys["ShiftLeft"] || keys["ShiftRight"] || keys["KeyC"];
+  const horizVel = new THREE.Vector3(player.vel.x, 0, player.vel.z);
+  const currentSpeed = horizVel.length();
+
+  if (
+    slideKey &&
+    player.onGround &&
+    !player.isSliding &&
+    player.slideCooldown <= 0 &&
+    currentSpeed > 4.5
+  ) {
+    player.isSliding = true;
+    player.slideTimer = CONFIG.slideDuration;
+    player.slideCooldown = CONFIG.slideCooldown;
+    const dir = wishDir.lengthSq() > 0 ? wishDir : horizVel.clone().normalize();
+    const boost = Math.max(currentSpeed + 3.5, CONFIG.slideBoost);
+    player.vel.x = dir.x * Math.min(boost, CONFIG.maxSpeed);
+    player.vel.z = dir.z * Math.min(boost, CONFIG.maxSpeed);
+    playSfx("slide");
+    showTrick("SLIDE BOOST!");
+  }
+
+  if (player.isSliding) {
+    player.slideTimer -= dt;
+    if (player.slideTimer <= 0 || !slideKey || !player.onGround) {
+      player.isSliding = false;
     }
   }
 
-  function drawPlayer(p) {
-    // 体
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#222222";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(p.x, p.y, p.w, p.h, 8);
-    ctx.fill();
-    ctx.stroke();
+  // 水平加速＆摩擦
+  if (player.onGround) {
+    const friction = player.isSliding ? CONFIG.slideFriction : CONFIG.groundFriction;
+    const speed = Math.hypot(player.vel.x, player.vel.z);
+    if (speed > 0.01) {
+      const drop = speed * friction * dt;
+      const newSpeed = Math.max(0, speed - drop);
+      player.vel.x *= newSpeed / speed;
+      player.vel.z *= newSpeed / speed;
+    }
 
-    // 耳っぽい突起
-    ctx.beginPath();
-    ctx.moveTo(p.x + 4, p.y + 2);
-    ctx.lineTo(p.x + 8, p.y - 6);
-    ctx.lineTo(p.x + 12, p.y + 2);
-    ctx.moveTo(p.x + p.w - 12, p.y + 2);
-    ctx.lineTo(p.x + p.w - 8, p.y - 6);
-    ctx.lineTo(p.x + p.w - 4, p.y + 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // 表情
-    ctx.fillStyle = "#222222";
-    ctx.font = "bold 12px sans-serif";
-    ctx.textAlign = "center";
-    const face = p.dead ? "×_×" : "・ω・";
-    ctx.fillText(face, p.x + p.w / 2 + p.facing * 2, p.y + 21);
+    if (!player.isSliding && wishDir.lengthSq() > 0) {
+      player.vel.x += wishDir.x * CONFIG.groundAccel * dt;
+      player.vel.z += wishDir.z * CONFIG.groundAccel * dt;
+      const sp = Math.hypot(player.vel.x, player.vel.z);
+      if (sp > CONFIG.baseSpeed && !player.isSliding) {
+        // バニホ直後の速度を急激に殺さないよう緩やかに制限
+        const target = Math.max(CONFIG.baseSpeed, sp - 12 * dt);
+        player.vel.x *= target / sp;
+        player.vel.z *= target / sp;
+      }
+    }
+  } else {
+    // 空中ストレイフ（バニホの気持ちよさ）
+    if (wishDir.lengthSq() > 0) {
+      player.vel.x += wishDir.x * CONFIG.airAccel * dt;
+      player.vel.z += wishDir.z * CONFIG.airAccel * dt;
+      const sp = Math.hypot(player.vel.x, player.vel.z);
+      if (sp > CONFIG.maxSpeed) {
+        player.vel.x *= CONFIG.maxSpeed / sp;
+        player.vel.z *= CONFIG.maxSpeed / sp;
+      }
+    }
   }
 
-  function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
+  // ウォールラン判定（空中で壁に近い＋前進中）
+  player.isWallRunning = false;
+  if (!player.onGround && keys["KeyW"] && Math.hypot(player.vel.x, player.vel.z) > 5.0) {
+    const wallN = detectNearbyWall(player.pos, CONFIG.playerRadius, player.currentHeight);
+    if (wallN) {
+      player.isWallRunning = true;
+      player.wallNormal.copy(wallN);
+      if (player.vel.y < -1.5) player.vel.y = -1.5;
+
+      // 壁に沿う方向へ速度を補正
+      const along = forward.clone().projectOnPlane(wallN).normalize();
+      if (along.lengthSq() > 0.1) {
+        const sp = Math.max(Math.hypot(player.vel.x, player.vel.z), CONFIG.wallRunSpeed);
+        player.vel.x = along.x * Math.min(sp, CONFIG.maxSpeed);
+        player.vel.z = along.z * Math.min(sp, CONFIG.maxSpeed);
+      }
+    }
   }
 
-  buildStage();
-  loop();
-})();
+  // ジャンプ / バニホ / 壁キック
+  if (player.jumpBuffer > 0) {
+    if (player.coyoteTimer > 0) {
+      player.vel.y = CONFIG.jumpForce;
+      player.onGround = false;
+      player.coyoteTimer = 0;
+      player.jumpBuffer = 0;
+
+      // スライディングジャンプ or 高速バニホでさらに微加速
+      const sp = Math.hypot(player.vel.x, player.vel.z);
+      if (player.isSliding || sp > CONFIG.baseSpeed + 1.2) {
+        const boost = Math.min(sp + 1.8, CONFIG.maxSpeed);
+        const dir = new THREE.Vector3(player.vel.x, 0, player.vel.z).normalize();
+        player.vel.x = dir.x * boost;
+        player.vel.z = dir.z * boost;
+        showTrick(player.isSliding ? "SLIDE JUMP!" : "BUNNY HOP!");
+      }
+      player.isSliding = false;
+      playSfx("jump");
+    } else if (player.isWallRunning) {
+      // 壁キック！
+      player.vel.y = CONFIG.wallJumpUp;
+      player.vel.x += player.wallNormal.x * CONFIG.wallJumpPush;
+      player.vel.z += player.wallNormal.z * CONFIG.wallJumpPush;
+      player.isWallRunning = false;
+      player.jumpBuffer = 0;
+      playSfx("walljump");
+      showTrick("WALL KICK!");
+    }
+  }
+
+  // 重力
+  const grav = player.isWallRunning ? CONFIG.wallRunGravity : CONFIG.gravity;
+  player.vel.y -= grav * dt;
+
+  // 座標更新＆衝突解決
+  player.pos.x += player.vel.x * dt;
+  player.pos.y += player.vel.y * dt;
+  player.pos.z += player.vel.z * dt;
+
+  const targetH = player.isSliding ? CONFIG.slideHeight : CONFIG.standHeight;
+  player.currentHeight += (targetH - player.currentHeight) * Math.min(1, dt * 16);
+
+  const col = resolveCollisions(player.pos, player.vel, CONFIG.playerRadius, player.currentHeight);
+  player.onGround = col.onGround;
+
+  // ジャンプパッド判定
+  for (const pad of jumpPads) {
+    const dx = player.pos.x - pad.x;
+    const dz = player.pos.z - pad.z;
+    if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(player.pos.y - pad.y) < 1.1) {
+      player.vel.y = CONFIG.jumpPadForce;
+      player.onGround = false;
+      playSfx("pad");
+      showTrick("SUPER JUMP!");
+    }
+  }
+
+  // カメラ反映（スピード連動FOV＆ウォールラン傾き）
+  const speedNow = Math.hypot(player.vel.x, player.vel.z);
+  const targetFov = 78 + Math.min(18, Math.max(0, (speedNow - 10) * 1.4));
+  camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8);
+  camera.updateProjectionMatrix();
+
+  let targetTilt = 0;
+  if (player.isWallRunning) {
+    const side = right.dot(player.wallNormal);
+    targetTilt = side > 0 ? -0.18 : 0.18;
+  }
+  player.wallTilt += (targetTilt - player.wallTilt) * Math.min(1, dt * 10);
+
+  camera.position.set(player.pos.x, player.pos.y + player.currentHeight - 0.15, player.pos.z);
+  camera.rotation.order = "YXZ";
+  camera.rotation.y = player.yaw;
+  camera.rotation.x = player.pitch;
+  camera.rotation.z = player.wallTilt;
+
+  // HUD更新
+  speedDisplay.textContent = speedNow.toFixed(1);
+  if (player.isWallRunning) {
+    stateBadge.textContent = "WALL RUN";
+    stateBadge.className = "wallrun";
+  } else if (player.isSliding) {
+    stateBadge.textContent = "SLIDING";
+    stateBadge.className = "slide";
+  } else if (!player.onGround) {
+    stateBadge.textContent = "AIR";
+    stateBadge.className = "air";
+  } else {
+    stateBadge.textContent = "RUN";
+    stateBadge.className = "";
+  }
+}
+
+// ==========================================
+// 鬼（AI）の追跡更新
+// ==========================================
+function updateOni(dt) {
+  // 時間経過で少しずつ速くなる
+  const currentOniSpeed = oni.baseSpeed + Math.min(4.8, game.elapsed * 0.08);
+
+  const toPlayer = new THREE.Vector3(
+    player.pos.x - oni.pos.x,
+    0,
+    player.pos.z - oni.pos.z
+  );
+  const distHoriz = toPlayer.length();
+  if (distHoriz > 0.01) toPlayer.divideScalar(distHoriz);
+
+  oni.vel.x = toPlayer.x * currentOniSpeed;
+  oni.vel.z = toPlayer.z * currentOniSpeed;
+  oni.vel.y -= CONFIG.gravity * dt;
+
+  if (oni.jumpCooldown > 0) oni.jumpCooldown -= dt;
+
+  const prevX = oni.pos.x;
+  const prevZ = oni.pos.z;
+
+  oni.pos.x += oni.vel.x * dt;
+  oni.pos.y += oni.vel.y * dt;
+  oni.pos.z += oni.vel.z * dt;
+
+  const col = resolveCollisions(oni.pos, oni.vel, 0.65, 1.9);
+  oni.onGround = col.onGround;
+
+  // 壁に引っかかったりプレイヤーが高い場所にいるときはジャンプ
+  const moved = Math.hypot(oni.pos.x - prevX, oni.pos.z - prevZ);
+  if (
+    oni.onGround &&
+    oni.jumpCooldown <= 0 &&
+    (moved < currentOniSpeed * dt * 0.45 || player.pos.y > oni.pos.y + 1.4)
+  ) {
+    oni.vel.y = 12.2;
+    oni.jumpCooldown = 0.65;
+  }
+
+  oniGroup.position.copy(oni.pos);
+  oniGroup.lookAt(player.pos.x, oni.pos.y, player.pos.z);
+
+  // 距離＆捕獲・ニアミス判定
+  const totalDist = oni.pos.distanceTo(player.pos);
+  distDisplay.textContent = totalDist.toFixed(1);
+
+  if (game.nearMissCooldown > 0) game.nearMissCooldown -= dt;
+  if (totalDist < 3.4 && totalDist > 1.55 && game.nearMissCooldown <= 0) {
+    game.nearMissCount += 1;
+    game.nearMissCooldown = 1.8;
+    nearmissDisplay.textContent = String(game.nearMissCount);
+    showTrick("NEAR MISS!! +1");
+  }
+
+  if (totalDist < 1.45) {
+    triggerGameOver();
+  }
+}
+
+function triggerGameOver() {
+  game.over = true;
+  game.active = false;
+  playSfx("caught");
+
+  if (game.elapsed > game.best) {
+    game.best = game.elapsed;
+    localStorage.setItem("parkour_tag_best", game.best.toFixed(2));
+    bestDisplay.textContent = game.best.toFixed(1);
+  }
+
+  document.exitPointerLock?.();
+  modalTitle.textContent = "鬼に捕まった！";
+  modalDesc.innerHTML =
+    `生存時間: <strong>${game.elapsed.toFixed(1)} 秒</strong>（ベスト: ${game.best.toFixed(1)} 秒）<br />` +
+    `ニアミス回数: <strong>${game.nearMissCount} 回</strong>`;
+  startBtn.textContent = "もう一回逃げる";
+  overlay.classList.remove("hidden");
+}
+
+// ==========================================
+// メインループ
+// ==========================================
+let lastTime = performance.now();
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+
+  if (trickTimer > 0) {
+    trickTimer -= dt;
+    if (trickTimer <= 0) trickFeed.classList.remove("show");
+  }
+
+  if (game.active && !game.over) {
+    game.elapsed += dt;
+    timeDisplay.textContent = game.elapsed.toFixed(1);
+    updatePlayer(dt);
+    updateOni(dt);
+  }
+
+  renderer.render(scene, camera);
+}
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate(performance.now());
