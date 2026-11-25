@@ -7,6 +7,7 @@ const overlay = document.getElementById("overlay");
 const modalTitle = document.getElementById("modal-title");
 const modalDesc = document.getElementById("modal-desc");
 const startBtn = document.getElementById("start-btn");
+const modeToggleBtn = document.getElementById("mode-toggle-btn");
 
 const timeDisplay = document.getElementById("time-display");
 const bestDisplay = document.getElementById("best-display");
@@ -15,6 +16,16 @@ const distDisplay = document.getElementById("dist-display");
 const nearmissDisplay = document.getElementById("nearmiss-display");
 const stateBadge = document.getElementById("state-badge");
 const trickFeed = document.getElementById("trick-feed");
+const hudRetryBtn = document.getElementById("hud-retry-btn");
+const hudPauseBtn = document.getElementById("hud-pause-btn");
+
+const touchLayer = document.getElementById("touch-layer");
+const lookZone = document.getElementById("look-zone");
+const joystickZone = document.getElementById("joystick-zone");
+const joystickBase = document.getElementById("joystick-base");
+const joystickKnob = document.getElementById("joystick-knob");
+const btnJump = document.getElementById("btn-jump");
+const btnSlide = document.getElementById("btn-slide");
 
 // ==========================================
 // キャラコン調整パラメータ（ここをいじると操作感が激変します！）
@@ -40,17 +51,52 @@ const CONFIG = {
   standHeight: 1.8,
   slideHeight: 0.95,
   mouseSensitivity: 0.0022,
+  touchLookSensitivity: 0.0055,
 };
+
+// ==========================================
+// タッチモード判定＆切替
+// ==========================================
+const isCoarsePointer =
+  window.matchMedia("(pointer: coarse)").matches ||
+  "ontouchstart" in window ||
+  navigator.maxTouchPoints > 0;
+
+let controlMode = isCoarsePointer ? "touch" : "pc"; // "touch" | "pc"
+
+function applyControlMode() {
+  if (controlMode === "touch") {
+    document.body.classList.add("touch-mode");
+    touchLayer.classList.remove("hidden");
+    modeToggleBtn.textContent = "操作モード: スマホ（タッチ）";
+  } else {
+    document.body.classList.remove("touch-mode");
+    touchLayer.classList.add("hidden");
+    modeToggleBtn.textContent = "操作モード: PC（マウス＋キーボード）";
+  }
+}
+applyControlMode();
+
+modeToggleBtn.addEventListener("click", () => {
+  controlMode = controlMode === "touch" ? "pc" : "touch";
+  applyControlMode();
+});
 
 // ==========================================
 // 効果音（Web Audio API・外部ファイル不要）
 // ==========================================
 let audioCtx = null;
-function playSfx(type) {
+function ensureAudio() {
   if (!audioCtx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (AC) audioCtx = new AC();
   }
+  if (audioCtx && audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
+
+function playSfx(type) {
   if (!audioCtx) return;
   if (audioCtx.state === "suspended") audioCtx.resume();
 
@@ -118,32 +164,34 @@ scene.background = new THREE.Color(0x0b1220);
 scene.fog = new THREE.Fog(0x0b1220, 35, 115);
 
 const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerHeight, 0.1, 200);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !isCoarsePointer; // スマホでは影を軽くして60fps維持
 document.body.appendChild(renderer.domElement);
 
 // ライト
-const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.9);
+const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.95);
 scene.add(hemiLight);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
 dirLight.position.set(28, 48, 22);
-dirLight.castShadow = true;
-dirLight.shadow.mapSize.width = 2048;
-dirLight.shadow.mapSize.height = 2048;
-dirLight.shadow.camera.left = -55;
-dirLight.shadow.camera.right = 55;
-dirLight.shadow.camera.top = 55;
-dirLight.shadow.camera.bottom = -55;
+if (!isCoarsePointer) {
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.camera.left = -55;
+  dirLight.shadow.camera.right = 55;
+  dirLight.shadow.camera.top = 55;
+  dirLight.shadow.camera.bottom = -55;
+}
 scene.add(dirLight);
 
 // ==========================================
 // マップ構築（AABBコライダー付き）
 // ==========================================
-const colliders = []; // { minX, maxX, minY, maxY, minZ, maxZ, isWallRun }
-const jumpPads = [];  // { x, y, z, radius }
+const colliders = [];
+const jumpPads = [];
 
 function addBox(x, y, z, w, h, d, color, options = {}) {
   const geo = new THREE.BoxGeometry(w, h, d);
@@ -206,7 +254,7 @@ function buildArena() {
   addBox(14, 4.5, -18, 20, 9, 1.2, 0x7e22ce, { wallRun: true });
   addBox(-14, 4.5, 18, 20, 9, 1.2, 0x7e22ce, { wallRun: true });
 
-  // アスレチック足場（段差ジャンプ＆バニホ用）
+  // アスレチック足場
   const platforms = [
     [-12, 1.2, 0, 6, 2.4, 6, 0x0284c7],
     [12, 1.2, 0, 6, 2.4, 6, 0x0284c7],
@@ -233,7 +281,7 @@ function buildArena() {
     addBox(x, y, z, w, h, d, color, { wallRun: true });
   }
 
-  // ジャンプパッド（4隅＋中央付近）
+  // ジャンプパッド
   addJumpPad(-10, 0, -10);
   addJumpPad(10, 0, 10);
   addJumpPad(10, 0, -10);
@@ -260,7 +308,6 @@ oniBody.position.y = 1.15;
 oniBody.castShadow = true;
 oniGroup.add(oniBody);
 
-// 鬼の目（光る）
 const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
 const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), eyeMat);
 leftEye.position.set(-0.22, 1.55, 0.52);
@@ -279,7 +326,7 @@ const oni = {
 };
 
 // ==========================================
-// プレイヤー状態＆入力
+// プレイヤー状態＆入力（PC + スマホ両対応）
 // ==========================================
 const player = {
   pos: new THREE.Vector3(0, 2, 32),
@@ -308,6 +355,7 @@ const game = {
 };
 bestDisplay.textContent = game.best.toFixed(1);
 
+// PCキーボード入力
 const keys = {};
 window.addEventListener("keydown", (e) => {
   keys[e.code] = true;
@@ -322,32 +370,230 @@ window.addEventListener("keyup", (e) => {
   keys[e.code] = false;
 });
 
-// PointerLock（FPS視点）
+// スマホ・タッチ入力状態
+const touchInput = {
+  moveX: 0, // -1 (左) ~ +1 (右)
+  moveY: 0, // -1 (後) ~ +1 (前)
+  slideHeld: false,
+  joyTouchId: null,
+  joyCenterX: 0,
+  joyCenterY: 0,
+  lookTouchId: null,
+  lookLastX: 0,
+  lookLastY: 0,
+};
+
+const JOY_MAX_RADIUS = 42;
+
+function resetJoystickVisual() {
+  touchInput.moveX = 0;
+  touchInput.moveY = 0;
+  touchInput.joyTouchId = null;
+  joystickKnob.style.transform = "translate(0px, 0px)";
+}
+
+joystickZone.addEventListener(
+  "touchstart",
+  (e) => {
+    if (!game.active) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (touchInput.joyTouchId === null) {
+        touchInput.joyTouchId = t.identifier;
+        const rect = joystickBase.getBoundingClientRect();
+        touchInput.joyCenterX = rect.left + rect.width / 2;
+        touchInput.joyCenterY = rect.top + rect.height / 2;
+        updateJoystickFromPoint(t.clientX, t.clientY);
+        break;
+      }
+    }
+  },
+  { passive: false }
+);
+
+joystickZone.addEventListener(
+  "touchmove",
+  (e) => {
+    if (!game.active) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier === touchInput.joyTouchId) {
+        updateJoystickFromPoint(t.clientX, t.clientY);
+        break;
+      }
+    }
+  },
+  { passive: false }
+);
+
+function handleJoyEnd(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchInput.joyTouchId) {
+      resetJoystickVisual();
+      break;
+    }
+  }
+}
+joystickZone.addEventListener("touchend", handleJoyEnd);
+joystickZone.addEventListener("touchcancel", handleJoyEnd);
+
+function updateJoystickFromPoint(clientX, clientY) {
+  const dx = clientX - touchInput.joyCenterX;
+  const dy = clientY - touchInput.joyCenterY;
+  const dist = Math.hypot(dx, dy);
+  const clamped = Math.min(dist, JOY_MAX_RADIUS);
+  const angle = Math.atan2(dy, dx);
+  const kx = Math.cos(angle) * clamped;
+  const ky = Math.sin(angle) * clamped;
+
+  joystickKnob.style.transform = `translate(${kx}px, ${ky}px)`;
+  touchInput.moveX = kx / JOY_MAX_RADIUS;
+  touchInput.moveY = -ky / JOY_MAX_RADIUS; // 上方向が前進 (+1)
+}
+
+// 右画面スワイプ（視点移動）
+lookZone.addEventListener(
+  "touchstart",
+  (e) => {
+    if (!game.active) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (touchInput.lookTouchId === null) {
+        touchInput.lookTouchId = t.identifier;
+        touchInput.lookLastX = t.clientX;
+        touchInput.lookLastY = t.clientY;
+        break;
+      }
+    }
+  },
+  { passive: false }
+);
+
+lookZone.addEventListener(
+  "touchmove",
+  (e) => {
+    if (!game.active) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier === touchInput.lookTouchId) {
+        const dx = t.clientX - touchInput.lookLastX;
+        const dy = t.clientY - touchInput.lookLastY;
+        touchInput.lookLastX = t.clientX;
+        touchInput.lookLastY = t.clientY;
+
+        player.yaw -= dx * CONFIG.touchLookSensitivity;
+        player.pitch -= dy * CONFIG.touchLookSensitivity;
+        player.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, player.pitch));
+        break;
+      }
+    }
+  },
+  { passive: false }
+);
+
+function handleLookEnd(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchInput.lookTouchId) {
+      touchInput.lookTouchId = null;
+      break;
+    }
+  }
+}
+lookZone.addEventListener("touchend", handleLookEnd);
+lookZone.addEventListener("touchcancel", handleLookEnd);
+
+// タッチ用 JUMP / SLIDE ボタン
+btnJump.addEventListener(
+  "touchstart",
+  (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!game.active) return;
+    player.jumpBuffer = 0.16;
+    btnJump.classList.add("pressed");
+  },
+  { passive: false }
+);
+btnJump.addEventListener("touchend", () => btnJump.classList.remove("pressed"));
+btnJump.addEventListener("touchcancel", () => btnJump.classList.remove("pressed"));
+
+btnSlide.addEventListener(
+  "touchstart",
+  (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!game.active) return;
+    touchInput.slideHeld = true;
+    btnSlide.classList.add("pressed");
+  },
+  { passive: false }
+);
+function endSlideTouch() {
+  touchInput.slideHeld = false;
+  btnSlide.classList.remove("pressed");
+}
+btnSlide.addEventListener("touchend", endSlideTouch);
+btnSlide.addEventListener("touchcancel", endSlideTouch);
+
+// ==========================================
+// 開始・停止・リトライ管理
+// ==========================================
+function pauseGame() {
+  game.active = false;
+  resetJoystickVisual();
+  touchInput.slideHeld = false;
+  touchInput.lookTouchId = null;
+  if (!game.over) {
+    modalTitle.textContent = "一時停止";
+    modalDesc.innerHTML = "「再開する」を押すと戻ります。<br />操作モードの切り替えもできます。";
+    startBtn.textContent = "再開する";
+    overlay.classList.remove("hidden");
+  }
+}
+
 startBtn.addEventListener("click", () => {
+  ensureAudio();
   if (game.over) {
     resetMatch();
   }
-  document.body.requestPointerLock();
+  if (controlMode === "pc" && document.body.requestPointerLock) {
+    document.body.requestPointerLock();
+  } else {
+    overlay.classList.add("hidden");
+    game.active = true;
+  }
+});
+
+hudRetryBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  ensureAudio();
+  resetMatch();
+  overlay.classList.add("hidden");
+  game.active = true;
+});
+
+hudPauseBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  } else {
+    pauseGame();
+  }
 });
 
 document.addEventListener("pointerlockchange", () => {
+  if (controlMode !== "pc") return;
   const locked = document.pointerLockElement === document.body;
   if (locked) {
     overlay.classList.add("hidden");
     game.active = true;
   } else {
-    game.active = false;
-    if (!game.over) {
-      modalTitle.textContent = "一時停止";
-      modalDesc.innerHTML = "クリックすると再開します。<br />Rキーでいつでもリトライできます。";
-      startBtn.textContent = "再開する";
-      overlay.classList.remove("hidden");
-    }
+    pauseGame();
   }
 });
 
 document.addEventListener("mousemove", (e) => {
-  if (!game.active) return;
+  if (!game.active || controlMode !== "pc") return;
   player.yaw -= e.movementX * CONFIG.mouseSensitivity;
   player.pitch -= e.movementY * CONFIG.mouseSensitivity;
   player.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, player.pitch));
@@ -362,6 +608,10 @@ function resetMatch() {
   player.slideTimer = 0;
   player.slideCooldown = 0;
   player.isWallRunning = false;
+
+  resetJoystickVisual();
+  touchInput.slideHeld = false;
+  touchInput.lookTouchId = null;
 
   oni.pos.set(0, 1, -34);
   oni.vel.set(0, 0, 0);
@@ -382,12 +632,10 @@ function resolveCollisions(pos, vel, radius, height) {
   let hitWallNormal = null;
 
   for (const c of colliders) {
-    // Y軸重なりチェック
     const minY = pos.y;
     const maxY = pos.y + height;
     if (maxY <= c.minY || minY >= c.maxY) continue;
 
-    // XZ軸の最寄り点
     const closestX = Math.max(c.minX, Math.min(pos.x, c.maxX));
     const closestZ = Math.max(c.minZ, Math.min(pos.z, c.maxZ));
     const dx = pos.x - closestX;
@@ -395,7 +643,6 @@ function resolveCollisions(pos, vel, radius, height) {
     const distSq = dx * dx + dz * dz;
 
     if (distSq < radius * radius) {
-      // 上面への着地判定
       const prevBottom = pos.y - vel.y * 0.016;
       if (vel.y <= 0 && pos.y >= c.maxY - 0.45 && prevBottom >= c.maxY - 0.55) {
         pos.y = c.maxY;
@@ -403,14 +650,12 @@ function resolveCollisions(pos, vel, radius, height) {
         onGround = true;
         continue;
       }
-      // 天井への衝突
       if (vel.y > 0 && maxY <= c.minY + 0.4) {
         pos.y = c.minY - height;
         vel.y = 0;
         continue;
       }
 
-      // 横方向の押し出し
       const dist = Math.sqrt(distSq);
       if (dist > 0.0001) {
         const overlap = radius - dist;
@@ -422,7 +667,6 @@ function resolveCollisions(pos, vel, radius, height) {
           hitWallNormal = new THREE.Vector3(nx, 0, nz);
         }
       } else {
-        // 完全にめり込んだ場合の簡易押し出し
         pos.y = c.maxY;
         vel.y = 0;
         onGround = true;
@@ -434,7 +678,7 @@ function resolveCollisions(pos, vel, radius, height) {
 }
 
 function detectNearbyWall(pos, radius, height) {
-  const probe = radius + 0.35;
+  const probe = radius + 0.38;
   for (const c of colliders) {
     if (!c.isWallRun) continue;
     if (pos.y + height <= c.minY + 0.2 || pos.y >= c.maxY - 0.2) continue;
@@ -455,16 +699,24 @@ function detectNearbyWall(pos, radius, height) {
 // プレイヤー更新（キャラコンの心臓部）
 // ==========================================
 function updatePlayer(dt) {
-  // 入力方向ベクトル
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
 
-  const wishDir = new THREE.Vector3();
-  if (keys["KeyW"]) wishDir.add(forward);
-  if (keys["KeyS"]) wishDir.sub(forward);
-  if (keys["KeyD"]) wishDir.add(right);
-  if (keys["KeyA"]) wishDir.sub(right);
-  if (wishDir.lengthSq() > 0) wishDir.normalize();
+  // PCキー＋スマホスティックを統合
+  let inputForward = 0;
+  let inputRight = 0;
+  if (keys["KeyW"]) inputForward += 1;
+  if (keys["KeyS"]) inputForward -= 1;
+  if (keys["KeyD"]) inputRight += 1;
+  if (keys["KeyA"]) inputRight -= 1;
+
+  if (Math.abs(touchInput.moveY) > 0.12) inputForward += touchInput.moveY;
+  if (Math.abs(touchInput.moveX) > 0.12) inputRight += touchInput.moveX;
+
+  const wishDir = new THREE.Vector3()
+    .addScaledVector(forward, inputForward)
+    .addScaledVector(right, inputRight);
+  if (wishDir.lengthSq() > 1) wishDir.normalize();
 
   // クールタイム更新
   if (player.slideCooldown > 0) player.slideCooldown -= dt;
@@ -473,7 +725,8 @@ function updatePlayer(dt) {
   else player.coyoteTimer -= dt;
 
   // スライディング開始
-  const slideKey = keys["ShiftLeft"] || keys["ShiftRight"] || keys["KeyC"];
+  const slideKey =
+    keys["ShiftLeft"] || keys["ShiftRight"] || keys["KeyC"] || touchInput.slideHeld;
   const horizVel = new THREE.Vector3(player.vel.x, 0, player.vel.z);
   const currentSpeed = horizVel.length();
 
@@ -487,7 +740,8 @@ function updatePlayer(dt) {
     player.isSliding = true;
     player.slideTimer = CONFIG.slideDuration;
     player.slideCooldown = CONFIG.slideCooldown;
-    const dir = wishDir.lengthSq() > 0 ? wishDir : horizVel.clone().normalize();
+    const dir =
+      wishDir.lengthSq() > 0.05 ? wishDir.clone().normalize() : horizVel.clone().normalize();
     const boost = Math.max(currentSpeed + 3.5, CONFIG.slideBoost);
     player.vel.x = dir.x * Math.min(boost, CONFIG.maxSpeed);
     player.vel.z = dir.z * Math.min(boost, CONFIG.maxSpeed);
@@ -513,20 +767,18 @@ function updatePlayer(dt) {
       player.vel.z *= newSpeed / speed;
     }
 
-    if (!player.isSliding && wishDir.lengthSq() > 0) {
+    if (!player.isSliding && wishDir.lengthSq() > 0.01) {
       player.vel.x += wishDir.x * CONFIG.groundAccel * dt;
       player.vel.z += wishDir.z * CONFIG.groundAccel * dt;
       const sp = Math.hypot(player.vel.x, player.vel.z);
       if (sp > CONFIG.baseSpeed && !player.isSliding) {
-        // バニホ直後の速度を急激に殺さないよう緩やかに制限
         const target = Math.max(CONFIG.baseSpeed, sp - 12 * dt);
         player.vel.x *= target / sp;
         player.vel.z *= target / sp;
       }
     }
   } else {
-    // 空中ストレイフ（バニホの気持ちよさ）
-    if (wishDir.lengthSq() > 0) {
+    if (wishDir.lengthSq() > 0.01) {
       player.vel.x += wishDir.x * CONFIG.airAccel * dt;
       player.vel.z += wishDir.z * CONFIG.airAccel * dt;
       const sp = Math.hypot(player.vel.x, player.vel.z);
@@ -537,16 +789,16 @@ function updatePlayer(dt) {
     }
   }
 
-  // ウォールラン判定（空中で壁に近い＋前進中）
+  // ウォールラン判定（空中で壁に近い＋前進入力中）
   player.isWallRunning = false;
-  if (!player.onGround && keys["KeyW"] && Math.hypot(player.vel.x, player.vel.z) > 5.0) {
+  const pressingForward = keys["KeyW"] || touchInput.moveY > 0.35;
+  if (!player.onGround && pressingForward && Math.hypot(player.vel.x, player.vel.z) > 5.0) {
     const wallN = detectNearbyWall(player.pos, CONFIG.playerRadius, player.currentHeight);
     if (wallN) {
       player.isWallRunning = true;
       player.wallNormal.copy(wallN);
       if (player.vel.y < -1.5) player.vel.y = -1.5;
 
-      // 壁に沿う方向へ速度を補正
       const along = forward.clone().projectOnPlane(wallN).normalize();
       if (along.lengthSq() > 0.1) {
         const sp = Math.max(Math.hypot(player.vel.x, player.vel.z), CONFIG.wallRunSpeed);
@@ -564,7 +816,6 @@ function updatePlayer(dt) {
       player.coyoteTimer = 0;
       player.jumpBuffer = 0;
 
-      // スライディングジャンプ or 高速バニホでさらに微加速
       const sp = Math.hypot(player.vel.x, player.vel.z);
       if (player.isSliding || sp > CONFIG.baseSpeed + 1.2) {
         const boost = Math.min(sp + 1.8, CONFIG.maxSpeed);
@@ -576,7 +827,6 @@ function updatePlayer(dt) {
       player.isSliding = false;
       playSfx("jump");
     } else if (player.isWallRunning) {
-      // 壁キック！
       player.vel.y = CONFIG.wallJumpUp;
       player.vel.x += player.wallNormal.x * CONFIG.wallJumpPush;
       player.vel.z += player.wallNormal.z * CONFIG.wallJumpPush;
@@ -614,7 +864,7 @@ function updatePlayer(dt) {
     }
   }
 
-  // カメラ反映（スピード連動FOV＆ウォールラン傾き）
+  // カメラ反映
   const speedNow = Math.hypot(player.vel.x, player.vel.z);
   const targetFov = 78 + Math.min(18, Math.max(0, (speedNow - 10) * 1.4));
   camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8);
@@ -654,7 +904,6 @@ function updatePlayer(dt) {
 // 鬼（AI）の追跡更新
 // ==========================================
 function updateOni(dt) {
-  // 時間経過で少しずつ速くなる
   const currentOniSpeed = oni.baseSpeed + Math.min(4.8, game.elapsed * 0.08);
 
   const toPlayer = new THREE.Vector3(
@@ -681,7 +930,6 @@ function updateOni(dt) {
   const col = resolveCollisions(oni.pos, oni.vel, 0.65, 1.9);
   oni.onGround = col.onGround;
 
-  // 壁に引っかかったりプレイヤーが高い場所にいるときはジャンプ
   const moved = Math.hypot(oni.pos.x - prevX, oni.pos.z - prevZ);
   if (
     oni.onGround &&
@@ -695,7 +943,6 @@ function updateOni(dt) {
   oniGroup.position.copy(oni.pos);
   oniGroup.lookAt(player.pos.x, oni.pos.y, player.pos.z);
 
-  // 距離＆捕獲・ニアミス判定
   const totalDist = oni.pos.distanceTo(player.pos);
   distDisplay.textContent = totalDist.toFixed(1);
 
@@ -715,6 +962,9 @@ function updateOni(dt) {
 function triggerGameOver() {
   game.over = true;
   game.active = false;
+  resetJoystickVisual();
+  touchInput.slideHeld = false;
+  touchInput.lookTouchId = null;
   playSfx("caught");
 
   if (game.elapsed > game.best) {
@@ -723,7 +973,10 @@ function triggerGameOver() {
     bestDisplay.textContent = game.best.toFixed(1);
   }
 
-  document.exitPointerLock?.();
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+
   modalTitle.textContent = "鬼に捕まった！";
   modalDesc.innerHTML =
     `生存時間: <strong>${game.elapsed.toFixed(1)} 秒</strong>（ベスト: ${game.best.toFixed(1)} 秒）<br />` +

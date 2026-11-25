@@ -2,62 +2,73 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
   background: #0f172a;
   font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
   color: #f8fafc;
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
 canvas {
   display: block;
 }
 
+.hidden {
+  display: none !important;
+}
+
+/* ==========================================
+   HUD
+   ========================================== */
 #hud {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 5;
+  z-index: 10;
 }
 
 .hud-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 16px 20px;
-  gap: 12px;
+  padding: 12px 14px;
+  gap: 8px;
 }
 
 .panel {
   background: rgba(15, 23, 42, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  line-height: 1.45;
   backdrop-filter: blur(4px);
 }
 
 .center-panel {
   text-align: center;
-  min-width: 150px;
+  min-width: 124px;
 }
 
 #state-badge {
   display: inline-block;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: bold;
   letter-spacing: 0.08em;
   padding: 2px 10px;
   border-radius: 999px;
   background: #38bdf8;
   color: #0f172a;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 #state-badge.slide {
@@ -74,18 +85,41 @@ canvas {
 }
 
 .speed-wrap {
-  font-size: 1.6rem;
+  font-size: 1.45rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .speed-wrap small {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #cbd5e1;
 }
 
 .right-panel {
   text-align: right;
+}
+
+.hud-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+  pointer-events: auto;
+}
+
+.mini-btn {
+  background: rgba(51, 65, 85, 0.9);
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.mini-btn:active {
+  background: #475569;
 }
 
 #crosshair {
@@ -105,12 +139,13 @@ canvas {
   top: 22%;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: #fde047;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
   opacity: 0;
   transition: opacity 0.15s ease;
+  white-space: nowrap;
 }
 
 #trick-feed.show {
@@ -134,54 +169,161 @@ canvas {
   color: #e2e8f0;
 }
 
-#overlay {
+body.touch-mode .hud-bottom {
+  display: none;
+}
+
+/* ==========================================
+   スマホ・タブレット用タッチ操作レイヤー
+   ========================================== */
+#touch-layer {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.78);
+  z-index: 8;
+  touch-action: none;
+}
+
+#look-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 58%;
+  height: 100%;
+  touch-action: none;
+}
+
+#joystick-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 44%;
+  height: 55%;
+  touch-action: none;
+}
+
+#joystick-base {
+  position: absolute;
+  left: 28px;
+  bottom: 28px;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.45);
+  border: 2px solid rgba(56, 189, 248, 0.55);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 20;
-  backdrop-filter: blur(5px);
+  pointer-events: none;
 }
 
-#overlay.hidden {
-  display: none;
+#joystick-knob {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.78);
+  border: 2px solid #e0f2fe;
+  transform: translate(0px, 0px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+#touch-buttons {
+  position: absolute;
+  right: 22px;
+  bottom: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+  z-index: 12;
+}
+
+.action-btn {
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  touch-action: none;
+  opacity: 0.88;
+}
+
+.action-btn.pressed {
+  transform: scale(0.92);
+  opacity: 1;
+}
+
+.jump-btn {
+  background: rgba(34, 197, 94, 0.78);
+  border-color: #86efac;
+}
+
+.slide-btn {
+  width: 72px;
+  height: 72px;
+  background: rgba(245, 158, 11, 0.78);
+  border-color: #fde68a;
+  font-size: 0.82rem;
+}
+
+/* ==========================================
+   モーダル（スタート / ポーズ / リザルト）
+   ========================================== */
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 30;
+  backdrop-filter: blur(5px);
+  padding: 16px;
 }
 
 .modal {
   background: #1e293b;
   border: 2px solid #38bdf8;
   border-radius: 16px;
-  padding: 28px 34px;
+  padding: 24px 26px;
   max-width: 520px;
-  width: 92%;
+  width: 100%;
   text-align: center;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
 }
 
 .modal h1 {
-  font-size: 1.75rem;
+  font-size: 1.55rem;
   color: #38bdf8;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .modal p {
-  font-size: 0.96rem;
-  line-height: 1.6;
+  font-size: 0.92rem;
+  line-height: 1.55;
   color: #e2e8f0;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .controls-box {
   background: rgba(15, 23, 42, 0.65);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 11px 13px;
   text-align: left;
-  font-size: 0.86rem;
-  line-height: 1.7;
+  font-size: 0.82rem;
+  line-height: 1.65;
   color: #cbd5e1;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
+}
+
+.modal-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
 }
 
 #start-btn {
@@ -189,14 +331,60 @@ canvas {
   color: #0f172a;
   border: none;
   border-radius: 10px;
-  padding: 12px 28px;
+  padding: 12px 30px;
   font-size: 1.05rem;
   font-weight: 800;
   cursor: pointer;
-  transition: transform 0.1s ease, background 0.15s ease;
+  width: 100%;
+  max-width: 260px;
 }
 
-#start-btn:hover {
-  background: #7dd3fc;
-  transform: translateY(-1px);
+#start-btn:active {
+  transform: scale(0.98);
+}
+
+.secondary-btn {
+  background: transparent;
+  color: #cbd5e1;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    font-size: 0.78rem;
+    padding: 6px 9px;
+  }
+  .center-panel {
+    min-width: 96px;
+  }
+  .speed-wrap {
+    font-size: 1.2rem;
+  }
+  #joystick-base {
+    left: 18px;
+    bottom: 20px;
+    width: 112px;
+    height: 112px;
+  }
+  #joystick-knob {
+    width: 48px;
+    height: 48px;
+  }
+  #touch-buttons {
+    right: 16px;
+    bottom: 20px;
+    gap: 12px;
+  }
+  .action-btn {
+    width: 74px;
+    height: 74px;
+  }
+  .slide-btn {
+    width: 66px;
+    height: 66px;
+  }
 }

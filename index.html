@@ -2,26 +2,32 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3D キャラコン鬼ごっこ - Parkour Tag Prototype</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D キャラコン鬼ごっこ - スマホ＆PC両対応版</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="hud">
     <div class="hud-top">
       <div class="panel">
-        <div>生存時間: <strong id="time-display">0.0</strong>s</div>
+        <div>生存: <strong id="time-display">0.0</strong>s</div>
         <div>ベスト: <strong id="best-display">0.0</strong>s</div>
       </div>
+
       <div class="panel center-panel">
         <div id="state-badge">RUN</div>
         <div class="speed-wrap">
-          <span id="speed-display">0</span> <small>m/s</small>
+          <span id="speed-display">0.0</span> <small>m/s</small>
         </div>
       </div>
+
       <div class="panel right-panel">
-        <div>鬼との距離: <strong id="dist-display">--</strong>m</div>
+        <div>鬼: <strong id="dist-display">--</strong>m</div>
         <div>ニアミス: <strong id="nearmiss-display">0</strong></div>
+        <div class="hud-actions">
+          <button id="hud-retry-btn" class="mini-btn" type="button">リトライ</button>
+          <button id="hud-pause-btn" class="mini-btn" type="button">停止</button>
+        </div>
       </div>
     </div>
 
@@ -37,22 +43,39 @@
     </div>
   </div>
 
+  <!-- スマホ・タブレット用タッチ操作レイヤー -->
+  <div id="touch-layer" class="hidden">
+    <div id="look-zone"></div>
+
+    <div id="joystick-zone">
+      <div id="joystick-base">
+        <div id="joystick-knob"></div>
+      </div>
+    </div>
+
+    <div id="touch-buttons">
+      <button id="btn-slide" class="action-btn slide-btn" type="button">SLIDE</button>
+      <button id="btn-jump" class="action-btn jump-btn" type="button">JUMP</button>
+    </div>
+  </div>
+
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
       <h1 id="modal-title">3D キャラコン鬼ごっこ</h1>
       <p id="modal-desc">
         スライディング・バニホ・ウォールランを駆使して鬼から逃げ切れ！<br />
-        画面をクリックするとマウス操作（FPS視点）が始まります。
+        PC（マウス＋キーボード）とスマホ（タッチ操作）の両方に対応しています。
       </p>
       <div class="controls-box">
-        <div><strong>WASD</strong>：移動　/　<strong>マウス</strong>：視点</div>
-        <div><strong>Space</strong>：ジャンプ（着地即ジャンプでバニホ加速）</div>
-        <div><strong>Shift または C</strong>：スライディング（高速移動＆加速）</div>
-        <div><strong>空中で壁に近づく</strong>：ウォールラン → <strong>Space</strong> で壁キック</div>
-        <div><strong>黄緑のパッド</strong>：大ジャンプパッド</div>
+        <div><strong>【スマホ】</strong>左スティック：移動 ／ 右画面スワイプ：視点 ／ 右下：JUMP・SLIDE</div>
+        <div><strong>【PC】</strong>WASD：移動 ／ マウス：視点 ／ Space：ジャンプ ／ Shift・C：スライディング</div>
+        <div><strong>【コツ】</strong>空中で紫の壁に向かって前進するとウォールラン → JUMPで壁キック！</div>
       </div>
-      <button id="start-btn" type="button">プレイ開始（クリック）</button>
+      <div class="modal-buttons">
+        <button id="start-btn" type="button">プレイ開始</button>
+        <button id="mode-toggle-btn" class="secondary-btn" type="button">操作モード: 自動</button>
+      </div>
     </div>
   </div>
 
