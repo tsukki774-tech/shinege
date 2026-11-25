@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>しょぼん風ミニアクション - 初見殺しステージ</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="hud">
+      <div class="title">(´・ω・｀) しょぼん風アクション</div>
+      <div class="stats">
+        <span>死亡回数: <strong id="death-count">0</strong></span>
+        <span>タイム: <strong id="timer">0.0</strong>s</span>
+        <button id="retry-btn" type="button">リトライ (R)</button>
+        <button id="mute-btn" type="button">音: ON</button>
+      </div>
+    </header>
+
+    <div class="canvas-wrapper">
+      <canvas id="gameCanvas" width="800" height="480"></canvas>
+      <div id="overlay" class="overlay hidden">
+        <div class="overlay-box">
+          <h2 id="overlay-title">STAGE CLEAR!</h2>
+          <p id="overlay-message"></p>
+          <button id="restart-all-btn" type="button">最初からもう一回遊ぶ</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-info">
+      <span>移動: <strong>← →</strong> / <strong>A D</strong></span>
+      <span>ジャンプ: <strong>Space</strong> / <strong>↑</strong> / <strong>W</strong></span>
+      <span>即リトライ: <strong>R</strong></span>
+    </div>
+
+    <!-- スマホ・タブレット用タッチ操作 -->
+    <div class="touch-controls">
+      <div class="touch-left-group">
+        <button id="btn-left" class="touch-btn" type="button">◀</button>
+        <button id="btn-right" class="touch-btn" type="button">▶</button>
+      </div>
+      <button id="btn-jump" class="touch-btn jump-btn" type="button">JUMP</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
