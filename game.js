@@ -136,15 +136,15 @@ const layoutSaveBtn = document.getElementById("layout-save-btn");
 const CONFIG = {
   gravity: 28,
   baseSpeed: 10.8,
-  maxSpeed: 28.0,
+  maxSpeed: 34.0,
   groundAccel: 78,
-  airAccel: 24,
+  airAccel: 32,
   groundFriction: 9.0,
-  slideFriction: 1.5,
-  jumpForce: 11.4,
-  slideBoost: 17.0,
-  slideDuration: 0.72,
-  slideCooldown: 0.42,
+  slideFriction: 0.36,
+  jumpForce: 11.6,
+  slideBoost: 21.8,
+  slideDuration: 1.28,
+  slideCooldown: 0.22,
   wallRunGravity: 4.2,
   wallRunSpeed: 14.2,
   wallJumpUp: 11.8,
@@ -1764,6 +1764,10 @@ const player = {
   wallTilt: 0,
   jumpBuffer: 0,
   coyoteTimer: 0,
+  lurchTimer: 0,
+  lastTapStrafeTime: 0,
+  lastWishX: 0,
+  lastWishZ: 0,
 
   // 空中ダッシュ
   dashTimer: 0,
@@ -4312,6 +4316,9 @@ function resetMatch(broadcast = false) {
   player.slideTimer = 0;
   player.slideCooldown = 0;
   player.isWallRunning = false;
+  player.lurchTimer = 0;
+  player.lastWishX = 0;
+  player.lastWishZ = 0;
   player.dashTimer = 0;
   player.dashCooldown = 0;
   player.isGrappling = false;
@@ -4545,7 +4552,7 @@ function updatePlayer(dt) {
       player.dashTimer -= dt;
       player.vel.copy(player.dashDir).multiplyScalar(CONFIG.dashSpeed);
     } else {
-      // スライディング開始
+      // スライディング開始（超低摩擦＆モメンタム継承）
       const slideKey =
         keys["ShiftLeft"] || keys["ShiftRight"] || keys["KeyC"] || touchInput.slideHeld;
       const horizVel = new THREE.Vector3(player.vel.x, 0, player.vel.z);
@@ -4556,14 +4563,17 @@ function updatePlayer(dt) {
         player.onGround &&
         !player.isSliding &&
         player.slideCooldown <= 0 &&
-        currentSpeed > 4.5
+        currentSpeed > 3.2
       ) {
         player.isSliding = true;
         player.slideTimer = CONFIG.slideDuration;
         player.slideCooldown = CONFIG.slideCooldown;
         const dir =
           wishDir.lengthSq() > 0.05 ? wishDir.clone().normalize() : horizVel.clone().normalize();
-        const boost = Math.max(currentSpeed + 3.5, (CONFIG.slideBoost + (activeCh.slideBoostAdd || 0)) * charMoveMult);
+        const boost = Math.max(
+          currentSpeed + 5.2,
+          (CONFIG.slideBoost + (activeCh.slideBoostAdd || 0)) * charMoveMult
+        );
         player.vel.x = dir.x * Math.min(boost, CONFIG.maxSpeed);
         player.vel.z = dir.z * Math.min(boost, CONFIG.maxSpeed);
         playSfx("slide");
@@ -4572,12 +4582,13 @@ function updatePlayer(dt) {
 
       if (player.isSliding) {
         player.slideTimer -= dt;
-        if (player.slideTimer <= 0 || !slideKey || !player.onGround) {
+        const slideSpeed = Math.hypot(player.vel.x, player.vel.z);
+        if (player.slideTimer <= 0 || !slideKey || !player.onGround || slideSpeed < 3.6) {
           player.isSliding = false;
         }
       }
 
-      // 水平加速＆摩擦
+      // 水平加速＆摩擦（スライディング中は超低摩擦＋カービングステア）
       if (player.onGround) {
         const friction = player.isSliding ? CONFIG.slideFriction : CONFIG.groundFriction;
         const speed = Math.hypot(player.vel.x, player.vel.z);
@@ -4586,6 +4597,18 @@ function updatePlayer(dt) {
           const newSpeed = Math.max(0, speed - drop);
           player.vel.x *= newSpeed / speed;
           player.vel.z *= newSpeed / speed;
+        }
+
+        // スライディング中の緩やかな方向転換（カービング）
+        if (player.isSliding && wishDir.lengthSq() > 0.01) {
+          const sp = Math.hypot(player.vel.x, player.vel.z);
+          if (sp > 2.0) {
+            const curDir = new THREE.Vector3(player.vel.x / sp, 0, player.vel.z / sp);
+            const targetDir = wishDir.clone().normalize();
+            curDir.lerp(targetDir, Math.min(1, dt * 3.4)).normalize();
+            player.vel.x = curDir.x * sp;
+            player.vel.z = curDir.z * sp;
+          }
         }
 
         const effBaseSpeed = CONFIG.baseSpeed * charMoveMult;
@@ -4600,14 +4623,50 @@ function updatePlayer(dt) {
           }
         }
       } else {
+        // 空中ストレイフ（Air-Strafe）＆ タップストレイフ（Tap-Strafe / Lurch）
+        if (player.lurchTimer > 0) {
+          player.lurchTimer = Math.max(0, player.lurchTimer - dt);
+        }
+
+        const sp = Math.hypot(player.vel.x, player.vel.z);
         if (wishDir.lengthSq() > 0.01) {
-          player.vel.x += wishDir.x * CONFIG.airAccel * dt;
-          player.vel.z += wishDir.z * CONFIG.airAccel * dt;
-          const sp = Math.hypot(player.vel.x, player.vel.z);
-          if (sp > CONFIG.maxSpeed) {
-            player.vel.x *= CONFIG.maxSpeed / sp;
-            player.vel.z *= CONFIG.maxSpeed / sp;
+          const wishNorm = wishDir.clone().normalize();
+          const wishChanged =
+            Math.hypot(wishNorm.x - player.lastWishX, wishNorm.z - player.lastWishZ) > 0.25;
+
+          // ジャンプ・壁キック・パッド直後のタップストレイフ（速度を保ったまま進行方向を鋭角に曲げられる）
+          if (player.lurchTimer > 0 && sp > 7.5 && (wishChanged || player.lurchTimer > 0.22)) {
+            const curDir = new THREE.Vector3(player.vel.x / sp, 0, player.vel.z / sp);
+            const turnStrength = wishChanged ? Math.min(1, dt * 16.5) : Math.min(1, dt * 9.5);
+            curDir.lerp(wishNorm, turnStrength).normalize();
+            player.vel.x = curDir.x * sp;
+            player.vel.z = curDir.z * sp;
+
+            if (wishChanged && performance.now() - player.lastTapStrafeTime > 900) {
+              player.lastTapStrafeTime = performance.now();
+              showTrick("TAP STRAFE!");
+            }
+          } else if (sp > 6.5) {
+            // 通常の空中ストレイフ：カメラ旋回＋左右キーで速度を落とさず綺麗にカーブ
+            const curDir = new THREE.Vector3(player.vel.x / sp, 0, player.vel.z / sp);
+            curDir.lerp(wishNorm, Math.min(1, dt * 4.2)).normalize();
+            const boostedAirSp = Math.min(CONFIG.maxSpeed, sp + 2.2 * dt);
+            player.vel.x = curDir.x * boostedAirSp;
+            player.vel.z = curDir.z * boostedAirSp;
+          } else {
+            player.vel.x += wishDir.x * CONFIG.airAccel * dt;
+            player.vel.z += wishDir.z * CONFIG.airAccel * dt;
+            const newSp = Math.hypot(player.vel.x, player.vel.z);
+            if (newSp > CONFIG.maxSpeed) {
+              player.vel.x *= CONFIG.maxSpeed / newSp;
+              player.vel.z *= CONFIG.maxSpeed / newSp;
+            }
           }
+          player.lastWishX = wishNorm.x;
+          player.lastWishZ = wishNorm.z;
+        } else {
+          player.lastWishX = 0;
+          player.lastWishZ = 0;
         }
       }
 
@@ -4638,9 +4697,10 @@ function updatePlayer(dt) {
           player.coyoteTimer = 0;
           player.jumpBuffer = 0;
 
+          player.lurchTimer = 0.48;
           const sp = Math.hypot(player.vel.x, player.vel.z);
           if (player.isSliding || sp > CONFIG.baseSpeed + 1.2) {
-            const boost = Math.min(sp + 1.8, CONFIG.maxSpeed);
+            const boost = Math.min(sp + 2.4, CONFIG.maxSpeed);
             const dir = new THREE.Vector3(player.vel.x, 0, player.vel.z).normalize();
             player.vel.x = dir.x * boost;
             player.vel.z = dir.z * boost;
@@ -4649,6 +4709,7 @@ function updatePlayer(dt) {
           player.isSliding = false;
           playSfx("jump");
         } else if (player.isWallRunning) {
+          player.lurchTimer = 0.48;
           player.vel.y = CONFIG.wallJumpUp;
           player.vel.x += player.wallNormal.x * CONFIG.wallJumpPush;
           player.vel.z += player.wallNormal.z * CONFIG.wallJumpPush;
@@ -4682,6 +4743,7 @@ function updatePlayer(dt) {
       if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(player.pos.y - pad.y) < 1.2) {
         player.vel.y = pad.force;
         player.onGround = false;
+        player.lurchTimer = 0.55;
         player.isGrappling = false;
         wireLine.visible = false;
         playSfx("pad");
@@ -4729,6 +4791,9 @@ function updatePlayer(dt) {
   if (player.isWallRunning) {
     const side = right.dot(player.wallNormal);
     targetTilt = side > 0 ? -0.18 : 0.18;
+  } else if (player.isSliding) {
+    const sideMove = right.x * player.vel.x + right.z * player.vel.z;
+    targetTilt = sideMove >= 0 ? -0.055 : 0.055;
   }
   player.wallTilt += (targetTilt - player.wallTilt) * Math.min(1, dt * 10);
 
