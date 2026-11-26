@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコン鬼ごっこ v5 - 広大アリーナ＆全ギミック対応</title>
+  <title>3D キャラコン鬼ごっこ v6 - FPS銃バトル対応 - 広大アリーナ＆全ギミック対応</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -42,8 +42,21 @@
     </div>
 
     <div id="crosshair"></div>
+    <div id="hitmarker"></div>
     <div id="zip-prompt" class="hidden">ZIPLINE 乗車可能 [E / ZIP]</div>
     <div id="trick-feed"></div>
+
+    <!-- 銃・残弾HUD -->
+    <div id="weapon-hud">
+      <div class="weapon-name">PULSE RIFLE</div>
+      <div class="ammo-wrap">
+        <span id="ammo-display">15</span> <small>/ 15</small>
+      </div>
+      <div id="reload-status" class="hidden">RELOADING...</div>
+      <div class="stun-bar-wrap">
+        <div id="stun-bar-fill"></div>
+      </div>
+    </div>
 
     <!-- PC用クールタイム表示 -->
     <div id="pc-ability-bar">
@@ -53,6 +66,8 @@
     </div>
 
     <div class="hud-bottom">
+      <span><strong>左クリック</strong> 射撃</span>
+      <span><strong>R</strong> リロード</span>
       <span><strong>WASD</strong> 移動</span>
       <span><strong>Space</strong> ジャンプ/壁キック</span>
       <span><strong>Shift/C</strong> スライド</span>
@@ -84,6 +99,8 @@
       <small id="btn-grapple-cd"></small>
     </button>
     <button id="btn-zip" class="action-btn zip-btn" type="button">ZIP</button>
+    <button id="btn-fire" class="action-btn fire-btn" type="button">FIRE</button>
+    <button id="btn-reload" class="action-btn reload-btn" type="button">RELOAD</button>
   </div>
 
   <!-- ボタン配置編集モード用バー -->
@@ -98,10 +115,10 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコン鬼ごっこ v5</h1>
+      <h1 id="modal-title">3D キャラコン鬼ごっこ v6 - FPS銃バトル対応</h1>
       <p id="modal-desc">
-        広大アリーナで、スライディング・バニホ・ウォールランに加え<br />
-        <strong>空中ダッシュ・ワイヤー・ジップライン</strong>を駆使して鬼から逃げ切れ！
+        広大アリーナで多彩なキャラコンと<strong>FPSパルスライフル</strong>を駆使して逃げ切れ！<br />
+        鬼を撃つとノックバック＆減速、5発命中で<strong>STUN（行動不能）</strong>にできる！
       </p>
 
       <!-- キャラコンギミック選択 -->
@@ -133,9 +150,9 @@
       </div>
 
       <div class="controls-box">
-        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ JUMP・SLIDE・DASH・WIRE・ZIP</div>
-        <div><strong>【PC】</strong>WASD移動 ／ Spaceジャンプ ／ Shift・Cスライド ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップライン</div>
-        <div><strong>【コツ】</strong>照準が水色に光ったらWIREが届く合図！黄色のロープに近づいてZIPで高速滑走！</div>
+        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ FIRE射撃・RELOAD・JUMP・SLIDE・DASH・WIRE・ZIP</div>
+        <div><strong>【PC】</strong>左クリック射撃 ／ Rリロード ／ WASD移動 ／ Spaceジャンプ ／ Shift・Cスライド ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップ</div>
+        <div><strong>【コツ】</strong>鬼に5発当てると2.5秒スタン！撃って距離を稼ぎながらワイヤーやZIPで逃げ切ろう！</div>
       </div>
 
       <div class="modal-buttons">
