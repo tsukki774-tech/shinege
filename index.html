@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v7 - 友達と1v1オンライン対戦</title>
+  <title>3D キャラコンFPS v8 - ショップ＆スキンガチャ・カラムビット対応</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -31,8 +31,8 @@
       </div>
 
       <div class="panel right-panel">
-        <div>相手: <strong id="dist-display">--</strong>m</div>
-        <div>相手HP: <strong id="enemy-hp-display">100</strong></div>
+        <div>通貨: <strong id="hud-coins-display" class="coin-text">0</strong> CR</div>
+        <div>相手: <strong id="dist-display">--</strong>m / HP:<strong id="enemy-hp-display">100</strong></div>
         <div class="hud-actions">
           <button id="hud-retry-btn" class="mini-btn" type="button">リセット</button>
           <button id="hud-pause-btn" class="mini-btn" type="button">メニュー</button>
@@ -62,6 +62,7 @@
       <div class="weapon-ammo-row">
         <strong id="ammo-display">18</strong><small id="ammo-max">/ 18</small>
       </div>
+      <div id="melee-ready-badge" class="hidden">MELEE READY（近接）</div>
       <div id="reload-status" class="hidden">RELOADING...</div>
       <div class="oni-stun-wrap">
         <span>ENEMY HP</span>
@@ -90,8 +91,8 @@
       <span><strong>Q</strong> ダッシュ</span>
       <span><strong>右クリック/F</strong> ワイヤー</span>
       <span><strong>E</strong> ジップライン</span>
-      <span><strong>左クリック</strong> 射撃</span>
-      <span><strong>1/2/3</strong> 武器切替</span>
+      <span><strong>左クリック</strong> 攻撃</span>
+      <span><strong>1/2・ホイール</strong> 銃↔近接切替</span>
       <span><strong>R</strong> リロード</span>
     </div>
   </div>
@@ -139,11 +140,37 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v7</h1>
+      <h1 id="modal-title">3D キャラコンFPS v8</h1>
       <p id="modal-desc">
         パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
         ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
       </p>
+
+      <!-- 所持通貨＆ショップ・ガチャバー -->
+      <div class="wallet-bar">
+        <div class="wallet-info">
+          <span class="wallet-label">所持クレジット</span>
+          <strong id="modal-coins-display" class="coin-val">0 CR</strong>
+        </div>
+        <button id="open-shop-btn" class="shop-open-btn" type="button">ショップ / スキンガチャ</button>
+      </div>
+
+      <!-- 2枠ロードアウト（メイン銃 + 近接武器） -->
+      <div class="loadout-slots-section">
+        <div class="slots-title">バトル装備（試合中に 1 / 2 キー・切替ボタンで持ち替え）</div>
+        <div class="slots-grid">
+          <div class="slot-card">
+            <div class="slot-badge">SLOT 1 : メイン銃</div>
+            <div class="slot-item-name" id="equipped-gun-name">パルスライフル</div>
+            <div class="slot-skin-name" id="equipped-gun-skin">スキン: スタンダード</div>
+          </div>
+          <div class="slot-card melee">
+            <div class="slot-badge">SLOT 2 : 近接武器（共通性能）</div>
+            <div class="slot-item-name" id="equipped-melee-name">コンバットナイフ</div>
+            <div class="slot-skin-name" id="equipped-melee-skin">スキン: スタンダード</div>
+          </div>
+        </div>
+      </div>
 
       <!-- オンライン対戦ロビー -->
       <div class="multiplayer-section">
@@ -219,29 +246,18 @@
         </div>
       </div>
 
-      <!-- FPS武器＆オート射撃設定 -->
+      <!-- 照準オート攻撃設定 -->
       <div class="weapon-settings-section">
-        <div class="weapon-settings-row">
-          <span class="weapon-settings-title">照準オート射撃（相手に合うと自動発射）</span>
+        <div class="weapon-settings-row" style="margin-bottom:0;">
+          <span class="weapon-settings-title">照準オート攻撃（銃・近接の射程内に相手が入ると自動攻撃）</span>
           <button id="autofire-toggle-btn" class="autofire-btn active" type="button">ON</button>
-        </div>
-        <div class="weapon-select-grid" id="weapon-select-grid">
-          <button class="weapon-select-btn active" data-weapon="rifle" type="button">
-            パルスライフル<small>連射バランス型</small>
-          </button>
-          <button class="weapon-select-btn" data-weapon="shotgun" type="button">
-            ショットガン<small>近距離・強ノックバック</small>
-          </button>
-          <button class="weapon-select-btn" data-weapon="sniper" type="button">
-            スナイパー<small>超遠距離・即スタン</small>
-          </button>
         </div>
       </div>
 
       <div class="controls-box">
-        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ FIRE・武器切替・JUMP・SLIDE・DASH・WIRE・ZIP</div>
-        <div><strong>【PC】</strong>WASD移動 ／ 左クリック射撃 ／ 1〜3・ホイール武器切替 ／ Rリロード ／ Spaceジャンプ ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップ</div>
-        <div><strong>【コツ】</strong>照準が相手に合うと赤く光って自動発射！高所を取ってスナイパーやショットガンを叩き込もう！</div>
+        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ FIRE・銃↔近接切替・JUMP・SLIDE・DASH・WIRE・ZIP</div>
+        <div><strong>【PC】</strong>WASD移動 ／ 左クリック攻撃 ／ 1・2・ホイールで銃↔近接切替 ／ Rリロード ／ Spaceジャンプ ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップ</div>
+        <div><strong>【報酬＆ガチャ】</strong>バトル勝利で <strong>+100 CR</strong>（ソロ練習 +40 CR）獲得！ショップで新武器やカラムビットを買い、ガチャでレアスキンを引こう！</div>
       </div>
 
       <div class="modal-buttons">
@@ -249,6 +265,57 @@
         <div class="sub-btn-row">
           <button id="layout-btn" class="secondary-btn" type="button">ボタン配置を変更</button>
           <button id="mode-toggle-btn" class="secondary-btn" type="button">操作モード: 読み込み中...</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ショップ＆スキンガチャ画面 -->
+  <div id="shop-overlay" class="hidden">
+    <div class="modal shop-modal">
+      <div class="shop-top-bar">
+        <h2>アーマリー＆スキンガチャ</h2>
+        <div class="shop-wallet-pill">所持: <strong id="shop-coins-display">0 CR</strong></div>
+        <button id="close-shop-btn" class="mini-btn" type="button">閉じる</button>
+      </div>
+
+      <div class="shop-tabs">
+        <button class="shop-tab-btn active" data-shoptab="guns" type="button">メイン銃</button>
+        <button class="shop-tab-btn" data-shoptab="melee" type="button">近接武器</button>
+        <button class="shop-tab-btn" data-shoptab="gacha" type="button">スキンガチャ</button>
+        <button class="shop-tab-btn" data-shoptab="skins" type="button">所持スキン装備</button>
+      </div>
+
+      <div id="shop-tab-note" class="shop-note">通貨を使って新しいメイン銃を購入・装備できます。</div>
+
+      <!-- ショップアイテム一覧（メイン銃 / 近接武器 / 所持スキン） -->
+      <div id="shop-items-grid" class="shop-items-grid"></div>
+
+      <!-- スキンガチャ専用ビュー -->
+      <div id="gacha-view" class="gacha-view hidden">
+        <div class="gacha-banner">
+          <div class="gacha-banner-title">WEAPON & MELEE SKIN GACHA</div>
+          <div class="gacha-banner-sub">銃＆近接武器のレアスキンがランダムで排出！（重複時は半額CR還元）</div>
+          <div class="gacha-rates">
+            <span class="rate-chip common">COMMON 45%</span>
+            <span class="rate-chip rare">RARE 32%</span>
+            <span class="rate-chip epic">EPIC 16%</span>
+            <span class="rate-chip legend">LEGEND 7%</span>
+          </div>
+        </div>
+
+        <div id="gacha-result-box" class="gacha-result-box">
+          <div class="gacha-placeholder">下のボタンを押してスキンガチャを回そう！</div>
+        </div>
+
+        <div class="gacha-actions">
+          <button id="gacha-pull-1-btn" class="gacha-btn single" type="button">
+            1回引く<strong>80 CR</strong>
+          </button>
+          <button id="gacha-pull-3-btn" class="gacha-btn multi" type="button">
+            3連ガチャ<strong>220 CR</strong>
+          </button>
         </div>
       </div>
     </div>

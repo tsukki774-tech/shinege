@@ -20,7 +20,25 @@ const ammoDisplay = document.getElementById("ammo-display");
 const ammoMaxDisplay = document.getElementById("ammo-max");
 const reloadStatus = document.getElementById("reload-status");
 const autofireToggleBtn = document.getElementById("autofire-toggle-btn");
-const weaponSelectBtns = document.querySelectorAll(".weapon-select-btn");
+const meleeReadyBadge = document.getElementById("melee-ready-badge");
+const hudCoinsDisplay = document.getElementById("hud-coins-display");
+const modalCoinsDisplay = document.getElementById("modal-coins-display");
+const equippedGunNameEl = document.getElementById("equipped-gun-name");
+const equippedGunSkinEl = document.getElementById("equipped-gun-skin");
+const equippedMeleeNameEl = document.getElementById("equipped-melee-name");
+const equippedMeleeSkinEl = document.getElementById("equipped-melee-skin");
+
+const openShopBtn = document.getElementById("open-shop-btn");
+const shopOverlay = document.getElementById("shop-overlay");
+const closeShopBtn = document.getElementById("close-shop-btn");
+const shopCoinsDisplay = document.getElementById("shop-coins-display");
+const shopTabBtns = document.querySelectorAll(".shop-tab-btn");
+const shopTabNote = document.getElementById("shop-tab-note");
+const shopItemsGrid = document.getElementById("shop-items-grid");
+const gachaView = document.getElementById("gacha-view");
+const gachaResultBox = document.getElementById("gacha-result-box");
+const gachaPull1Btn = document.getElementById("gacha-pull-1-btn");
+const gachaPull3Btn = document.getElementById("gacha-pull-3-btn");
 
 const myKillsDisplay = document.getElementById("my-kills-display");
 const enemyKillsDisplay = document.getElementById("enemy-kills-display");
@@ -542,6 +560,22 @@ function playSfx(type) {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
     osc.start(t);
     osc.stop(t + 0.25);
+  } else if (type === "melee_swing") {
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(360, t);
+    osc.frequency.exponentialRampToValueAtTime(110, t + 0.11);
+    gain.gain.setValueAtTime(0.09, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.start(t);
+    osc.stop(t + 0.12);
+  } else if (type === "melee_hit") {
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(780, t);
+    osc.frequency.exponentialRampToValueAtTime(190, t + 0.14);
+    gain.gain.setValueAtTime(0.14, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.start(t);
+    osc.stop(t + 0.15);
   } else if (type === "reload") {
     osc.type = "triangle";
     osc.frequency.setValueAtTime(300, t);
@@ -1253,14 +1287,19 @@ updateScoreAndHpUI();
 
 
 // ==========================================
-// FPS 武器システム（複数武器＆オート射撃）
+// 通貨・アーマリー・スキンガチャ・2スロット武器システム
 // ==========================================
-const WEAPON_ORDER = ["rifle", "shotgun", "sniper"];
-const WEAPONS = {
+const PROFILE_STORAGE_KEY = "parkour_fps_profile_v8";
+
+// メイン銃カタログ（新銃：バーストSMG・ヘビーマシンガンを追加）
+const GUNS = {
   rifle: {
     key: "rifle",
-    name: "PULSE RIFLE",
+    name: "パルスライフル",
+    hudName: "PULSE RIFLE",
     shortName: "RIFLE",
+    price: 0,
+    desc: "バランス型の連射ライフル（18発 / 威力14）",
     maxAmmo: 18,
     fireRate: 0.13,
     reloadTime: 1.25,
@@ -1268,15 +1307,37 @@ const WEAPONS = {
     pellets: 1,
     spread: 0.008,
     damage: 14,
-    color: 0x38bdf8,
+    defaultColor: 0x38bdf8,
     recoilZ: 0.055,
     recoilPitch: 0.045,
     sfx: "shot_rifle",
   },
+  smg: {
+    key: "smg",
+    name: "ボルトSMG",
+    hudName: "VOLT SMG",
+    shortName: "SMG",
+    price: 110,
+    desc: "超高速連射の近〜中距離サブマシンガン（28発 / 威力9）",
+    maxAmmo: 28,
+    fireRate: 0.075,
+    reloadTime: 1.15,
+    range: 78,
+    pellets: 1,
+    spread: 0.022,
+    damage: 9,
+    defaultColor: 0x22d3ee,
+    recoilZ: 0.036,
+    recoilPitch: 0.032,
+    sfx: "shot_rifle",
+  },
   shotgun: {
     key: "shotgun",
-    name: "SCATTER SHOTGUN",
+    name: "スキャッターショットガン",
+    hudName: "SHOTGUN",
     shortName: "SHOTGUN",
+    price: 150,
+    desc: "7発同時発射の散弾銃（6発 / 威力13×7）",
     maxAmmo: 6,
     fireRate: 0.68,
     reloadTime: 1.5,
@@ -1284,32 +1345,234 @@ const WEAPONS = {
     pellets: 7,
     spread: 0.064,
     damage: 13,
-    color: 0xf97316,
+    defaultColor: 0xf97316,
     recoilZ: 0.13,
     recoilPitch: 0.13,
     sfx: "shot_shotgun",
   },
   sniper: {
     key: "sniper",
-    name: "RAIL SNIPER",
+    name: "レイルスナイパー",
+    hudName: "RAIL SNIPER",
     shortName: "SNIPER",
+    price: 200,
+    desc: "超長距離・高威力ライフル（4発 / 威力65）",
     maxAmmo: 4,
     fireRate: 0.95,
     reloadTime: 1.65,
-    range: 180,
+    range: 185,
     pellets: 1,
     spread: 0.001,
     damage: 65,
-    color: 0xe879f9,
+    defaultColor: 0xe879f9,
     recoilZ: 0.15,
     recoilPitch: 0.15,
     sfx: "shot_sniper",
   },
+  lmg: {
+    key: "lmg",
+    name: "タイタンLMG",
+    hudName: "TITAN LMG",
+    shortName: "LMG",
+    price: 260,
+    desc: "45発の圧倒的弾幕を誇る重機関銃（45発 / 威力11）",
+    maxAmmo: 45,
+    fireRate: 0.11,
+    reloadTime: 1.95,
+    range: 115,
+    pellets: 1,
+    spread: 0.018,
+    damage: 11,
+    defaultColor: 0xfacc15,
+    recoilZ: 0.048,
+    recoilPitch: 0.042,
+    sfx: "shot_rifle",
+  },
 };
 
-const AUTOFIRE_STORAGE_KEY = "parkour_tag_autofire";
-const WEAPON_STORAGE_KEY = "parkour_tag_weapon";
+// 近接武器カタログ（性能は完全共通：威力55 / クールタイム0.48s / リーチ3.6m）
+const MELEE_COMMON_STATS = {
+  damage: 55,
+  attackRate: 0.48,
+  range: 3.6,
+};
 
+const MELEES = {
+  knife: {
+    key: "knife",
+    name: "コンバットナイフ",
+    hudName: "COMBAT KNIFE",
+    shortName: "KNIFE",
+    price: 0,
+    desc: "標準のタクティカルナイフ（近接共通性能: 威力55）",
+    defaultColor: 0x34d399,
+  },
+  karambit: {
+    key: "karambit",
+    name: "カラムビット",
+    hudName: "KARAMBIT",
+    shortName: "KARAMBIT",
+    price: 160,
+    desc: "フィンガーリングと湾曲ブレードが特徴の近接武器（威力55・共通性能）",
+    defaultColor: 0xf43f5e,
+  },
+  katana: {
+    key: "katana",
+    name: "サイバーカタナ",
+    hudName: "CYBER KATANA",
+    shortName: "KATANA",
+    price: 220,
+    desc: "ネオン刃を纏う近未来の日本刀（威力55・共通性能）",
+    defaultColor: 0x38bdf8,
+  },
+  axe: {
+    key: "axe",
+    name: "プラズマアックス",
+    hudName: "PLASMA AXE",
+    shortName: "AXE",
+    price: 280,
+    desc: "エネルギー刃を備えた戦術トマホーク（威力55・共通性能）",
+    defaultColor: 0xf59e0b,
+  },
+};
+
+// スキンカタログ（ガチャ排出限定スキン + 初期スタンダード）
+const SKINS = {
+  default: {
+    key: "default",
+    name: "スタンダード",
+    rarity: "COMMON",
+    bodyColor: 0x1e293b,
+    accentColor: null, // 武器固有色を使用
+    metalness: 0.65,
+    cssColor: "#64748b",
+  },
+  crimson: {
+    key: "crimson",
+    name: "クリムゾンレッド",
+    rarity: "COMMON",
+    bodyColor: 0x450a0a,
+    accentColor: 0xef4444,
+    metalness: 0.7,
+    cssColor: "#ef4444",
+  },
+  emerald: {
+    key: "emerald",
+    name: "エメラルドフォレスト",
+    rarity: "COMMON",
+    bodyColor: 0x064e3b,
+    accentColor: 0x10b981,
+    metalness: 0.65,
+    cssColor: "#10b981",
+  },
+  arctic: {
+    key: "arctic",
+    name: "アークティックホワイト",
+    rarity: "RARE",
+    bodyColor: 0xe2e8f0,
+    accentColor: 0x0284c7,
+    metalness: 0.55,
+    cssColor: "#e2e8f0",
+  },
+  cyber_cyan: {
+    key: "cyber_cyan",
+    name: "ネオンシアン",
+    rarity: "RARE",
+    bodyColor: 0x0f172a,
+    accentColor: 0x22d3ee,
+    metalness: 0.78,
+    cssColor: "#22d3ee",
+  },
+  violet_void: {
+    key: "violet_void",
+    name: "ヴォイドパープル",
+    rarity: "EPIC",
+    bodyColor: 0x2e1065,
+    accentColor: 0xc084fc,
+    metalness: 0.82,
+    cssColor: "#c084fc",
+  },
+  fade_prism: {
+    key: "fade_prism",
+    name: "プリズムフェード",
+    rarity: "EPIC",
+    bodyColor: 0x311042,
+    accentColor: 0xf472b6,
+    metalness: 0.85,
+    cssColor: "#f472b6",
+  },
+  gold_royal: {
+    key: "gold_royal",
+    name: "ロイヤルゴールド",
+    rarity: "LEGEND",
+    bodyColor: 0x78350f,
+    accentColor: 0xfde047,
+    metalness: 0.92,
+    cssColor: "#fde047",
+  },
+};
+
+const GACHA_POOL = [
+  { skin: "crimson", weight: 23 },
+  { skin: "emerald", weight: 22 },
+  { skin: "arctic", weight: 16 },
+  { skin: "cyber_cyan", weight: 16 },
+  { skin: "violet_void", weight: 8 },
+  { skin: "fade_prism", weight: 8 },
+  { skin: "gold_royal", weight: 7 },
+];
+
+function createDefaultProfile() {
+  return {
+    coins: 120, // 初回から1回ガチャや新銃を試せるボーナス
+    ownedGuns: ["rifle"],
+    ownedMelees: ["knife"],
+    ownedSkins: ["default"],
+    equippedGun: "rifle",
+    equippedMelee: "knife",
+    equippedGunSkin: "default",
+    equippedMeleeSkin: "default",
+  };
+}
+
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (!raw) return createDefaultProfile();
+    const p = JSON.parse(raw);
+    const def = createDefaultProfile();
+    return {
+      coins: typeof p.coins === "number" ? p.coins : def.coins,
+      ownedGuns: Array.isArray(p.ownedGuns) && p.ownedGuns.length ? p.ownedGuns : def.ownedGuns,
+      ownedMelees: Array.isArray(p.ownedMelees) && p.ownedMelees.length ? p.ownedMelees : def.ownedMelees,
+      ownedSkins: Array.isArray(p.ownedSkins) && p.ownedSkins.length ? p.ownedSkins : def.ownedSkins,
+      equippedGun: GUNS[p.equippedGun] ? p.equippedGun : def.equippedGun,
+      equippedMelee: MELEES[p.equippedMelee] ? p.equippedMelee : def.equippedMelee,
+      equippedGunSkin: SKINS[p.equippedGunSkin] ? p.equippedGunSkin : def.equippedGunSkin,
+      equippedMeleeSkin: SKINS[p.equippedMeleeSkin] ? p.equippedMeleeSkin : def.equippedMeleeSkin,
+    };
+  } catch {
+    return createDefaultProfile();
+  }
+}
+
+let profile = loadProfile();
+
+function saveProfile() {
+  try {
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  } catch {
+    // ignore
+  }
+}
+
+function addCoins(amount) {
+  profile.coins = Math.max(0, profile.coins + amount);
+  saveProfile();
+  updateEconomyAndLoadoutUI();
+}
+
+const AUTOFIRE_STORAGE_KEY = "parkour_tag_autofire";
 let autoFireEnabled = true;
 try {
   const savedAuto = localStorage.getItem(AUTOFIRE_STORAGE_KEY);
@@ -1318,32 +1581,37 @@ try {
   // ignore
 }
 
-let initialWeaponKey = "rifle";
-try {
-  const savedW = localStorage.getItem(WEAPON_STORAGE_KEY);
-  if (savedW && WEAPONS[savedW]) initialWeaponKey = savedW;
-} catch {
-  // ignore
-}
-
 const weaponState = {
-  currentKey: initialWeaponKey,
-  ammo: {
-    rifle: WEAPONS.rifle.maxAmmo,
-    shotgun: WEAPONS.shotgun.maxAmmo,
-    sniper: WEAPONS.sniper.maxAmmo,
-  },
+  activeSlot: "gun", // "gun" | "melee"
+  ammo: GUNS[profile.equippedGun].maxAmmo,
   fireCooldown: 0,
   reloading: false,
   reloadTimer: 0,
   manualFireHeld: false,
   recoilOffset: 0,
   recoilRot: 0,
+  meleeSwingTimer: 0,
   bobTime: 0,
   hitmarkerTimer: 0,
   muzzleFlashTimer: 0,
   isAimingOni: false,
 };
+
+function updateEconomyAndLoadoutUI() {
+  if (hudCoinsDisplay) hudCoinsDisplay.textContent = String(profile.coins);
+  if (modalCoinsDisplay) modalCoinsDisplay.textContent = `${profile.coins} CR`;
+  if (shopCoinsDisplay) shopCoinsDisplay.textContent = `${profile.coins} CR`;
+
+  const gun = GUNS[profile.equippedGun];
+  const melee = MELEES[profile.equippedMelee];
+  const gSkin = SKINS[profile.equippedGunSkin];
+  const mSkin = SKINS[profile.equippedMeleeSkin];
+
+  if (equippedGunNameEl) equippedGunNameEl.textContent = gun.name;
+  if (equippedGunSkinEl) equippedGunSkinEl.textContent = `スキン: ${gSkin.name}`;
+  if (equippedMeleeNameEl) equippedMeleeNameEl.textContent = melee.name;
+  if (equippedMeleeSkinEl) equippedMeleeSkinEl.textContent = `スキン: ${mSkin.name}`;
+}
 
 // 3D ビューモデル（カメラの子要素として右下に配置）
 const weaponRoot = new THREE.Group();
@@ -1354,73 +1622,180 @@ camera.add(weaponRoot);
 let muzzlePoint = new THREE.Object3D();
 let muzzleFlashMesh = null;
 
-function buildWeaponModel(key) {
+function getEffectiveAccentColor(baseColor, skinKey) {
+  const skin = SKINS[skinKey] || SKINS.default;
+  return skin.accentColor !== null ? skin.accentColor : baseColor;
+}
+
+function buildActiveViewModel() {
   while (weaponRoot.children.length > 0) {
     weaponRoot.remove(weaponRoot.children[0]);
   }
-  const w = WEAPONS[key];
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.65 });
-  const accentMat = new THREE.MeshStandardMaterial({
-    color: w.color,
-    emissive: w.color,
-    emissiveIntensity: 0.85,
-    roughness: 0.2,
-  });
-  const metalMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.3, metalness: 0.8 });
+  muzzleFlashMesh = null;
 
-  if (key === "rifle") {
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.13, 0.52), bodyMat);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.34, 10), metalMat);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.025, -0.34);
-    const core = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.035, 0.28), accentMat);
-    core.position.set(0, 0.03, -0.05);
-    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.08), metalMat);
-    mag.position.set(0, -0.11, -0.04);
-    mag.rotation.x = 0.22;
-    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.09), accentMat);
-    sight.position.set(0, 0.085, 0.02);
-    weaponRoot.add(body, barrel, core, mag, sight);
-    muzzlePoint.position.set(0, 0.025, -0.53);
-  } else if (key === "shotgun") {
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.48), bodyMat);
-    const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.034, 0.36, 10), metalMat);
-    barrelTop.rotation.x = Math.PI / 2;
-    barrelTop.position.set(0, 0.032, -0.30);
-    const barrelBot = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.32, 10), bodyMat);
-    barrelBot.rotation.x = Math.PI / 2;
-    barrelBot.position.set(0, -0.022, -0.28);
-    const pump = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.07, 0.18), accentMat);
-    pump.position.set(0, -0.02, -0.24);
-    weaponRoot.add(body, barrelTop, barrelBot, pump);
-    muzzlePoint.position.set(0, 0.032, -0.50);
+  if (weaponState.activeSlot === "gun") {
+    const g = GUNS[profile.equippedGun];
+    const skin = SKINS[profile.equippedGunSkin] || SKINS.default;
+    const accentHex = getEffectiveAccentColor(g.defaultColor, profile.equippedGunSkin);
+
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: skin.bodyColor,
+      roughness: 0.32,
+      metalness: skin.metalness,
+    });
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: accentHex,
+      emissive: accentHex,
+      emissiveIntensity: 0.85,
+      roughness: 0.2,
+    });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.3, metalness: 0.8 });
+
+    if (g.key === "rifle") {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.13, 0.52), bodyMat);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.34, 10), metalMat);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0, 0.025, -0.34);
+      const core = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.035, 0.28), accentMat);
+      core.position.set(0, 0.03, -0.05);
+      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.08), metalMat);
+      mag.position.set(0, -0.11, -0.04);
+      mag.rotation.x = 0.22;
+      const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.09), accentMat);
+      sight.position.set(0, 0.085, 0.02);
+      weaponRoot.add(body, barrel, core, mag, sight);
+      muzzlePoint.position.set(0, 0.025, -0.53);
+    } else if (g.key === "smg") {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.13, 0.36), bodyMat);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.022, 0.22, 10), metalMat);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0, 0.02, -0.24);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.106, 0.03, 0.24), accentMat);
+      rail.position.set(0, 0.055, -0.02);
+      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.20, 0.065), accentMat);
+      mag.position.set(0, -0.12, -0.05);
+      mag.rotation.x = -0.18;
+      weaponRoot.add(body, barrel, rail, mag);
+      muzzlePoint.position.set(0, 0.02, -0.38);
+    } else if (g.key === "shotgun") {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.48), bodyMat);
+      const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.034, 0.36, 10), metalMat);
+      barrelTop.rotation.x = Math.PI / 2;
+      barrelTop.position.set(0, 0.032, -0.30);
+      const barrelBot = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.32, 10), bodyMat);
+      barrelBot.rotation.x = Math.PI / 2;
+      barrelBot.position.set(0, -0.022, -0.28);
+      const pump = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.07, 0.18), accentMat);
+      pump.position.set(0, -0.02, -0.24);
+      weaponRoot.add(body, barrelTop, barrelBot, pump);
+      muzzlePoint.position.set(0, 0.032, -0.50);
+    } else if (g.key === "sniper") {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.12, 0.58), bodyMat);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.62, 10), metalMat);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0, 0.02, -0.50);
+      const railL = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.022, 0.50), accentMat);
+      railL.position.set(-0.048, 0.02, -0.35);
+      const railR = railL.clone();
+      railR.position.x = 0.048;
+      const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.028, 0.26, 12), metalMat);
+      scope.rotation.x = Math.PI / 2;
+      scope.position.set(0, 0.105, -0.02);
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.02, 12), accentMat);
+      lens.rotation.x = Math.PI / 2;
+      lens.position.set(0, 0.105, -0.155);
+      weaponRoot.add(body, barrel, railL, railR, scope, lens);
+      muzzlePoint.position.set(0, 0.02, -0.82);
+    } else {
+      // lmg
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.56), bodyMat);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.032, 0.42, 10), metalMat);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0, 0.03, -0.40);
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.12, 14), accentMat);
+      drum.rotation.z = Math.PI / 2;
+      drum.position.set(0, -0.10, -0.06);
+      const topCover = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.03, 0.34), accentMat);
+      topCover.position.set(0, 0.08, -0.04);
+      weaponRoot.add(body, barrel, drum, topCover);
+      muzzlePoint.position.set(0, 0.03, -0.62);
+    }
+
+    muzzleFlashMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(g.key === "shotgun" ? 0.095 : 0.065, 8, 8),
+      new THREE.MeshBasicMaterial({ color: accentHex, transparent: true, opacity: 0.92 })
+    );
+    muzzleFlashMesh.position.copy(muzzlePoint.position);
+    muzzleFlashMesh.visible = false;
+    weaponRoot.add(muzzlePoint, muzzleFlashMesh);
   } else {
-    // sniper
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.12, 0.58), bodyMat);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.62, 10), metalMat);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.02, -0.50);
-    const railL = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.022, 0.50), accentMat);
-    railL.position.set(-0.048, 0.02, -0.35);
-    const railR = railL.clone();
-    railR.position.x = 0.048;
-    const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.028, 0.26, 12), metalMat);
-    scope.rotation.x = Math.PI / 2;
-    scope.position.set(0, 0.105, -0.02);
-    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.02, 12), accentMat);
-    lens.rotation.x = Math.PI / 2;
-    lens.position.set(0, 0.105, -0.155);
-    weaponRoot.add(body, barrel, railL, railR, scope, lens);
-    muzzlePoint.position.set(0, 0.02, -0.82);
-  }
+    // 近接武器モデル（ナイフ / カラムビット / サイバーカタナ / プラズマアックス）
+    const m = MELEES[profile.equippedMelee];
+    const skin = SKINS[profile.equippedMeleeSkin] || SKINS.default;
+    const accentHex = getEffectiveAccentColor(m.defaultColor, profile.equippedMeleeSkin);
 
-  muzzleFlashMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(key === "shotgun" ? 0.095 : 0.065, 8, 8),
-    new THREE.MeshBasicMaterial({ color: w.color, transparent: true, opacity: 0.92 })
-  );
-  muzzleFlashMesh.position.copy(muzzlePoint.position);
-  muzzleFlashMesh.visible = false;
-  weaponRoot.add(muzzlePoint, muzzleFlashMesh);
+    const gripMat = new THREE.MeshStandardMaterial({
+      color: skin.bodyColor,
+      roughness: 0.35,
+      metalness: skin.metalness,
+    });
+    const bladeMat = new THREE.MeshStandardMaterial({
+      color: accentHex,
+      emissive: accentHex,
+      emissiveIntensity: 0.78,
+      roughness: 0.18,
+      metalness: 0.85,
+    });
+
+    if (m.key === "knife") {
+      const grip = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.055, 0.16), gripMat);
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.085, 0.022), bladeMat);
+      guard.position.set(0, 0, -0.09);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.045, 0.28), bladeMat);
+      blade.position.set(0, 0.005, -0.24);
+      weaponRoot.add(grip, guard, blade);
+    } else if (m.key === "karambit") {
+      // カラムビット：フィンガーリング + 湾曲クローブレード
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.011, 10, 20), bladeMat);
+      ring.rotation.y = Math.PI / 2;
+      ring.position.set(0, -0.01, 0.08);
+
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.048, 0.14), gripMat);
+      handle.rotation.x = 0.24;
+      handle.position.set(0, 0.01, -0.01);
+
+      const blade1 = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.044, 0.15), bladeMat);
+      blade1.rotation.x = -0.35;
+      blade1.position.set(0, -0.015, -0.14);
+
+      const blade2 = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.034, 0.14), bladeMat);
+      blade2.rotation.x = -0.88;
+      blade2.position.set(0, -0.095, -0.23);
+
+      weaponRoot.add(ring, handle, blade1, blade2);
+    } else if (m.key === "katana") {
+      const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.24, 10), gripMat);
+      hilt.rotation.x = Math.PI / 2.4;
+      hilt.position.set(0, -0.04, 0.04);
+      const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.016, 14), bladeMat);
+      tsuba.rotation.x = Math.PI / 2.4;
+      tsuba.position.set(0, 0.01, -0.07);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.036, 0.68), bladeMat);
+      blade.rotation.x = -0.22;
+      blade.position.set(0, 0.11, -0.40);
+      weaponRoot.add(hilt, tsuba, blade);
+    } else {
+      // axe
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.54, 10), gripMat);
+      shaft.rotation.x = Math.PI / 2.2;
+      shaft.position.set(0, -0.02, -0.14);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.19, 0.16), bladeMat);
+      head.position.set(0, 0.07, -0.34);
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.24, 0.07), bladeMat);
+      edge.position.set(0, 0.07, -0.42);
+      weaponRoot.add(shaft, head, edge);
+    }
+  }
 }
 
 const activeTracers = [];
@@ -1434,62 +1809,71 @@ function spawnTracer(startPos, endPos, colorHex) {
 }
 
 function updateWeaponUI() {
-  const w = WEAPONS[weaponState.currentKey];
-  if (weaponNameEl) weaponNameEl.textContent = w.name;
-  if (ammoDisplay) ammoDisplay.textContent = String(weaponState.ammo[w.key]);
-  if (ammoMaxDisplay) ammoMaxDisplay.textContent = `/ ${w.maxAmmo}`;
-  if (reloadStatus) reloadStatus.classList.toggle("hidden", !weaponState.reloading);
-  if (btnWeaponLabel) btnWeaponLabel.textContent = w.shortName;
+  const isGun = weaponState.activeSlot === "gun";
+  const g = GUNS[profile.equippedGun];
+  const m = MELEES[profile.equippedMelee];
+
+  if (weaponNameEl) {
+    weaponNameEl.textContent = isGun ? g.hudName : m.hudName;
+  }
+
+  const ammoRow = ammoDisplay ? ammoDisplay.parentElement : null;
+  if (isGun) {
+    if (ammoRow) ammoRow.classList.remove("hidden");
+    if (ammoDisplay) ammoDisplay.textContent = String(weaponState.ammo);
+    if (ammoMaxDisplay) ammoMaxDisplay.textContent = `/ ${g.maxAmmo}`;
+    if (reloadStatus) reloadStatus.classList.toggle("hidden", !weaponState.reloading);
+    if (meleeReadyBadge) meleeReadyBadge.classList.add("hidden");
+    if (btnWeaponLabel) btnWeaponLabel.textContent = m.shortName;
+  } else {
+    if (ammoRow) ammoRow.classList.add("hidden");
+    if (reloadStatus) reloadStatus.classList.add("hidden");
+    if (meleeReadyBadge) meleeReadyBadge.classList.remove("hidden");
+    if (btnWeaponLabel) btnWeaponLabel.textContent = g.shortName;
+  }
 
   if (autofireBadge) {
     autofireBadge.textContent = autoFireEnabled ? "AUTO" : "MANUAL";
     autofireBadge.classList.toggle("off", !autoFireEnabled);
   }
   if (btnFireSub) {
-    btnFireSub.textContent = autoFireEnabled ? "AUTO" : "手動";
+    btnFireSub.textContent = autoFireEnabled ? "AUTO" : (isGun ? "射撃" : "斬撃");
   }
   if (autofireToggleBtn) {
     autofireToggleBtn.textContent = autoFireEnabled ? "ON" : "OFF";
     autofireToggleBtn.classList.toggle("active", autoFireEnabled);
   }
-  weaponSelectBtns.forEach((b) => {
-    b.classList.toggle("active", b.dataset.weapon === weaponState.currentKey);
-  });
 }
 
-function selectWeapon(key, showNotice = false) {
-  if (!WEAPONS[key]) return;
-  if (weaponState.currentKey === key && weaponRoot.children.length > 0) {
+function switchWeaponSlot(slot, showNotice = false) {
+  if (slot !== "gun" && slot !== "melee") return;
+  if (weaponState.activeSlot === slot && weaponRoot.children.length > 0) {
     updateWeaponUI();
     return;
   }
-  weaponState.currentKey = key;
+  weaponState.activeSlot = slot;
   weaponState.reloading = false;
   weaponState.reloadTimer = 0;
-  weaponState.fireCooldown = 0.14;
-  buildWeaponModel(key);
+  weaponState.fireCooldown = 0.12;
+  buildActiveViewModel();
   updateWeaponUI();
-  try {
-    localStorage.setItem(WEAPON_STORAGE_KEY, key);
-  } catch {
-    // ignore
-  }
+
   if (showNotice) {
-    showTrick(`WEAPON: ${WEAPONS[key].name}`);
+    const label = slot === "gun" ? GUNS[profile.equippedGun].name : MELEES[profile.equippedMelee].name;
+    showTrick(`EQUIP: ${label}`);
   }
 }
 
-function cycleWeapon(dir = 1) {
-  const idx = WEAPON_ORDER.indexOf(weaponState.currentKey);
-  const nextIdx = (idx + dir + WEAPON_ORDER.length) % WEAPON_ORDER.length;
-  selectWeapon(WEAPON_ORDER[nextIdx], true);
+function toggleWeaponSlot(showNotice = true) {
+  switchWeaponSlot(weaponState.activeSlot === "gun" ? "melee" : "gun", showNotice);
 }
 
 function startReload() {
-  const w = WEAPONS[weaponState.currentKey];
-  if (weaponState.reloading || weaponState.ammo[w.key] >= w.maxAmmo) return;
+  if (weaponState.activeSlot !== "gun") return;
+  const g = GUNS[profile.equippedGun];
+  if (weaponState.reloading || weaponState.ammo >= g.maxAmmo) return;
   weaponState.reloading = true;
-  weaponState.reloadTimer = w.reloadTime;
+  weaponState.reloadTimer = g.reloadTime;
   playSfx("reload");
   updateWeaponUI();
 }
@@ -1503,21 +1887,76 @@ function checkAimOnRival(maxRange) {
   return hits.length > 0 && hits[0].object === rivalHitMesh;
 }
 
+function dealDamageToRival(totalDmg, weaponShortName) {
+  weaponState.hitmarkerTimer = 0.14;
+  hitmarker.classList.remove("hidden");
+  rival.hitFlashTimer = 0.12;
+  playSfx(weaponState.activeSlot === "melee" ? "melee_hit" : "hit");
+
+  if (net.connected) {
+    rival.hp = Math.max(1, rival.hp - totalDmg);
+    updateScoreAndHpUI();
+    sendNet({ type: "hit", dmg: totalDmg, weaponName: weaponShortName });
+  } else {
+    rival.hp = Math.max(0, rival.hp - totalDmg);
+    updateScoreAndHpUI();
+    if (rival.hp <= 0 && !rival.dead) {
+      rival.dead = true;
+      rival.respawnTimer = 2.6;
+      rivalGroup.visible = false;
+      game.myKills += 1;
+      playSfx("stun");
+      showTrick(`BOT K.O.!! (${game.myKills} / ${game.targetKills})`);
+      updateScoreAndHpUI();
+      if (game.myKills >= game.targetKills) {
+        triggerMatchEnd(true);
+      }
+    }
+  }
+}
+
+function performMeleeAttack() {
+  const m = MELEES[profile.equippedMelee];
+  weaponState.fireCooldown = MELEE_COMMON_STATS.attackRate;
+  weaponState.meleeSwingTimer = 0.22;
+  playSfx("melee_swing");
+
+  const accentHex = getEffectiveAccentColor(m.defaultColor, profile.equippedMeleeSkin);
+  const eyePos = camera.getWorldPosition(new THREE.Vector3());
+  const forward = getLookDirection();
+
+  // 斬撃エフェクトライン
+  const slashStart = eyePos.clone().addScaledVector(forward, 0.55).add(new THREE.Vector3(0.22, -0.15, 0));
+  const slashEnd = eyePos.clone().addScaledVector(forward, 2.2).add(new THREE.Vector3(-0.22, -0.1, 0));
+  spawnTracer(slashStart, slashEnd, accentHex);
+
+  if (checkAimOnRival(MELEE_COMMON_STATS.range)) {
+    dealDamageToRival(MELEE_COMMON_STATS.damage, m.shortName);
+  }
+}
+
 function fireWeapon() {
   if (player.dead) return;
-  const w = WEAPONS[weaponState.currentKey];
   if (weaponState.reloading || weaponState.fireCooldown > 0) return;
-  if (weaponState.ammo[w.key] <= 0) {
+
+  if (weaponState.activeSlot === "melee") {
+    performMeleeAttack();
+    return;
+  }
+
+  const g = GUNS[profile.equippedGun];
+  if (weaponState.ammo <= 0) {
     startReload();
     return;
   }
 
-  weaponState.ammo[w.key] -= 1;
-  weaponState.fireCooldown = w.fireRate;
-  weaponState.recoilOffset = Math.min(0.2, weaponState.recoilOffset + w.recoilZ);
-  weaponState.recoilRot = Math.min(0.28, weaponState.recoilRot + w.recoilPitch);
+  const tracerColor = getEffectiveAccentColor(g.defaultColor, profile.equippedGunSkin);
+  weaponState.ammo -= 1;
+  weaponState.fireCooldown = g.fireRate;
+  weaponState.recoilOffset = Math.min(0.2, weaponState.recoilOffset + g.recoilZ);
+  weaponState.recoilRot = Math.min(0.28, weaponState.recoilRot + g.recoilPitch);
   weaponState.muzzleFlashTimer = 0.045;
-  playSfx(w.sfx);
+  playSfx(g.sfx);
 
   const muzzleWorld = new THREE.Vector3();
   muzzlePoint.getWorldPosition(muzzleWorld);
@@ -1525,11 +1964,11 @@ function fireWeapon() {
   const targets = rival.dead ? worldMeshes : [...worldMeshes, rivalHitMesh];
   let hitCount = 0;
 
-  for (let p = 0; p < w.pellets; p++) {
-    const spreadX = (Math.random() - 0.5) * 2 * w.spread;
-    const spreadY = (Math.random() - 0.5) * 2 * w.spread;
+  for (let p = 0; p < g.pellets; p++) {
+    const spreadX = (Math.random() - 0.5) * 2 * g.spread;
+    const spreadY = (Math.random() - 0.5) * 2 * g.spread;
     raycaster.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
-    raycaster.far = w.range;
+    raycaster.far = g.range;
 
     const hits = raycaster.intersectObjects(targets, false);
     let endPos;
@@ -1539,9 +1978,9 @@ function fireWeapon() {
         hitCount += 1;
       }
     } else {
-      endPos = raycaster.ray.origin.clone().addScaledVector(raycaster.ray.direction, w.range);
+      endPos = raycaster.ray.origin.clone().addScaledVector(raycaster.ray.direction, g.range);
     }
-    spawnTracer(muzzleWorld, endPos, w.color);
+    spawnTracer(muzzleWorld, endPos, tracerColor);
 
     if (net.connected) {
       sendNet({
@@ -1552,43 +1991,16 @@ function fireWeapon() {
         ex: endPos.x,
         ey: endPos.y,
         ez: endPos.z,
-        color: w.color,
+        color: tracerColor,
       });
     }
   }
 
   if (hitCount > 0) {
-    const totalDmg = w.damage * hitCount;
-    weaponState.hitmarkerTimer = 0.14;
-    hitmarker.classList.remove("hidden");
-    rival.hitFlashTimer = 0.12;
-    playSfx("hit");
-
-    if (net.connected) {
-      // オンライン時は相手にダメージ通知を送信
-      rival.hp = Math.max(1, rival.hp - totalDmg);
-      updateScoreAndHpUI();
-      sendNet({ type: "hit", dmg: totalDmg, weaponName: w.shortName });
-    } else {
-      // ソロ練習BOTへのダメージ＆撃破処理
-      rival.hp = Math.max(0, rival.hp - totalDmg);
-      updateScoreAndHpUI();
-      if (rival.hp <= 0 && !rival.dead) {
-        rival.dead = true;
-        rival.respawnTimer = 2.6;
-        rivalGroup.visible = false;
-        game.myKills += 1;
-        playSfx("stun");
-        showTrick(`BOT K.O.!! (${game.myKills} / ${game.targetKills})`);
-        updateScoreAndHpUI();
-        if (game.myKills >= game.targetKills) {
-          triggerMatchEnd(true);
-        }
-      }
-    }
+    dealDamageToRival(g.damage * hitCount, g.shortName);
   }
 
-  if (weaponState.ammo[w.key] <= 0) {
+  if (weaponState.ammo <= 0) {
     startReload();
   } else {
     updateWeaponUI();
@@ -1596,7 +2008,8 @@ function fireWeapon() {
 }
 
 function updateWeapon(dt) {
-  const w = WEAPONS[weaponState.currentKey];
+  const isGun = weaponState.activeSlot === "gun";
+  const g = GUNS[profile.equippedGun];
 
   // トレーサー更新
   for (let i = activeTracers.length - 1; i >= 0; i--) {
@@ -1623,7 +2036,7 @@ function updateWeapon(dt) {
   // マズルフラッシュ更新
   if (weaponState.muzzleFlashTimer > 0) {
     weaponState.muzzleFlashTimer -= dt;
-    if (muzzleFlashMesh) {
+    if (muzzleFlashMesh && isGun) {
       muzzleFlashMesh.visible = true;
       muzzleFlashMesh.scale.setScalar(0.8 + Math.random() * 0.5);
     }
@@ -1631,22 +2044,26 @@ function updateWeapon(dt) {
     muzzleFlashMesh.visible = false;
   }
 
-  // クールタイム・リロード更新
+  // クールタイム・リロード・近接スイング更新
   if (weaponState.fireCooldown > 0) {
     weaponState.fireCooldown = Math.max(0, weaponState.fireCooldown - dt);
+  }
+  if (weaponState.meleeSwingTimer > 0) {
+    weaponState.meleeSwingTimer = Math.max(0, weaponState.meleeSwingTimer - dt);
   }
 
   if (weaponState.reloading) {
     weaponState.reloadTimer -= dt;
     if (weaponState.reloadTimer <= 0) {
       weaponState.reloading = false;
-      weaponState.ammo[w.key] = w.maxAmmo;
+      weaponState.ammo = g.maxAmmo;
       updateWeaponUI();
     }
   }
 
-  // 照準が相手に合っているか判定（オート射撃＆ロックオン表示）
-  const aimingRival = checkAimOnRival(w.range);
+  // 照準が相手に合っているか判定（銃・近接のそれぞれの射程で判定）
+  const checkRange = isGun ? g.range : MELEE_COMMON_STATS.range;
+  const aimingRival = checkAimOnRival(checkRange);
   weaponState.isAimingOni = aimingRival;
   crosshair.classList.toggle("lock-on", aimingRival);
 
@@ -1656,7 +2073,7 @@ function updateWeapon(dt) {
     }
   }
 
-  // ビューモデルのボビング・リコイル・リロードアニメーション
+  // ビューモデルのボビング・リコイル・近接スイングアニメーション
   const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
   if (player.onGround && horizSpeed > 1.0) {
     weaponState.bobTime += dt * Math.min(14, 6 + horizSpeed * 0.45);
@@ -1670,22 +2087,298 @@ function updateWeapon(dt) {
   weaponState.recoilOffset += (0 - weaponState.recoilOffset) * Math.min(1, dt * 14);
   weaponState.recoilRot += (0 - weaponState.recoilRot) * Math.min(1, dt * 14);
 
-  const reloadDrop = weaponState.reloading ? -0.14 : 0;
-  const reloadTilt = weaponState.reloading ? -0.55 : 0;
-
-  weaponRoot.position.set(
-    weaponBasePos.x + bobX,
-    weaponBasePos.y - bobY + reloadDrop,
-    weaponBasePos.z + weaponState.recoilOffset
-  );
-  weaponRoot.rotation.set(weaponState.recoilRot + reloadTilt, 0, weaponState.reloading ? 0.25 : 0);
-
-
+  if (isGun) {
+    const reloadDrop = weaponState.reloading ? -0.14 : 0;
+    const reloadTilt = weaponState.reloading ? -0.55 : 0;
+    weaponRoot.position.set(
+      weaponBasePos.x + bobX,
+      weaponBasePos.y - bobY + reloadDrop,
+      weaponBasePos.z + weaponState.recoilOffset
+    );
+    weaponRoot.rotation.set(weaponState.recoilRot + reloadTilt, 0, weaponState.reloading ? 0.25 : 0);
+  } else {
+    const swingPhase = weaponState.meleeSwingTimer > 0 ? Math.sin((weaponState.meleeSwingTimer / 0.22) * Math.PI) : 0;
+    weaponRoot.position.set(
+      weaponBasePos.x + bobX - swingPhase * 0.16,
+      weaponBasePos.y - bobY - swingPhase * 0.04,
+      weaponBasePos.z - swingPhase * 0.14
+    );
+    weaponRoot.rotation.set(-swingPhase * 0.85, swingPhase * 0.65, swingPhase * 0.45);
+  }
 }
 
-// 初期武器モデル構築＆設定イベント
-buildWeaponModel(weaponState.currentKey);
-updateWeaponUI();
+// ==========================================
+// ショップ＆スキンガチャロジック
+// ==========================================
+let currentShopTab = "guns";
+
+const SHOP_TAB_NOTES = {
+  guns: "バトルに持ち込むメイン銃を1つ購入・装備できます。",
+  melee: "バトルに持ち込む近接武器を購入・装備できます（すべて共通性能: 威力55）。",
+  gacha: "1回 80 CR / 3連 220 CR で銃・近接のスキンを引けます！",
+  skins: "ガチャで入手したスキンを「銃」と「近接武器」それぞれに装備できます。",
+};
+
+function renderShop() {
+  updateEconomyAndLoadoutUI();
+  shopTabBtns.forEach((b) => {
+    b.classList.toggle("active", b.dataset.shoptab === currentShopTab);
+  });
+  if (shopTabNote) {
+    shopTabNote.textContent = SHOP_TAB_NOTES[currentShopTab] || "";
+  }
+
+  if (currentShopTab === "gacha") {
+    shopItemsGrid.classList.add("hidden");
+    gachaView.classList.remove("hidden");
+    gachaPull1Btn.disabled = profile.coins < 80;
+    gachaPull3Btn.disabled = profile.coins < 220;
+    return;
+  }
+
+  gachaView.classList.add("hidden");
+  shopItemsGrid.classList.remove("hidden");
+  shopItemsGrid.innerHTML = "";
+
+  if (currentShopTab === "guns") {
+    for (const g of Object.values(GUNS)) {
+      const owned = profile.ownedGuns.includes(g.key);
+      const equipped = profile.equippedGun === g.key;
+      const card = document.createElement("div");
+      card.className = `shop-card${equipped ? " equipped" : ""}`;
+      card.innerHTML = `
+        <div class="shop-card-header">
+          <span class="shop-card-name">${g.name}</span>
+          <span class="skin-swatch" style="background:#${g.defaultColor.toString(16).padStart(6, "0")};"></span>
+        </div>
+        <div class="shop-card-desc">${g.desc}</div>
+      `;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      if (equipped) {
+        btn.className = "shop-card-btn equipped";
+        btn.textContent = "装備中";
+        btn.disabled = true;
+      } else if (owned) {
+        btn.className = "shop-card-btn equip";
+        btn.textContent = "装備する";
+        btn.addEventListener("click", () => {
+          profile.equippedGun = g.key;
+          weaponState.ammo = g.maxAmmo;
+          weaponState.reloading = false;
+          saveProfile();
+          buildActiveViewModel();
+          updateWeaponUI();
+          renderShop();
+        });
+      } else {
+        btn.className = "shop-card-btn buy";
+        btn.textContent = `購入する (${g.price} CR)`;
+        btn.disabled = profile.coins < g.price;
+        btn.addEventListener("click", () => {
+          if (profile.coins < g.price) return;
+          profile.coins -= g.price;
+          profile.ownedGuns.push(g.key);
+          profile.equippedGun = g.key;
+          weaponState.ammo = g.maxAmmo;
+          weaponState.reloading = false;
+          playSfx("stun");
+          saveProfile();
+          buildActiveViewModel();
+          updateWeaponUI();
+          renderShop();
+        });
+      }
+      card.appendChild(btn);
+      shopItemsGrid.appendChild(card);
+    }
+  } else if (currentShopTab === "melee") {
+    for (const m of Object.values(MELEES)) {
+      const owned = profile.ownedMelees.includes(m.key);
+      const equipped = profile.equippedMelee === m.key;
+      const card = document.createElement("div");
+      card.className = `shop-card${equipped ? " equipped" : ""}`;
+      card.innerHTML = `
+        <div class="shop-card-header">
+          <span class="shop-card-name">${m.name}</span>
+          <span class="skin-swatch" style="background:#${m.defaultColor.toString(16).padStart(6, "0")};"></span>
+        </div>
+        <div class="shop-card-desc">${m.desc}</div>
+      `;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      if (equipped) {
+        btn.className = "shop-card-btn equipped";
+        btn.textContent = "装備中";
+        btn.disabled = true;
+      } else if (owned) {
+        btn.className = "shop-card-btn equip";
+        btn.textContent = "装備する";
+        btn.addEventListener("click", () => {
+          profile.equippedMelee = m.key;
+          saveProfile();
+          buildActiveViewModel();
+          updateWeaponUI();
+          renderShop();
+        });
+      } else {
+        btn.className = "shop-card-btn buy";
+        btn.textContent = `購入する (${m.price} CR)`;
+        btn.disabled = profile.coins < m.price;
+        btn.addEventListener("click", () => {
+          if (profile.coins < m.price) return;
+          profile.coins -= m.price;
+          profile.ownedMelees.push(m.key);
+          profile.equippedMelee = m.key;
+          playSfx("stun");
+          saveProfile();
+          buildActiveViewModel();
+          updateWeaponUI();
+          renderShop();
+        });
+      }
+      card.appendChild(btn);
+      shopItemsGrid.appendChild(card);
+    }
+  } else if (currentShopTab === "skins") {
+    for (const s of Object.values(SKINS)) {
+      const owned = profile.ownedSkins.includes(s.key);
+      const eqGun = profile.equippedGunSkin === s.key;
+      const eqMelee = profile.equippedMeleeSkin === s.key;
+      const card = document.createElement("div");
+      card.className = `shop-card${eqGun || eqMelee ? " equipped" : ""}`;
+      card.innerHTML = `
+        <div class="shop-card-header">
+          <span class="shop-card-name">${s.name} <small style="color:#94a3b8;">[${s.rarity}]</small></span>
+          <span class="skin-swatch" style="background:${s.cssColor};"></span>
+        </div>
+        <div class="shop-card-desc">${owned ? "所持済み：銃・近接どちらにも適用可能" : "スキンガチャで入手できます"}</div>
+      `;
+
+      if (!owned) {
+        const lockBtn = document.createElement("button");
+        lockBtn.type = "button";
+        lockBtn.className = "shop-card-btn locked-gacha";
+        lockBtn.textContent = "未所持（ガチャ限定）";
+        lockBtn.disabled = true;
+        card.appendChild(lockBtn);
+      } else {
+        const row = document.createElement("div");
+        row.style.display = "grid";
+        row.style.gridTemplateColumns = "1fr 1fr";
+        row.style.gap = "5px";
+
+        const gunBtn = document.createElement("button");
+        gunBtn.type = "button";
+        gunBtn.className = `shop-card-btn ${eqGun ? "equipped" : "equip"}`;
+        gunBtn.textContent = eqGun ? "銃:装備中" : "銃に装備";
+        gunBtn.disabled = eqGun;
+        gunBtn.addEventListener("click", () => {
+          profile.equippedGunSkin = s.key;
+          saveProfile();
+          buildActiveViewModel();
+          renderShop();
+        });
+
+        const meleeBtn = document.createElement("button");
+        meleeBtn.type = "button";
+        meleeBtn.className = `shop-card-btn ${eqMelee ? "equipped" : "equip"}`;
+        meleeBtn.textContent = eqMelee ? "近接:装備中" : "近接に装備";
+        meleeBtn.disabled = eqMelee;
+        meleeBtn.addEventListener("click", () => {
+          profile.equippedMeleeSkin = s.key;
+          saveProfile();
+          buildActiveViewModel();
+          renderShop();
+        });
+
+        row.append(gunBtn, meleeBtn);
+        card.appendChild(row);
+      }
+      shopItemsGrid.appendChild(card);
+    }
+  }
+}
+
+function rollSingleSkin() {
+  const totalWeight = GACHA_POOL.reduce((acc, item) => acc + item.weight, 0);
+  let r = Math.random() * totalWeight;
+  let chosenKey = GACHA_POOL[0].skin;
+  for (const item of GACHA_POOL) {
+    r -= item.weight;
+    if (r <= 0) {
+      chosenKey = item.skin;
+      break;
+    }
+  }
+  const skin = SKINS[chosenKey];
+  const isDuplicate = profile.ownedSkins.includes(chosenKey);
+  if (isDuplicate) {
+    profile.coins += 40;
+  } else {
+    profile.ownedSkins.push(chosenKey);
+  }
+  return { skin, isDuplicate };
+}
+
+function executeGacha(count, cost) {
+  if (profile.coins < cost) return;
+  profile.coins -= cost;
+  const results = [];
+  for (let i = 0; i < count; i++) {
+    results.push(rollSingleSkin());
+  }
+  saveProfile();
+  playSfx("stun");
+  renderShop();
+
+  gachaResultBox.innerHTML = "";
+  for (const res of results) {
+    const row = document.createElement("div");
+    row.className = `gacha-drop-row ${res.skin.rarity}`;
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="skin-swatch" style="background:${res.skin.cssColor};"></span>
+        <strong>${res.skin.name}</strong>
+      </div>
+      <div>
+        <span class="gacha-drop-tag">${res.skin.rarity}</span>
+        <span style="font-size:0.72rem;margin-left:6px;color:${res.isDuplicate ? "#fde047" : "#4ade80"};">
+          ${res.isDuplicate ? "重複 (+40 CR還元)" : "NEW! 獲得"}
+        </span>
+      </div>
+    `;
+    gachaResultBox.appendChild(row);
+  }
+}
+
+if (openShopBtn) {
+  openShopBtn.addEventListener("click", () => {
+    currentShopTab = "guns";
+    renderShop();
+    shopOverlay.classList.remove("hidden");
+  });
+}
+
+if (closeShopBtn) {
+  closeShopBtn.addEventListener("click", () => {
+    shopOverlay.classList.add("hidden");
+  });
+}
+
+shopTabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    currentShopTab = btn.dataset.shoptab;
+    renderShop();
+  });
+});
+
+if (gachaPull1Btn) {
+  gachaPull1Btn.addEventListener("click", () => executeGacha(1, 80));
+}
+if (gachaPull3Btn) {
+  gachaPull3Btn.addEventListener("click", () => executeGacha(3, 220));
+}
 
 if (autofireToggleBtn) {
   autofireToggleBtn.addEventListener("click", () => {
@@ -1699,11 +2392,10 @@ if (autofireToggleBtn) {
   });
 }
 
-weaponSelectBtns.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    selectWeapon(btn.dataset.weapon, false);
-  });
-});
+// 初期モデル・UI構築
+buildActiveViewModel();
+updateWeaponUI();
+updateEconomyAndLoadoutUI();
 
 // ==========================================
 // ギミック発動関数（PC・スマホ共通）
@@ -1841,9 +2533,8 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyE") {
     triggerZipline();
   }
-  if (e.code === "Digit1") selectWeapon("rifle", true);
-  if (e.code === "Digit2") selectWeapon("shotgun", true);
-  if (e.code === "Digit3") selectWeapon("sniper", true);
+  if (e.code === "Digit1") switchWeaponSlot("gun", true);
+  if (e.code === "Digit2") switchWeaponSlot("melee", true);
   if (e.code === "KeyR") {
     if (game.active && !game.over) {
       startReload();
@@ -1874,7 +2565,7 @@ window.addEventListener("mouseup", (e) => {
 window.addEventListener("wheel", (e) => {
   if (!game.active || controlMode !== "pc") return;
   if (Math.abs(e.deltaY) > 4) {
-    cycleWeapon(e.deltaY > 0 ? 1 : -1);
+    toggleWeaponSlot(true);
   }
 }, { passive: true });
 window.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -2124,7 +2815,7 @@ btnWeapon.addEventListener(
     e.preventDefault();
     e.stopPropagation();
     if (!game.active) return;
-    cycleWeapon(1);
+    toggleWeaponSlot(true);
     btnWeapon.classList.add("pressed");
   },
   { passive: false }
@@ -2250,9 +2941,7 @@ function respawnSelf() {
   wireLine.visible = false;
   respawnBanner.classList.add("hidden");
 
-  for (const k of WEAPON_ORDER) {
-    weaponState.ammo[k] = WEAPONS[k].maxAmmo;
-  }
+  weaponState.ammo = GUNS[profile.equippedGun].maxAmmo;
   weaponState.reloading = false;
   weaponState.reloadTimer = 0;
   updateWeaponUI();
@@ -2338,9 +3027,7 @@ function resetMatch(broadcast = false) {
   rivalGroup.visible = true;
   rivalGroup.position.copy(enemyStart);
 
-  for (const k of WEAPON_ORDER) {
-    weaponState.ammo[k] = WEAPONS[k].maxAmmo;
-  }
+  weaponState.ammo = GUNS[profile.equippedGun].maxAmmo;
   weaponState.reloading = false;
   weaponState.reloadTimer = 0;
   weaponState.fireCooldown = 0;
@@ -3024,10 +3711,13 @@ function triggerMatchEnd(isWin) {
     document.exitPointerLock();
   }
 
+  const rewardCr = isWin ? (net.connected ? 100 : 40) : (net.connected ? 20 : 10);
+  addCoins(rewardCr);
+
   modalTitle.textContent = isWin ? "VICTORY!! 勝利！" : "DEFEAT... 敗北";
   modalDesc.innerHTML =
     `最終スコア: <strong>YOU ${game.myKills} - ${game.enemyKills} ${net.connected ? "FRIEND" : "BOT"}</strong><br />` +
-    `「もう一度対戦する」を押すとリマッチします！`;
+    `バトル報酬: <strong style="color:#fde047;">+${rewardCr} CR</strong> 獲得！（ショップやガチャで使えます）`;
   startBtn.textContent = "もう一度対戦する";
   overlay.classList.remove("hidden");
 }
@@ -3078,7 +3768,7 @@ function animate(now) {
         yaw: player.yaw,
         hp: player.hp,
         dead: player.dead,
-        w: weaponState.currentKey,
+        w: weaponState.activeSlot,
       });
     }
   }

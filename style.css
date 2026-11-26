@@ -1318,3 +1318,425 @@ body.touch-mode #weapon-hud {
   color: #f87171;
   font-weight: 700;
 }
+
+
+/* ==========================================
+   v8: 通貨・2枠ロードアウト・ショップ＆スキンガチャ
+   ========================================== */
+.coin-text {
+  color: #fde047;
+}
+
+#melee-ready-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #34d399;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+.wallet-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.95));
+  border: 1.5px solid rgba(250, 204, 21, 0.5);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.wallet-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.wallet-label {
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+.coin-val {
+  font-size: 1.15rem;
+  color: #fde047;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-open-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0f172a;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+
+.shop-open-btn:active {
+  transform: scale(0.97);
+}
+
+.loadout-slots-section {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  padding: 9px 10px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.slots-title {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #93c5fd;
+  margin-bottom: 6px;
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.slot-card {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.slot-card.melee {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.slot-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #38bdf8;
+  margin-bottom: 2px;
+}
+
+.slot-card.melee .slot-badge {
+  color: #34d399;
+}
+
+.slot-item-name {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.slot-skin-name {
+  font-size: 0.68rem;
+  color: #cbd5e1;
+  margin-top: 2px;
+}
+
+/* ショップオーバーレイ */
+#shop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  z-index: 30;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.shop-modal {
+  max-width: 620px;
+  width: 100%;
+  text-align: left;
+}
+
+.shop-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.shop-top-bar h2 {
+  font-size: 1.15rem;
+  color: #fde047;
+}
+
+.shop-wallet-pill {
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+}
+
+.shop-wallet-pill strong {
+  color: #fde047;
+}
+
+.shop-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.shop-tab-btn {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: #cbd5e1;
+  padding: 7px 4px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shop-tab-btn.active {
+  background: rgba(250, 204, 21, 0.2);
+  border-color: #fde047;
+  color: #fde047;
+}
+
+.shop-note {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+.shop-items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.shop-card {
+  background: rgba(30, 41, 59, 0.92);
+  border: 1.5px solid #475569;
+  border-radius: 10px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.shop-card.equipped {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.25);
+}
+
+.shop-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.shop-card-name {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.skin-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  flex-shrink: 0;
+}
+
+.shop-card-desc {
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
+.shop-card-btn {
+  width: 100%;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shop-card-btn.buy {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0f172a;
+}
+
+.shop-card-btn.buy:disabled {
+  background: #334155;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.shop-card-btn.equip {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.shop-card-btn.equipped {
+  background: #1e293b;
+  color: #38bdf8;
+  border: 1px solid #38bdf8;
+  cursor: default;
+}
+
+.shop-card-btn.locked-gacha {
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px dashed #475569;
+  cursor: default;
+}
+
+/* スキンガチャUI */
+.gacha-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gacha-banner {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.55), rgba(15, 23, 42, 0.92));
+  border: 1.5px solid rgba(192, 132, 252, 0.55);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.gacha-banner-title {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #e879f9;
+  letter-spacing: 0.05em;
+}
+
+.gacha-banner-sub {
+  font-size: 0.72rem;
+  color: #e2e8f0;
+  margin-top: 3px;
+}
+
+.gacha-rates {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.rate-chip {
+  font-size: 0.64rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.rate-chip.common { background: #334155; color: #cbd5e1; }
+.rate-chip.rare { background: rgba(14, 165, 233, 0.25); color: #38bdf8; }
+.rate-chip.epic { background: rgba(168, 85, 247, 0.28); color: #d8b4fe; }
+.rate-chip.legend { background: rgba(250, 204, 21, 0.25); color: #fde047; }
+
+.gacha-result-box {
+  min-height: 112px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gacha-placeholder {
+  text-align: center;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.gacha-drop-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(30, 41, 59, 0.92);
+  border-left: 4px solid #38bdf8;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
+.gacha-drop-row.RARE { border-left-color: #38bdf8; }
+.gacha-drop-row.EPIC { border-left-color: #c084fc; }
+.gacha-drop-row.LEGEND { border-left-color: #fde047; background: rgba(113, 63, 18, 0.35); }
+
+.gacha-drop-tag {
+  font-size: 0.66rem;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.gacha-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.gacha-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.gacha-btn strong {
+  font-size: 0.95rem;
+}
+
+.gacha-btn.single {
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+}
+
+.gacha-btn.multi {
+  background: linear-gradient(135deg, #c026d3, #7c3aed);
+  color: #ffffff;
+}
+
+.gacha-btn:disabled {
+  background: #334155;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+@media (max-width: 540px) {
+  .shop-items-grid {
+    grid-template-columns: 1fr;
+  }
+  .slots-grid {
+    grid-template-columns: 1fr;
+  }
+}
