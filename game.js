@@ -131,7 +131,7 @@ const CONFIG = {
   dashSpeed: 24.5,
   dashDuration: 0.22,
   dashCooldown: 2.6,
-  grappleRange: 50,
+  grappleRange: 64,
   grapplePullSpeed: 29.0,
   grappleMaxTime: 1.25,
   grappleCooldown: 3.5,
@@ -607,9 +607,9 @@ function showTrick(text) {
 // ==========================================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1220);
-scene.fog = new THREE.Fog(0x0b1220, 48, 175);
+scene.fog = new THREE.Fog(0x0b1220, 85, 310);
 
-const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerHeight, 0.1, 260);
+const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerHeight, 0.1, 420);
 scene.add(camera);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -621,15 +621,16 @@ const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.98);
 scene.add(hemiLight);
 
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
-dirLight.position.set(42, 68, 35);
+dirLight.position.set(75, 110, 65);
 if (!isCoarsePointer) {
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
   dirLight.shadow.mapSize.height = 2048;
-  dirLight.shadow.camera.left = -80;
-  dirLight.shadow.camera.right = 80;
-  dirLight.shadow.camera.top = 80;
-  dirLight.shadow.camera.bottom = -80;
+  dirLight.shadow.camera.left = -145;
+  dirLight.shadow.camera.right = 145;
+  dirLight.shadow.camera.top = 145;
+  dirLight.shadow.camera.bottom = -145;
+  dirLight.shadow.camera.far = 320;
 }
 scene.add(dirLight);
 
@@ -647,9 +648,9 @@ scene.add(wireLine);
 const raycaster = new THREE.Raycaster();
 
 // ==========================================
-// 広大マップ構築（140 x 140）
+// 超広大バトルアリーナ構築（260 x 260 / 約3.5倍面積）
 // ==========================================
-const ARENA_HALF = 70;
+const ARENA_HALF = 130;
 const colliders = [];
 const grappleMeshes = [];
 const worldMeshes = [];
@@ -693,7 +694,7 @@ function addBox(x, y, z, w, h, d, color, options = {}) {
 }
 
 function addJumpPad(x, y, z, force = CONFIG.jumpPadForce) {
-  const geo = new THREE.CylinderGeometry(1.8, 2.0, 0.28, 24);
+  const geo = new THREE.CylinderGeometry(2.0, 2.2, 0.28, 24);
   const mat = new THREE.MeshStandardMaterial({
     color: 0x22c55e,
     emissive: 0x15803d,
@@ -702,7 +703,7 @@ function addJumpPad(x, y, z, force = CONFIG.jumpPadForce) {
   const pad = new THREE.Mesh(geo, mat);
   pad.position.set(x, y + 0.14, z);
   scene.add(pad);
-  jumpPads.push({ x, y: y + 0.14, z, radius: 1.95, force });
+  jumpPads.push({ x, y: y + 0.14, z, radius: 2.15, force });
 }
 
 function addBoostPad(x, y, z, w, d) {
@@ -734,8 +735,7 @@ function addZipline(ax, ay, az, bx, by, bz) {
   const diff = new THREE.Vector3().subVectors(end, start);
   const len = diff.length();
 
-  // 光る黄色ケーブル
-  const cableGeo = new THREE.CylinderGeometry(0.09, 0.09, len, 8);
+  const cableGeo = new THREE.CylinderGeometry(0.10, 0.10, len, 8);
   const cableMat = new THREE.MeshStandardMaterial({
     color: 0xfacc15,
     emissive: 0xca8a04,
@@ -746,13 +746,12 @@ function addZipline(ax, ay, az, bx, by, bz) {
   cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), diff.clone().normalize());
   scene.add(cable);
 
-  // 両端のアンカーリング
   const postMat = new THREE.MeshStandardMaterial({
     color: 0xfde047,
     emissive: 0xa16207,
     emissiveIntensity: 0.5,
   });
-  const anchorGeo = new THREE.SphereGeometry(0.42, 12, 12);
+  const anchorGeo = new THREE.SphereGeometry(0.46, 12, 12);
   const aMesh = new THREE.Mesh(anchorGeo, postMat);
   aMesh.position.copy(start);
   const bMesh = new THREE.Mesh(anchorGeo, postMat);
@@ -763,142 +762,201 @@ function addZipline(ax, ay, az, bx, by, bz) {
 }
 
 function buildArena() {
-  // 広大な床（140 x 140）
-  addBox(0, -0.5, 0, 140, 1, 140, 0x1e293b, { noCast: true, roughness: 0.85, isFloor: true });
-  const grid = new THREE.GridHelper(140, 70, 0x38bdf8, 0x334155);
+  // 超広大な床（260 x 260）
+  addBox(0, -0.5, 0, 260, 1, 260, 0x1e293b, { noCast: true, roughness: 0.85, isFloor: true });
+  const grid = new THREE.GridHelper(260, 65, 0x38bdf8, 0x334155);
   grid.position.y = 0.02;
   scene.add(grid);
 
-  // 外周の壁
-  addBox(0, 9, -70, 140, 18, 1.5, 0x334155, { wallRun: true, isOuterWall: true });
-  addBox(0, 9, 70, 140, 18, 1.5, 0x334155, { wallRun: true, isOuterWall: true });
-  addBox(-70, 9, 0, 1.5, 18, 140, 0x334155, { wallRun: true, isOuterWall: true });
-  addBox(70, 9, 0, 1.5, 18, 140, 0x334155, { wallRun: true, isOuterWall: true });
+  // 外周の壁（±130）
+  addBox(0, 11, -130, 260, 22, 2.0, 0x334155, { wallRun: true, isOuterWall: true });
+  addBox(0, 11, 130, 260, 22, 2.0, 0x334155, { wallRun: true, isOuterWall: true });
+  addBox(-130, 11, 0, 2.0, 22, 260, 0x334155, { wallRun: true, isOuterWall: true });
+  addBox(130, 11, 0, 2.0, 22, 260, 0x334155, { wallRun: true, isOuterWall: true });
 
   // ======================================
-  // 中央メガタワー（3段構造）
+  // 1. 中央メガシタデル（4段構造の超高層タワー）
   // ======================================
-  addBox(0, 2.5, 0, 12, 5, 12, 0x475569, { wallRun: true });
-  addBox(0, 6.8, 0, 8, 3.6, 8, 0x64748b, { wallRun: true });
-  addBox(0, 10.6, 0, 5, 4.0, 5, 0x94a3b8, { wallRun: true });
-  addJumpPad(0, 12.6, 0, 20.0); // 頂上ジャンプパッド
+  addBox(0, 2.5, 0, 16, 5, 16, 0x475569, { wallRun: true });
+  addBox(0, 7.0, 0, 11, 4.0, 11, 0x64748b, { wallRun: true });
+  addBox(0, 11.2, 0, 7, 4.4, 7, 0x94a3b8, { wallRun: true });
+  addBox(0, 15.2, 0, 4.5, 3.6, 4.5, 0xcbd5e1, { wallRun: true });
+  addJumpPad(0, 17.0, 0, 22.0); // 頂上ジャンプパッド
 
-  // 中央周辺の階段状ステップ
+  // 中央周辺の階段＆遮蔽物（撃ち合い用カバー）
   const centerSteps = [
-    [-13, 1.3, 0, 6, 2.6, 6, 0x0284c7],
-    [13, 1.3, 0, 6, 2.6, 6, 0x0284c7],
-    [0, 1.3, -13, 6, 2.6, 6, 0x0284c7],
-    [0, 1.3, 13, 6, 2.6, 6, 0x0284c7],
+    [-16, 1.4, 0, 7, 2.8, 7, 0x0284c7],
+    [16, 1.4, 0, 7, 2.8, 7, 0x0284c7],
+    [0, 1.4, -16, 7, 2.8, 7, 0x0284c7],
+    [0, 1.4, 16, 7, 2.8, 7, 0x0284c7],
+    // 中央周囲の戦術遮蔽ブロック
+    [-25, 1.6, -25, 5, 3.2, 2.2, 0x475569],
+    [25, 1.6, 25, 5, 3.2, 2.2, 0x475569],
+    [25, 1.6, -25, 2.2, 3.2, 5, 0x475569],
+    [-25, 1.6, 25, 2.2, 3.2, 5, 0x475569],
   ];
 
   // ======================================
-  // 4隅のスカイタワー（ジップライン拠点）
+  // 2. 4隅の巨大スカイ要塞（スナイパー＆ジップライン拠点）
   // ======================================
   const cornerTowers = [
-    [-46, 5.0, -46, 12, 10, 12, 0x2563eb],
-    [46, 5.0, 46, 12, 10, 12, 0x2563eb],
-    [46, 5.0, -46, 12, 10, 12, 0x2563eb],
-    [-46, 5.0, 46, 12, 10, 12, 0x2563eb],
-    // 各タワーの2段目ステップ
-    [-36, 2.5, -46, 6, 5, 8, 0x3b82f6],
-    [36, 2.5, 46, 6, 5, 8, 0x3b82f6],
-    [46, 2.5, -36, 8, 5, 6, 0x3b82f6],
-    [-46, 2.5, 36, 8, 5, 6, 0x3b82f6],
+    [-86, 6.0, -86, 16, 12, 16, 0x2563eb],
+    [86, 6.0, 86, 16, 12, 16, 0x2563eb],
+    [86, 6.0, -86, 16, 12, 16, 0x2563eb],
+    [-86, 6.0, 86, 16, 12, 16, 0x2563eb],
+    // 各要塞の2段目・登り階段デッキ
+    [-72, 3.0, -86, 8, 6, 10, 0x3b82f6],
+    [72, 3.0, 86, 8, 6, 10, 0x3b82f6],
+    [86, 3.0, -72, 10, 6, 8, 0x3b82f6],
+    [-86, 3.0, 72, 10, 6, 8, 0x3b82f6],
+    // 要塞屋上のスナイパー用胸壁（遮蔽）
+    [-86, 13.0, -79, 10, 2.0, 1.4, 0x1d4ed8],
+    [86, 13.0, 79, 10, 2.0, 1.4, 0x1d4ed8],
+    [79, 13.0, -86, 1.4, 2.0, 10, 0x1d4ed8],
+    [-79, 13.0, 86, 1.4, 2.0, 10, 0x1d4ed8],
   ];
 
   // ======================================
-  // ウォールラン用の紫の大型パネル（連続コース）
+  // 3. 東西南北の4大前線バンカー（中距離銃撃戦エリア）
+  // ======================================
+  const outpostBunkers = [
+    // 北・南バンカー
+    [0, 3.5, -78, 24, 7, 10, 0x1e40af],
+    [0, 3.5, 78, 24, 7, 10, 0x1e40af],
+    [-16, 1.8, -78, 6, 3.6, 8, 0x0284c7],
+    [16, 1.8, 78, 6, 3.6, 8, 0x0284c7],
+    // 東・西バンカー
+    [-78, 3.5, 0, 10, 7, 24, 0x1e40af],
+    [78, 3.5, 0, 10, 7, 24, 0x1e40af],
+    [-78, 1.8, 16, 8, 3.6, 6, 0x0284c7],
+    [78, 1.8, -16, 8, 3.6, 6, 0x0284c7],
+  ];
+
+  // ======================================
+  // 4. ウォールラン用の紫の大型パネル（内側＆外周ロングコース）
   // ======================================
   const wallRunPanels = [
-    [-22, 5.0, -18, 1.4, 10, 24, 0x7e22ce],
-    [22, 5.0, 18, 1.4, 10, 24, 0x7e22ce],
-    [18, 5.0, -22, 24, 10, 1.4, 0x7e22ce],
-    [-18, 5.0, 22, 24, 10, 1.4, 0x7e22ce],
+    // インナーウォールラン
+    [-34, 5.5, -24, 1.6, 11, 30, 0x7e22ce],
+    [34, 5.5, 24, 1.6, 11, 30, 0x7e22ce],
+    [24, 5.5, -34, 30, 11, 1.6, 0x7e22ce],
+    [-24, 5.5, 34, 30, 11, 1.6, 0x7e22ce],
 
-    // 外周側のロングウォールラン壁
-    [-54, 6.0, 0, 1.4, 12, 34, 0x9333ea],
-    [54, 6.0, 0, 1.4, 12, 34, 0x9333ea],
-    [0, 6.0, -54, 34, 12, 1.4, 0x9333ea],
-    [0, 6.0, 54, 34, 12, 1.4, 0x9333ea],
+    // ミッドウォールラン
+    [-62, 6.5, -42, 1.6, 13, 36, 0x9333ea],
+    [62, 6.5, 42, 1.6, 13, 36, 0x9333ea],
+    [42, 6.5, -62, 36, 13, 1.6, 0x9333ea],
+    [-42, 6.5, 62, 36, 13, 1.6, 0x9333ea],
+
+    // アウター超ロングウォールラン壁
+    [-108, 7.0, 0, 1.8, 14, 58, 0xa855f7],
+    [108, 7.0, 0, 1.8, 14, 58, 0xa855f7],
+    [0, 7.0, -108, 58, 14, 1.8, 0xa855f7],
+    [0, 7.0, 108, 58, 14, 1.8, 0xa855f7],
   ];
 
   // ======================================
-  // 空中ブリッジ・高台・グラップル用ピラー
+  // 5. 空中ブリッジ・浮島・グラップルピラー・スライディングゲート
   // ======================================
   const platforms = [
-    // 空中ブリッジ（4方向）
-    [-34, 6.2, 0, 6, 0.9, 22, 0x0ea5e9],
-    [34, 6.2, 0, 6, 0.9, 22, 0x0ea5e9],
-    [0, 6.2, -34, 22, 0.9, 6, 0x0ea5e9],
-    [0, 6.2, 34, 22, 0.9, 6, 0x0ea5e9],
+    // 空中スカイブリッジ（4方向・ロング）
+    [-50, 7.0, 0, 7, 1.0, 32, 0x0ea5e9],
+    [50, 7.0, 0, 7, 1.0, 32, 0x0ea5e9],
+    [0, 7.0, -50, 32, 1.0, 7, 0x0ea5e9],
+    [0, 7.0, 50, 32, 1.0, 7, 0x0ea5e9],
 
-    // 浮島足場（ワイヤーや大ジャンプで届く）
-    [-24, 9.5, -24, 6, 1.0, 6, 0x38bdf8],
-    [24, 9.5, 24, 6, 1.0, 6, 0x38bdf8],
-    [24, 9.5, -24, 6, 1.0, 6, 0x38bdf8],
-    [-24, 9.5, 24, 6, 1.0, 6, 0x38bdf8],
+    // 高高度の浮島足場（8箇所）
+    [-44, 10.5, -44, 8, 1.1, 8, 0x38bdf8],
+    [44, 10.5, 44, 8, 1.1, 8, 0x38bdf8],
+    [44, 10.5, -44, 8, 1.1, 8, 0x38bdf8],
+    [-44, 10.5, 44, 8, 1.1, 8, 0x38bdf8],
+    [-92, 9.5, -36, 7, 1.1, 7, 0x38bdf8],
+    [92, 9.5, 36, 7, 1.1, 7, 0x38bdf8],
+    [36, 9.5, -92, 7, 1.1, 7, 0x38bdf8],
+    [-36, 9.5, 92, 7, 1.1, 7, 0x38bdf8],
 
-    // グラップル引っ掛け用の高いピラー（柱）
-    [-38, 9.0, -16, 2.6, 18, 2.6, 0x6366f1],
-    [38, 9.0, 16, 2.6, 18, 2.6, 0x6366f1],
-    [16, 9.0, -38, 2.6, 18, 2.6, 0x6366f1],
-    [-16, 9.0, 38, 2.6, 18, 2.6, 0x6366f1],
+    // グラップル引っ掛け用の高層ピラー（8本）
+    [-56, 11.0, -24, 3.0, 22, 3.0, 0x6366f1],
+    [56, 11.0, 24, 3.0, 22, 3.0, 0x6366f1],
+    [24, 11.0, -56, 3.0, 22, 3.0, 0x6366f1],
+    [-24, 11.0, 56, 3.0, 22, 3.0, 0x6366f1],
+    [-95, 11.0, -55, 3.0, 22, 3.0, 0x6366f1],
+    [95, 11.0, 55, 3.0, 22, 3.0, 0x6366f1],
+    [55, 11.0, -95, 3.0, 22, 3.0, 0x6366f1],
+    [-55, 11.0, 95, 3.0, 22, 3.0, 0x6366f1],
 
     // スライディングでくぐれるオレンジゲート（各地に配置）
-    [-10, 3.0, -34, 1.8, 3.4, 8, 0xf59e0b],
-    [10, 3.0, 34, 1.8, 3.4, 8, 0xf59e0b],
-    [-34, 3.0, 10, 8, 3.4, 1.8, 0xf59e0b],
-    [34, 3.0, -10, 8, 3.4, 1.8, 0xf59e0b],
-    [-46, 3.0, 0, 1.8, 3.4, 9, 0xf59e0b],
-    [46, 3.0, 0, 1.8, 3.4, 9, 0xf59e0b],
+    [-14, 3.0, -52, 2.0, 3.4, 10, 0xf59e0b],
+    [14, 3.0, 52, 2.0, 3.4, 10, 0xf59e0b],
+    [-52, 3.0, 14, 10, 3.4, 2.0, 0xf59e0b],
+    [52, 3.0, -14, 10, 3.4, 2.0, 0xf59e0b],
+    [-92, 3.0, 0, 2.0, 3.4, 12, 0xf59e0b],
+    [92, 3.0, 0, 2.0, 3.4, 12, 0xf59e0b],
+    [0, 3.0, -92, 12, 3.4, 2.0, 0xf59e0b],
+    [0, 3.0, 92, 12, 3.4, 2.0, 0xf59e0b],
   ];
 
-  for (const list of [centerSteps, cornerTowers, wallRunPanels, platforms]) {
+  for (const list of [centerSteps, cornerTowers, outpostBunkers, wallRunPanels, platforms]) {
     for (const [x, y, z, w, h, d, color] of list) {
       addBox(x, y, z, w, h, d, color, { wallRun: true });
     }
   }
 
   // ======================================
-  // ジャンプパッド（緑）
+  // 6. ジャンプパッド（緑・16箇所）
   // ======================================
-  addJumpPad(-11, 0, -11);
-  addJumpPad(11, 0, 11);
-  addJumpPad(11, 0, -11);
-  addJumpPad(-11, 0, 11);
+  addJumpPad(-14, 0, -14);
+  addJumpPad(14, 0, 14);
+  addJumpPad(14, 0, -14);
+  addJumpPad(-14, 0, 14);
 
-  addJumpPad(-40, 0, 0);
-  addJumpPad(40, 0, 0);
-  addJumpPad(0, 0, -40);
-  addJumpPad(0, 0, 40);
+  addJumpPad(-64, 0, 0);
+  addJumpPad(64, 0, 0);
+  addJumpPad(0, 0, -64);
+  addJumpPad(0, 0, 64);
 
-  addJumpPad(-34, 0, -34, 24.5);
-  addJumpPad(34, 0, 34, 24.5);
-  addJumpPad(34, 0, -34, 24.5);
-  addJumpPad(-34, 0, 34, 24.5);
+  addJumpPad(-64, 0, -64, 25.5);
+  addJumpPad(64, 0, 64, 25.5);
+  addJumpPad(64, 0, -64, 25.5);
+  addJumpPad(-64, 0, 64, 25.5);
 
-  // ======================================
-  // スピードブースト床（シアン）
-  // ======================================
-  addBoostPad(0, 0, 24, 5, 3.5);
-  addBoostPad(0, 0, -24, 5, 3.5);
-  addBoostPad(24, 0, 0, 3.5, 5);
-  addBoostPad(-24, 0, 0, 3.5, 5);
-  addBoostPad(-58, 0, -20, 4, 6);
-  addBoostPad(58, 0, 20, 4, 6);
+  addJumpPad(-112, 0, -65, 24.5);
+  addJumpPad(112, 0, 65, 24.5);
+  addJumpPad(65, 0, -112, 24.5);
+  addJumpPad(-65, 0, 112, 24.5);
 
   // ======================================
-  // ジップライン（6本：高台同士＆中央を結ぶ）
+  // 7. スピードブースト床（シアン・10箇所）
   // ======================================
-  // 4隅のタワー外周をつなぐロングジップライン
-  addZipline(-42, 11.4, -42, 42, 11.4, -42);
-  addZipline(42, 11.4, -42, 42, 11.4, 42);
-  addZipline(42, 11.4, 42, -42, 11.4, 42);
-  addZipline(-42, 11.4, 42, -42, 11.4, -42);
+  addBoostPad(0, 0, 36, 6, 4.5);
+  addBoostPad(0, 0, -36, 6, 4.5);
+  addBoostPad(36, 0, 0, 4.5, 6);
+  addBoostPad(-36, 0, 0, 4.5, 6);
+  addBoostPad(-115, 0, -28, 5, 8);
+  addBoostPad(115, 0, 28, 5, 8);
+  addBoostPad(-28, 0, -115, 8, 5);
+  addBoostPad(28, 0, 115, 8, 5);
+  addBoostPad(-78, 0, -45, 5, 6);
+  addBoostPad(78, 0, 45, 5, 6);
 
-  // 対角線で中央メガタワー頂上とつながるジップライン
-  addZipline(-42, 11.4, -42, 0, 14.0, 0);
-  addZipline(42, 11.4, 42, 0, 14.0, 0);
+  // ======================================
+  // 8. ジップライン（10本：超広大アリーナを高速横断）
+  // ======================================
+  // 4隅のスカイ要塞外周をつなぐ超ロングジップライン（4本）
+  addZipline(-80, 13.4, -80, 80, 13.4, -80);
+  addZipline(80, 13.4, -80, 80, 13.4, 80);
+  addZipline(80, 13.4, 80, -80, 13.4, 80);
+  addZipline(-80, 13.4, 80, -80, 13.4, -80);
+
+  // 4隅の要塞から中央メガシタデル頂上へ結ぶ対角線ジップライン（4本）
+  addZipline(-80, 13.4, -80, 0, 18.4, 0);
+  addZipline(80, 13.4, 80, 0, 18.4, 0);
+  addZipline(80, 13.4, -80, 0, 18.4, 0);
+  addZipline(-80, 13.4, 80, 0, 18.4, 0);
+
+  // 南北・東西のバンカー屋上を横断するジップライン（2本）
+  addZipline(0, 8.4, -74, 0, 8.4, 74);
+  addZipline(-74, 8.4, 0, 74, 8.4, 0);
 }
 
 buildArena();
@@ -920,7 +978,6 @@ rivalBody.position.y = 1.05;
 rivalBody.castShadow = true;
 rivalGroup.add(rivalBody);
 
-// バイザー（向いている方向がわかるように）
 const visorMesh = new THREE.Mesh(
   new THREE.BoxGeometry(0.62, 0.22, 0.24),
   new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
@@ -928,7 +985,6 @@ const visorMesh = new THREE.Mesh(
 visorMesh.position.set(0, 1.48, 0.45);
 rivalGroup.add(visorMesh);
 
-// 相手が持っている銃モデル
 const rivalGun = new THREE.Mesh(
   new THREE.BoxGeometry(0.14, 0.14, 0.62),
   new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.3 })
@@ -936,7 +992,6 @@ const rivalGun = new THREE.Mesh(
 rivalGun.position.set(0.38, 1.15, 0.42);
 rivalGroup.add(rivalGun);
 
-// 射撃・オートエイム用の当たり判定
 const rivalHitMesh = new THREE.Mesh(
   new THREE.CapsuleGeometry(0.85, 1.25, 6, 10),
   new THREE.MeshBasicMaterial({ visible: false })
@@ -947,17 +1002,19 @@ rivalGroup.add(rivalHitMesh);
 scene.add(rivalGroup);
 
 const SPAWN_POINTS = [
-  new THREE.Vector3(0, 2, 52),
-  new THREE.Vector3(0, 2, -52),
-  new THREE.Vector3(52, 2, 0),
-  new THREE.Vector3(-52, 2, 0),
-  new THREE.Vector3(44, 6, 44),
-  new THREE.Vector3(-44, 6, -44),
+  new THREE.Vector3(0, 2, 102),
+  new THREE.Vector3(0, 2, -102),
+  new THREE.Vector3(102, 2, 0),
+  new THREE.Vector3(-102, 2, 0),
+  new THREE.Vector3(86, 14, 86),
+  new THREE.Vector3(-86, 14, -86),
+  new THREE.Vector3(86, 14, -86),
+  new THREE.Vector3(-86, 14, 86),
 ];
 
 const rival = {
-  pos: new THREE.Vector3(0, 2, -52),
-  targetPos: new THREE.Vector3(0, 2, -52),
+  pos: new THREE.Vector3(0, 2, -102),
+  targetPos: new THREE.Vector3(0, 2, -102),
   vel: new THREE.Vector3(),
   yaw: Math.PI,
   hp: 100,
@@ -3526,7 +3583,7 @@ function updateRival(dt) {
 
       const strafe = new THREE.Vector3(-toPlayer.z * rival.botStrafeDir, 0, toPlayer.x * rival.botStrafeDir);
       const approach = distHoriz > 24 ? 1 : distHoriz < 12 ? -0.6 : 0.15;
-      const botSpeed = 9.2;
+      const botSpeed = 11.2;
 
       rival.vel.x = (toPlayer.x * approach + strafe.x * 0.85) * botSpeed;
       rival.vel.z = (toPlayer.z * approach + strafe.z * 0.85) * botSpeed;
@@ -3562,7 +3619,7 @@ function updateRival(dt) {
       rivalGroup.lookAt(player.pos.x, rival.pos.y, player.pos.z);
 
       // BOTの射撃（遮蔽物チェック付き）
-      if (!player.dead && distHoriz < 55) {
+      if (!player.dead && distHoriz < 95) {
         rival.botFireCooldown -= dt;
         if (rival.botFireCooldown <= 0) {
           rival.botFireCooldown = 0.72 + Math.random() * 0.45;
@@ -3610,8 +3667,8 @@ function drawMinimap(now) {
   // グリッド
   ctx.strokeStyle = "rgba(56, 189, 248, 0.12)";
   ctx.lineWidth = 1;
-  const step = size / 7;
-  for (let i = 1; i < 7; i++) {
+  const step = size / 8;
+  for (let i = 1; i < 8; i++) {
     ctx.beginPath();
     ctx.moveTo(i * step, 0);
     ctx.lineTo(i * step, size);
