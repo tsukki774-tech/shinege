@@ -771,152 +771,256 @@ body.layout-editing .action-btn:active {
 
 
 /* ==========================================
-   FPS 武器HUD・ヒットマーカー・射撃ボタン
+   FPS クロスヘア・ヒットマーカー・武器HUD
    ========================================== */
+#crosshair.lock-on {
+  border-color: #ef4444;
+  transform: translate(-50%, -50%) scale(1.6);
+  box-shadow: 0 0 12px #ef4444;
+}
+
 #hitmarker {
   position: fixed;
   top: 50%;
   left: 50%;
   width: 24px;
   height: 24px;
-  transform: translate(-50%, -50%) rotate(45deg) scale(0.7);
+  transform: translate(-50%, -50%);
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.08s ease, transform 0.08s ease;
 }
 
 #hitmarker::before,
 #hitmarker::after {
   content: "";
   position: absolute;
-  background: #f87171;
-  box-shadow: 0 0 8px #ef4444;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 2.5px;
+  background: #fde047;
+  box-shadow: 0 0 8px #f59e0b;
 }
 
 #hitmarker::before {
-  top: 11px;
-  left: 0;
-  width: 24px;
-  height: 2px;
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 
 #hitmarker::after {
-  top: 0;
-  left: 11px;
-  width: 2px;
-  height: 24px;
-}
-
-#hitmarker.show {
-  opacity: 1;
-  transform: translate(-50%, -50%) rotate(45deg) scale(1.1);
-}
-
-#hitmarker.stun::before,
-#hitmarker.stun::after {
-  background: #facc15;
-  box-shadow: 0 0 12px #fde047;
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 #weapon-hud {
   position: fixed;
-  right: 16px;
-  bottom: 56px;
+  right: 14px;
+  bottom: 62px;
   background: rgba(15, 23, 42, 0.78);
-  border: 1px solid rgba(56, 189, 248, 0.45);
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
   border-radius: 10px;
-  padding: 7px 12px;
+  padding: 8px 12px;
+  min-width: 158px;
   text-align: right;
-  pointer-events: none;
-  min-width: 122px;
   backdrop-filter: blur(4px);
+  pointer-events: none;
 }
 
 body.touch-mode #weapon-hud {
-  top: 66px;
+  top: 86px;
   bottom: auto;
-  right: 10px;
-  padding: 5px 9px;
-  min-width: 100px;
+  right: 14px;
+  min-width: 128px;
+  padding: 6px 9px;
 }
 
-.weapon-name {
-  font-size: 0.66rem;
+.weapon-hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+#weapon-name {
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  color: #38bdf8;
+  color: #93c5fd;
+  letter-spacing: 0.04em;
 }
 
-.ammo-wrap {
-  font-size: 1.3rem;
-  font-weight: 900;
-  color: #f8fafc;
+#autofire-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.88);
+  color: #ffffff;
+}
+
+#autofire-badge.off {
+  background: #475569;
+  color: #cbd5e1;
+}
+
+.weapon-ammo-row {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
 }
 
-.ammo-wrap.low {
-  color: #f87171;
-}
-
-.ammo-wrap small {
-  font-size: 0.76rem;
+.weapon-ammo-row small {
+  font-size: 0.85rem;
   color: #94a3b8;
-  font-weight: 700;
+  margin-left: 3px;
 }
 
 #reload-status {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 800;
-  color: #facc15;
-  letter-spacing: 0.05em;
+  color: #fde047;
+  margin-top: 2px;
+  letter-spacing: 0.06em;
 }
 
-.stun-bar-wrap {
-  margin-top: 4px;
+.oni-stun-wrap {
+  margin-top: 6px;
+  text-align: left;
+}
+
+.oni-stun-wrap span {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fca5a5;
+  margin-bottom: 2px;
+}
+
+.oni-stun-bar {
   width: 100%;
-  height: 4px;
+  height: 6px;
   background: rgba(51, 65, 85, 0.9);
   border-radius: 999px;
   overflow: hidden;
 }
 
-#stun-bar-fill {
+#oni-stun-fill {
   width: 0%;
   height: 100%;
-  background: linear-gradient(90deg, #38bdf8, #facc15);
-  transition: width 0.08s ease;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  transition: width 0.08s linear;
 }
 
+#oni-stun-fill.stunned {
+  background: linear-gradient(90deg, #fde047, #38bdf8);
+}
+
+/* タッチ用 FIRE / WEAPON ボタン */
 .fire-btn {
-  width: 78px;
-  height: 78px;
-  background: rgba(239, 68, 68, 0.85);
+  width: 76px;
+  height: 76px;
+  background: rgba(239, 68, 68, 0.84);
   border-color: #fca5a5;
-  font-size: 0.86rem;
-  box-shadow: 0 0 18px rgba(239, 68, 68, 0.45);
+  font-size: 0.82rem;
 }
 
-.reload-btn {
-  width: 60px;
-  height: 60px;
-  background: rgba(71, 85, 105, 0.86);
-  border-color: #cbd5e1;
+.weapon-btn {
+  width: 66px;
+  height: 66px;
+  background: rgba(99, 102, 241, 0.84);
+  border-color: #c7d2fe;
   font-size: 0.68rem;
 }
 
+/* モーダル内：武器＆オート射撃設定 */
+.weapon-settings-section {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.weapon-settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.weapon-settings-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fca5a5;
+  text-align: left;
+}
+
+.autofire-btn {
+  background: #475569;
+  color: #e2e8f0;
+  border: 1px solid #64748b;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  min-width: 58px;
+}
+
+.autofire-btn.active {
+  background: #ef4444;
+  border-color: #fca5a5;
+  color: #ffffff;
+}
+
+.weapon-select-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.weapon-select-btn {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1.5px solid #475569;
+  border-radius: 8px;
+  color: #e2e8f0;
+  padding: 7px 4px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.weapon-select-btn small {
+  font-size: 0.62rem;
+  font-weight: normal;
+  color: #94a3b8;
+}
+
+.weapon-select-btn.active {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: #f87171;
+  color: #ffffff;
+}
+
+.weapon-select-btn.active small {
+  color: #fecaca;
+}
+
 @media (max-width: 640px) {
-  .ammo-wrap {
-    font-size: 1.05rem;
-  }
   .fire-btn {
     width: 68px;
     height: 68px;
-    font-size: 0.78rem;
+    font-size: 0.74rem;
   }
-  .reload-btn {
-    width: 54px;
-    height: 54px;
-    font-size: 0.62rem;
+  .weapon-btn {
+    width: 60px;
+    height: 60px;
+    font-size: 0.64rem;
+  }
+  .weapon-ammo-row {
+    font-size: 1.2rem;
   }
 }

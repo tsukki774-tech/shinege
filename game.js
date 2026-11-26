@@ -13,6 +13,15 @@ const loadoutBtns = document.querySelectorAll(".loadout-btn");
 const sensSlider = document.getElementById("sens-slider");
 const sensValue = document.getElementById("sens-value");
 const sensResetBtn = document.getElementById("sens-reset-btn");
+const hitmarker = document.getElementById("hitmarker");
+const weaponNameEl = document.getElementById("weapon-name");
+const autofireBadge = document.getElementById("autofire-badge");
+const ammoDisplay = document.getElementById("ammo-display");
+const ammoMaxDisplay = document.getElementById("ammo-max");
+const reloadStatus = document.getElementById("reload-status");
+const oniStunFill = document.getElementById("oni-stun-fill");
+const autofireToggleBtn = document.getElementById("autofire-toggle-btn");
+const weaponSelectBtns = document.querySelectorAll(".weapon-select-btn");
 
 const timeDisplay = document.getElementById("time-display");
 const bestDisplay = document.getElementById("best-display");
@@ -48,12 +57,9 @@ const btnGrapple = document.getElementById("btn-grapple");
 const btnGrappleCd = document.getElementById("btn-grapple-cd");
 const btnZip = document.getElementById("btn-zip");
 const btnFire = document.getElementById("btn-fire");
-const btnReload = document.getElementById("btn-reload");
-const hitmarker = document.getElementById("hitmarker");
-const ammoDisplay = document.getElementById("ammo-display");
-const ammoWrap = document.querySelector(".ammo-wrap");
-const reloadStatus = document.getElementById("reload-status");
-const stunBarFill = document.getElementById("stun-bar-fill");
+const btnFireSub = document.getElementById("btn-fire-sub");
+const btnWeapon = document.getElementById("btn-weapon");
+const btnWeaponLabel = document.getElementById("btn-weapon-label");
 
 const layoutEditorBar = document.getElementById("layout-editor-bar");
 const layoutResetBtn = document.getElementById("layout-reset-btn");
@@ -94,13 +100,6 @@ const CONFIG = {
   slideHeight: 0.95,
   mouseSensitivity: 0.0022,
   touchLookSensitivity: 0.0055,
-  gunMaxAmmo: 15,
-  gunFireInterval: 0.13,
-  gunReloadTime: 1.15,
-  gunRange: 110,
-  gunKnockback: 7.5,
-  gunHitsToStun: 5,
-  oniStunDuration: 2.5,
 };
 
 
@@ -225,15 +224,15 @@ modeToggleBtn.addEventListener("click", () => {
 // ==========================================
 // ボタン配置カスタマイズ（全ボタン対応・保存）
 // ==========================================
-const LAYOUT_STORAGE_KEY = "parkour_tag_layout_v3";
+const LAYOUT_STORAGE_KEY = "parkour_tag_layout_v2";
 const DEFAULT_LAYOUT = {
-  jump: { xPct: 0.91, yPct: 0.84 },
-  slide: { xPct: 0.79, yPct: 0.86 },
-  fire: { xPct: 0.90, yPct: 0.64 },
-  reload: { xPct: 0.79, yPct: 0.68 },
-  dash: { xPct: 0.90, yPct: 0.46 },
-  grapple: { xPct: 0.79, yPct: 0.50 },
-  zip: { xPct: 0.67, yPct: 0.78 },
+  jump: { xPct: 0.90, yPct: 0.82 },
+  slide: { xPct: 0.78, yPct: 0.86 },
+  dash: { xPct: 0.90, yPct: 0.64 },
+  grapple: { xPct: 0.78, yPct: 0.67 },
+  zip: { xPct: 0.66, yPct: 0.80 },
+  fire: { xPct: 0.89, yPct: 0.46 },
+  weapon: { xPct: 0.66, yPct: 0.63 },
   stick: { xPct: 0.14, yPct: 0.80 },
 };
 
@@ -298,7 +297,7 @@ function applyAllButtonPositions() {
   positionElementByPct(btnGrapple, buttonLayout.grapple.xPct, buttonLayout.grapple.yPct, 1.0);
   positionElementByPct(btnZip, buttonLayout.zip.xPct, buttonLayout.zip.yPct, 1.0);
   positionElementByPct(btnFire, buttonLayout.fire.xPct, buttonLayout.fire.yPct, 1.0);
-  positionElementByPct(btnReload, buttonLayout.reload.xPct, buttonLayout.reload.yPct, 1.0);
+  positionElementByPct(btnWeapon, buttonLayout.weapon.xPct, buttonLayout.weapon.yPct, 1.0);
   applyStickHomePosition();
 }
 
@@ -359,7 +358,7 @@ attachDraggable(btnDash, "dash", 1.0);
 attachDraggable(btnGrapple, "grapple", 1.0);
 attachDraggable(btnZip, "zip", 1.0);
 attachDraggable(btnFire, "fire", 1.0);
-attachDraggable(btnReload, "reload", 1.0);
+attachDraggable(btnWeapon, "weapon", 1.0);
 attachDraggable(joystickBase, "stick", 0.5);
 
 function enterLayoutEditor() {
@@ -479,38 +478,54 @@ function playSfx(type) {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
     osc.start(t);
     osc.stop(t + 0.13);
-  } else if (type === "shoot") {
+  } else if (type === "shot_rifle") {
     osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(980, t);
-    osc.frequency.exponentialRampToValueAtTime(160, t + 0.08);
+    osc.frequency.setValueAtTime(520, t);
+    osc.frequency.exponentialRampToValueAtTime(120, t + 0.08);
     gain.gain.setValueAtTime(0.08, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
     osc.start(t);
     osc.stop(t + 0.09);
+  } else if (type === "shot_shotgun") {
+    osc.type = "square";
+    osc.frequency.setValueAtTime(210, t);
+    osc.frequency.exponentialRampToValueAtTime(48, t + 0.18);
+    gain.gain.setValueAtTime(0.14, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+    osc.start(t);
+    osc.stop(t + 0.19);
+  } else if (type === "shot_sniper") {
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(980, t);
+    osc.frequency.exponentialRampToValueAtTime(90, t + 0.24);
+    gain.gain.setValueAtTime(0.13, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc.start(t);
+    osc.stop(t + 0.25);
   } else if (type === "hit") {
-    osc.type = "sine";
+    osc.type = "triangle";
     osc.frequency.setValueAtTime(1250, t);
-    osc.frequency.exponentialRampToValueAtTime(1680, t + 0.06);
+    osc.frequency.exponentialRampToValueAtTime(820, t + 0.06);
     gain.gain.setValueAtTime(0.09, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
     osc.start(t);
     osc.stop(t + 0.07);
   } else if (type === "stun") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(520, t);
-    osc.frequency.exponentialRampToValueAtTime(1320, t + 0.22);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(420, t);
+    osc.frequency.exponentialRampToValueAtTime(1320, t + 0.24);
     gain.gain.setValueAtTime(0.12, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
     osc.start(t);
-    osc.stop(t + 0.24);
+    osc.stop(t + 0.25);
   } else if (type === "reload") {
-    osc.type = "square";
-    osc.frequency.setValueAtTime(320, t);
-    osc.frequency.exponentialRampToValueAtTime(540, t + 0.12);
-    gain.gain.setValueAtTime(0.06, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.linearRampToValueAtTime(520, t + 0.14);
+    gain.gain.setValueAtTime(0.07, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
     osc.start(t);
-    osc.stop(t + 0.13);
+    osc.stop(t + 0.15);
   } else if (type === "caught") {
     osc.type = "sawtooth";
     osc.frequency.setValueAtTime(220, t);
@@ -537,6 +552,7 @@ scene.background = new THREE.Color(0x0b1220);
 scene.fog = new THREE.Fog(0x0b1220, 48, 175);
 
 const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerHeight, 0.1, 260);
+scene.add(camera);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -573,128 +589,12 @@ scene.add(wireLine);
 const raycaster = new THREE.Raycaster();
 
 // ==========================================
-// FPS 銃ビューモデル（カメラ追従3Dモデル）
-// ==========================================
-const gunGroup = new THREE.Group();
-
-const gunDarkMat = new THREE.MeshStandardMaterial({
-  color: 0x1e293b,
-  roughness: 0.35,
-  metalness: 0.75,
-});
-const gunBodyMat = new THREE.MeshStandardMaterial({
-  color: 0x334155,
-  roughness: 0.4,
-  metalness: 0.65,
-});
-const gunAccentMat = new THREE.MeshStandardMaterial({
-  color: 0x38bdf8,
-  emissive: 0x0284c7,
-  emissiveIntensity: 0.9,
-});
-
-// レシーバー（本体）
-const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.13, 0.48), gunBodyMat);
-receiver.position.set(0, 0, -0.12);
-gunGroup.add(receiver);
-
-// バレル（銃身）
-const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.34, 12), gunDarkMat);
-barrel.rotation.x = Math.PI / 2;
-barrel.position.set(0, 0.02, -0.46);
-gunGroup.add(barrel);
-
-// シュラウド（銃身カバー）
-const shroud = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.075, 0.26), gunDarkMat);
-shroud.position.set(0, 0.015, -0.38);
-gunGroup.add(shroud);
-
-// 発光エネルギーレール（上部＆側面）
-const topRail = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.018, 0.44), gunAccentMat);
-topRail.position.set(0, 0.072, -0.15);
-gunGroup.add(topRail);
-
-const sideCore = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.028, 0.24), gunAccentMat);
-sideCore.position.set(0, 0.01, -0.12);
-gunGroup.add(sideCore);
-
-// ホロサイト（照準器）
-const sightFrame = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.055, 0.09), gunDarkMat);
-sightFrame.position.set(0, 0.105, -0.05);
-gunGroup.add(sightFrame);
-
-const sightLens = new THREE.Mesh(
-  new THREE.BoxGeometry(0.052, 0.036, 0.005),
-  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35 })
-);
-sightLens.position.set(0, 0.105, -0.05);
-gunGroup.add(sightLens);
-
-// グリップ＆マガジン
-const grip = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.16, 0.09), gunDarkMat);
-grip.position.set(0, -0.11, 0.04);
-grip.rotation.x = 0.28;
-gunGroup.add(grip);
-
-const magazine = new THREE.Mesh(new THREE.BoxGeometry(0.068, 0.18, 0.085), gunDarkMat);
-magazine.position.set(0, -0.12, -0.18);
-magazine.rotation.x = -0.18;
-gunGroup.add(magazine);
-
-// マズルフラッシュ
-const muzzleFlash = new THREE.Mesh(
-  new THREE.OctahedronGeometry(0.085, 0),
-  new THREE.MeshBasicMaterial({ color: 0x7dd3fc })
-);
-muzzleFlash.position.set(0, 0.02, -0.66);
-muzzleFlash.visible = false;
-gunGroup.add(muzzleFlash);
-
-const muzzleAnchor = new THREE.Object3D();
-muzzleAnchor.position.set(0, 0.02, -0.64);
-gunGroup.add(muzzleAnchor);
-
-const GUN_BASE_POS = new THREE.Vector3(0.27, -0.23, -0.44);
-gunGroup.position.copy(GUN_BASE_POS);
-camera.add(gunGroup);
-scene.add(camera);
-
-// 弾道ビーム＆着弾スパークエフェクト配列
-const activeTracers = [];
-const activeSparks = [];
-
-function spawnTracer(startPos, endPos, isHitOni = false) {
-  const geo = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
-  const mat = new THREE.LineBasicMaterial({
-    color: isHitOni ? 0xfacc15 : 0x38bdf8,
-    transparent: true,
-    opacity: 0.95,
-  });
-  const line = new THREE.Line(geo, mat);
-  scene.add(line);
-  activeTracers.push({ line, life: 0.09, maxLife: 0.09 });
-
-  // 着弾スパーク球
-  const spark = new THREE.Mesh(
-    new THREE.SphereGeometry(isHitOni ? 0.26 : 0.14, 8, 8),
-    new THREE.MeshBasicMaterial({
-      color: isHitOni ? 0xfef08a : 0x7dd3fc,
-      transparent: true,
-      opacity: 0.95,
-    })
-  );
-  spark.position.copy(endPos);
-  scene.add(spark);
-  activeSparks.push({ mesh: spark, life: 0.14, maxLife: 0.14 });
-}
-
-
-// ==========================================
 // 広大マップ構築（140 x 140）
 // ==========================================
 const ARENA_HALF = 70;
 const colliders = [];
 const grappleMeshes = [];
+const worldMeshes = [];
 const jumpPads = [];
 const boostPads = [];
 const ziplines = [];
@@ -712,6 +612,7 @@ function addBox(x, y, z, w, h, d, color, options = {}) {
   mesh.castShadow = !options.noCast;
   scene.add(mesh);
 
+  worldMeshes.push(mesh);
   if (!options.isFloor) {
     grappleMeshes.push(mesh);
   }
@@ -967,6 +868,14 @@ const rightEye = leftEye.clone();
 rightEye.position.x = 0.23;
 oniGroup.add(leftEye, rightEye);
 
+// 射撃・オートエイム用の当たり判定（少し余裕を持たせて当てやすく）
+const oniHitMesh = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.95, 1.35, 6, 10),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+oniHitMesh.position.y = 1.25;
+oniGroup.add(oniHitMesh);
+
 scene.add(oniGroup);
 
 const oni = {
@@ -977,8 +886,9 @@ const oni = {
   jumpCooldown: 0,
   stunGauge: 0,
   stunTimer: 0,
-  hitFlashTimer: 0,
   slowTimer: 0,
+  hitFlashTimer: 0,
+  knockbackVel: new THREE.Vector3(),
 };
 
 // ==========================================
@@ -1022,15 +932,6 @@ const player = {
 
   // ブースト床クールタイム
   boostPadCooldown: 0,
-
-  // FPS銃状態
-  ammo: CONFIG.gunMaxAmmo,
-  fireCooldown: 0,
-  isReloading: false,
-  reloadTimer: 0,
-  gunRecoil: 0,
-  gunBobTime: 0,
-  muzzleTimer: 0,
 };
 
 const game = {
@@ -1045,121 +946,454 @@ bestDisplay.textContent = game.best.toFixed(1);
 
 
 // ==========================================
-// FPS 射撃＆リロード処理
+// FPS 武器システム（複数武器＆オート射撃）
 // ==========================================
-let hitmarkerTimer = 0;
-function triggerHitmarker(isStun = false) {
-  if (!hitmarker) return;
-  hitmarker.classList.add("show");
-  hitmarker.classList.toggle("stun", isStun);
-  hitmarkerTimer = isStun ? 0.28 : 0.14;
+const WEAPON_ORDER = ["rifle", "shotgun", "sniper"];
+const WEAPONS = {
+  rifle: {
+    key: "rifle",
+    name: "PULSE RIFLE",
+    shortName: "RIFLE",
+    maxAmmo: 18,
+    fireRate: 0.13,
+    reloadTime: 1.25,
+    range: 115,
+    pellets: 1,
+    spread: 0.008,
+    stunGain: 22,
+    slowDuration: 0.75,
+    knockback: 5.5,
+    color: 0x38bdf8,
+    recoilZ: 0.055,
+    recoilPitch: 0.045,
+    sfx: "shot_rifle",
+  },
+  shotgun: {
+    key: "shotgun",
+    name: "SCATTER SHOTGUN",
+    shortName: "SHOTGUN",
+    maxAmmo: 6,
+    fireRate: 0.66,
+    reloadTime: 1.5,
+    range: 46,
+    pellets: 7,
+    spread: 0.062,
+    stunGain: 12,
+    slowDuration: 1.15,
+    knockback: 3.4,
+    color: 0xf97316,
+    recoilZ: 0.13,
+    recoilPitch: 0.13,
+    sfx: "shot_shotgun",
+  },
+  sniper: {
+    key: "sniper",
+    name: "RAIL SNIPER",
+    shortName: "SNIPER",
+    maxAmmo: 4,
+    fireRate: 0.92,
+    reloadTime: 1.65,
+    range: 175,
+    pellets: 1,
+    spread: 0.001,
+    stunGain: 55,
+    slowDuration: 1.45,
+    knockback: 16.5,
+    color: 0xe879f9,
+    recoilZ: 0.15,
+    recoilPitch: 0.15,
+    sfx: "shot_sniper",
+  },
+};
+
+const AUTOFIRE_STORAGE_KEY = "parkour_tag_autofire";
+const WEAPON_STORAGE_KEY = "parkour_tag_weapon";
+
+let autoFireEnabled = true;
+try {
+  const savedAuto = localStorage.getItem(AUTOFIRE_STORAGE_KEY);
+  if (savedAuto !== null) autoFireEnabled = savedAuto === "true";
+} catch {
+  // ignore
 }
 
-function updateWeaponHUD() {
-  if (ammoDisplay) ammoDisplay.textContent = String(player.ammo);
-  if (ammoWrap) ammoWrap.classList.toggle("low", player.ammo <= 4);
-  if (reloadStatus) reloadStatus.classList.toggle("hidden", !player.isReloading);
-  if (stunBarFill) {
-    const pct = oni.stunTimer > 0
-      ? (oni.stunTimer / CONFIG.oniStunDuration) * 100
-      : (oni.stunGauge / CONFIG.gunHitsToStun) * 100;
-    stunBarFill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+let initialWeaponKey = "rifle";
+try {
+  const savedW = localStorage.getItem(WEAPON_STORAGE_KEY);
+  if (savedW && WEAPONS[savedW]) initialWeaponKey = savedW;
+} catch {
+  // ignore
+}
+
+const weaponState = {
+  currentKey: initialWeaponKey,
+  ammo: {
+    rifle: WEAPONS.rifle.maxAmmo,
+    shotgun: WEAPONS.shotgun.maxAmmo,
+    sniper: WEAPONS.sniper.maxAmmo,
+  },
+  fireCooldown: 0,
+  reloading: false,
+  reloadTimer: 0,
+  manualFireHeld: false,
+  recoilOffset: 0,
+  recoilRot: 0,
+  bobTime: 0,
+  hitmarkerTimer: 0,
+  muzzleFlashTimer: 0,
+  isAimingOni: false,
+};
+
+// 3D ビューモデル（カメラの子要素として右下に配置）
+const weaponRoot = new THREE.Group();
+const weaponBasePos = new THREE.Vector3(0.28, -0.24, -0.44);
+weaponRoot.position.copy(weaponBasePos);
+camera.add(weaponRoot);
+
+let muzzlePoint = new THREE.Object3D();
+let muzzleFlashMesh = null;
+
+function buildWeaponModel(key) {
+  while (weaponRoot.children.length > 0) {
+    weaponRoot.remove(weaponRoot.children[0]);
+  }
+  const w = WEAPONS[key];
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.65 });
+  const accentMat = new THREE.MeshStandardMaterial({
+    color: w.color,
+    emissive: w.color,
+    emissiveIntensity: 0.85,
+    roughness: 0.2,
+  });
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.3, metalness: 0.8 });
+
+  if (key === "rifle") {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.13, 0.52), bodyMat);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.34, 10), metalMat);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.025, -0.34);
+    const core = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.035, 0.28), accentMat);
+    core.position.set(0, 0.03, -0.05);
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.08), metalMat);
+    mag.position.set(0, -0.11, -0.04);
+    mag.rotation.x = 0.22;
+    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.09), accentMat);
+    sight.position.set(0, 0.085, 0.02);
+    weaponRoot.add(body, barrel, core, mag, sight);
+    muzzlePoint.position.set(0, 0.025, -0.53);
+  } else if (key === "shotgun") {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.48), bodyMat);
+    const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.034, 0.36, 10), metalMat);
+    barrelTop.rotation.x = Math.PI / 2;
+    barrelTop.position.set(0, 0.032, -0.30);
+    const barrelBot = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.32, 10), bodyMat);
+    barrelBot.rotation.x = Math.PI / 2;
+    barrelBot.position.set(0, -0.022, -0.28);
+    const pump = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.07, 0.18), accentMat);
+    pump.position.set(0, -0.02, -0.24);
+    weaponRoot.add(body, barrelTop, barrelBot, pump);
+    muzzlePoint.position.set(0, 0.032, -0.50);
+  } else {
+    // sniper
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.12, 0.58), bodyMat);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.62, 10), metalMat);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.02, -0.50);
+    const railL = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.022, 0.50), accentMat);
+    railL.position.set(-0.048, 0.02, -0.35);
+    const railR = railL.clone();
+    railR.position.x = 0.048;
+    const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.028, 0.26, 12), metalMat);
+    scope.rotation.x = Math.PI / 2;
+    scope.position.set(0, 0.105, -0.02);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.02, 12), accentMat);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(0, 0.105, -0.155);
+    weaponRoot.add(body, barrel, railL, railR, scope, lens);
+    muzzlePoint.position.set(0, 0.02, -0.82);
+  }
+
+  muzzleFlashMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(key === "shotgun" ? 0.095 : 0.065, 8, 8),
+    new THREE.MeshBasicMaterial({ color: w.color, transparent: true, opacity: 0.92 })
+  );
+  muzzleFlashMesh.position.copy(muzzlePoint.position);
+  muzzleFlashMesh.visible = false;
+  weaponRoot.add(muzzlePoint, muzzleFlashMesh);
+}
+
+const activeTracers = [];
+function spawnTracer(startPos, endPos, colorHex) {
+  const geo = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
+  const mat = new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.95 });
+  const line = new THREE.Line(geo, mat);
+  line.frustumCulled = false;
+  scene.add(line);
+  activeTracers.push({ line, geo, mat, life: 0.11, maxLife: 0.11 });
+}
+
+function updateWeaponUI() {
+  const w = WEAPONS[weaponState.currentKey];
+  if (weaponNameEl) weaponNameEl.textContent = w.name;
+  if (ammoDisplay) ammoDisplay.textContent = String(weaponState.ammo[w.key]);
+  if (ammoMaxDisplay) ammoMaxDisplay.textContent = `/ ${w.maxAmmo}`;
+  if (reloadStatus) reloadStatus.classList.toggle("hidden", !weaponState.reloading);
+  if (btnWeaponLabel) btnWeaponLabel.textContent = w.shortName;
+
+  if (autofireBadge) {
+    autofireBadge.textContent = autoFireEnabled ? "AUTO" : "MANUAL";
+    autofireBadge.classList.toggle("off", !autoFireEnabled);
+  }
+  if (btnFireSub) {
+    btnFireSub.textContent = autoFireEnabled ? "AUTO" : "手動";
+  }
+  if (autofireToggleBtn) {
+    autofireToggleBtn.textContent = autoFireEnabled ? "ON" : "OFF";
+    autofireToggleBtn.classList.toggle("active", autoFireEnabled);
+  }
+  weaponSelectBtns.forEach((b) => {
+    b.classList.toggle("active", b.dataset.weapon === weaponState.currentKey);
+  });
+}
+
+function selectWeapon(key, showNotice = false) {
+  if (!WEAPONS[key]) return;
+  if (weaponState.currentKey === key && weaponRoot.children.length > 0) {
+    updateWeaponUI();
+    return;
+  }
+  weaponState.currentKey = key;
+  weaponState.reloading = false;
+  weaponState.reloadTimer = 0;
+  weaponState.fireCooldown = 0.14;
+  buildWeaponModel(key);
+  updateWeaponUI();
+  try {
+    localStorage.setItem(WEAPON_STORAGE_KEY, key);
+  } catch {
+    // ignore
+  }
+  if (showNotice) {
+    showTrick(`WEAPON: ${WEAPONS[key].name}`);
   }
 }
 
-function startReload() {
-  if (!game.active || player.isReloading) return;
-  if (player.ammo >= CONFIG.gunMaxAmmo) return;
-  player.isReloading = true;
-  player.reloadTimer = CONFIG.gunReloadTime;
-  playSfx("reload");
-  updateWeaponHUD();
+function cycleWeapon(dir = 1) {
+  const idx = WEAPON_ORDER.indexOf(weaponState.currentKey);
+  const nextIdx = (idx + dir + WEAPON_ORDER.length) % WEAPON_ORDER.length;
+  selectWeapon(WEAPON_ORDER[nextIdx], true);
 }
 
-function fireGun() {
-  if (!game.active || game.over) return;
-  if (player.isReloading || player.fireCooldown > 0) return;
+function startReload() {
+  const w = WEAPONS[weaponState.currentKey];
+  if (weaponState.reloading || weaponState.ammo[w.key] >= w.maxAmmo) return;
+  weaponState.reloading = true;
+  weaponState.reloadTimer = w.reloadTime;
+  playSfx("reload");
+  updateWeaponUI();
+}
 
-  if (player.ammo <= 0) {
+function checkAimOnOni(maxRange) {
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  raycaster.far = maxRange;
+  const targets = [...worldMeshes, oniHitMesh];
+  const hits = raycaster.intersectObjects(targets, false);
+  return hits.length > 0 && hits[0].object === oniHitMesh;
+}
+
+function fireWeapon() {
+  const w = WEAPONS[weaponState.currentKey];
+  if (weaponState.reloading || weaponState.fireCooldown > 0) return;
+  if (weaponState.ammo[w.key] <= 0) {
     startReload();
     return;
   }
 
-  player.ammo -= 1;
-  player.fireCooldown = CONFIG.gunFireInterval;
-  player.gunRecoil = 1.0;
-  player.muzzleTimer = 0.045;
-  muzzleFlash.visible = true;
-  playSfx("shoot");
+  weaponState.ammo[w.key] -= 1;
+  weaponState.fireCooldown = w.fireRate;
+  weaponState.recoilOffset = Math.min(0.2, weaponState.recoilOffset + w.recoilZ);
+  weaponState.recoilRot = Math.min(0.28, weaponState.recoilRot + w.recoilPitch);
+  weaponState.muzzleFlashTimer = 0.045;
+  playSfx(w.sfx);
 
-  if (player.ammo === 0) {
-    startReload();
-  } else {
-    updateWeaponHUD();
+  const muzzleWorld = new THREE.Vector3();
+  muzzlePoint.getWorldPosition(muzzleWorld);
+
+  const targets = [...worldMeshes, oniHitMesh];
+  let hitCount = 0;
+  let totalKbDir = new THREE.Vector3();
+
+  for (let p = 0; p < w.pellets; p++) {
+    const spreadX = (Math.random() - 0.5) * 2 * w.spread;
+    const spreadY = (Math.random() - 0.5) * 2 * w.spread;
+    raycaster.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
+    raycaster.far = w.range;
+
+    const hits = raycaster.intersectObjects(targets, false);
+    let endPos;
+    if (hits.length > 0) {
+      endPos = hits[0].point.clone();
+      if (hits[0].object === oniHitMesh) {
+        hitCount += 1;
+        totalKbDir.add(raycaster.ray.direction);
+      }
+    } else {
+      endPos = raycaster.ray.origin.clone().addScaledVector(raycaster.ray.direction, w.range);
+    }
+    spawnTracer(muzzleWorld, endPos, w.color);
   }
 
-  // レイキャスト判定（画面中央から）
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-  raycaster.far = CONFIG.gunRange;
-
-  const wallHits = raycaster.intersectObjects(grappleMeshes, false);
-  const wallDist = wallHits.length > 0 ? wallHits[0].distance : CONFIG.gunRange;
-
-  const oniHits = raycaster.intersectObjects(oniGroup.children, true);
-  let hitOni = false;
-  let hitPoint = raycaster.ray.origin
-    .clone()
-    .addScaledVector(raycaster.ray.direction, wallDist);
-
-  if (wallHits.length > 0) {
-    hitPoint.copy(wallHits[0].point);
-  }
-
-  if (oniHits.length > 0 && oniHits[0].distance <= wallDist + 0.2) {
-    hitOni = true;
-    hitPoint.copy(oniHits[0].point);
-
-    // 鬼にノックバック・減速・スタン蓄積
-    const pushDir = new THREE.Vector3(
-      raycaster.ray.direction.x,
-      0,
-      raycaster.ray.direction.z
-    );
-    if (pushDir.lengthSq() > 0.001) pushDir.normalize();
-
-    oni.vel.x += pushDir.x * CONFIG.gunKnockback;
-    oni.vel.z += pushDir.z * CONFIG.gunKnockback;
-    oni.pos.x += pushDir.x * 0.42;
-    oni.pos.z += pushDir.z * 0.42;
-    oni.slowTimer = 0.75;
+  if (hitCount > 0) {
+    weaponState.hitmarkerTimer = 0.14;
+    hitmarker.classList.remove("hidden");
     oni.hitFlashTimer = 0.12;
+    oni.slowTimer = Math.max(oni.slowTimer, w.slowDuration);
+
+    totalKbDir.y = 0;
+    if (totalKbDir.lengthSq() > 0.001) {
+      totalKbDir.normalize();
+      oni.knockbackVel.addScaledVector(totalKbDir, w.knockback * hitCount);
+      if (oni.knockbackVel.length() > 24) {
+        oni.knockbackVel.setLength(24);
+      }
+    }
 
     if (oni.stunTimer <= 0) {
-      oni.stunGauge += 1;
-      if (oni.stunGauge >= CONFIG.gunHitsToStun) {
-        oni.stunGauge = 0;
-        oni.stunTimer = CONFIG.oniStunDuration;
+      oni.stunGauge = Math.min(100, oni.stunGauge + w.stunGain * hitCount);
+      if (oni.stunGauge >= 100) {
+        oni.stunTimer = 2.5;
+        oni.stunGauge = 100;
         playSfx("stun");
-        triggerHitmarker(true);
         showTrick("ONI STUNNED!! (2.5s)");
       } else {
         playSfx("hit");
-        triggerHitmarker(false);
-        showTrick(`HIT! (${oni.stunGauge}/${CONFIG.gunHitsToStun})`);
       }
     } else {
       playSfx("hit");
-      triggerHitmarker(false);
     }
-    updateWeaponHUD();
   }
 
-  // 銃口ワールド座標から弾道ライン生成
-  camera.updateMatrixWorld(true);
-  const muzzleWorld = new THREE.Vector3();
-  muzzleAnchor.getWorldPosition(muzzleWorld);
-  spawnTracer(muzzleWorld, hitPoint, hitOni);
+  if (weaponState.ammo[w.key] <= 0) {
+    startReload();
+  } else {
+    updateWeaponUI();
+  }
 }
+
+function updateWeapon(dt) {
+  const w = WEAPONS[weaponState.currentKey];
+
+  // トレーサー更新
+  for (let i = activeTracers.length - 1; i >= 0; i--) {
+    const tr = activeTracers[i];
+    tr.life -= dt;
+    if (tr.life <= 0) {
+      scene.remove(tr.line);
+      tr.geo.dispose();
+      tr.mat.dispose();
+      activeTracers.splice(i, 1);
+    } else {
+      tr.mat.opacity = tr.life / tr.maxLife;
+    }
+  }
+
+  // ヒットマーカー消去
+  if (weaponState.hitmarkerTimer > 0) {
+    weaponState.hitmarkerTimer -= dt;
+    if (weaponState.hitmarkerTimer <= 0) {
+      hitmarker.classList.add("hidden");
+    }
+  }
+
+  // マズルフラッシュ更新
+  if (weaponState.muzzleFlashTimer > 0) {
+    weaponState.muzzleFlashTimer -= dt;
+    if (muzzleFlashMesh) {
+      muzzleFlashMesh.visible = true;
+      muzzleFlashMesh.scale.setScalar(0.8 + Math.random() * 0.5);
+    }
+  } else if (muzzleFlashMesh) {
+    muzzleFlashMesh.visible = false;
+  }
+
+  // クールタイム・リロード更新
+  if (weaponState.fireCooldown > 0) {
+    weaponState.fireCooldown = Math.max(0, weaponState.fireCooldown - dt);
+  }
+
+  if (weaponState.reloading) {
+    weaponState.reloadTimer -= dt;
+    if (weaponState.reloadTimer <= 0) {
+      weaponState.reloading = false;
+      weaponState.ammo[w.key] = w.maxAmmo;
+      updateWeaponUI();
+    }
+  }
+
+  // 照準が鬼に合っているか判定（オート射撃＆ロックオン表示）
+  const aimingOni = checkAimOnOni(w.range);
+  weaponState.isAimingOni = aimingOni;
+  crosshair.classList.toggle("lock-on", aimingOni);
+
+  if (game.active && !game.over) {
+    if ((autoFireEnabled && aimingOni) || weaponState.manualFireHeld) {
+      fireWeapon();
+    }
+  }
+
+  // ビューモデルのボビング・リコイル・リロードアニメーション
+  const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
+  if (player.onGround && horizSpeed > 1.0) {
+    weaponState.bobTime += dt * Math.min(14, 6 + horizSpeed * 0.45);
+  } else {
+    weaponState.bobTime += dt * 1.6;
+  }
+  const bobAmp = player.onGround ? Math.min(0.014, horizSpeed * 0.0011) : 0.004;
+  const bobX = Math.cos(weaponState.bobTime) * bobAmp;
+  const bobY = Math.abs(Math.sin(weaponState.bobTime)) * bobAmp * 1.2;
+
+  weaponState.recoilOffset += (0 - weaponState.recoilOffset) * Math.min(1, dt * 14);
+  weaponState.recoilRot += (0 - weaponState.recoilRot) * Math.min(1, dt * 14);
+
+  const reloadDrop = weaponState.reloading ? -0.14 : 0;
+  const reloadTilt = weaponState.reloading ? -0.55 : 0;
+
+  weaponRoot.position.set(
+    weaponBasePos.x + bobX,
+    weaponBasePos.y - bobY + reloadDrop,
+    weaponBasePos.z + weaponState.recoilOffset
+  );
+  weaponRoot.rotation.set(weaponState.recoilRot + reloadTilt, 0, weaponState.reloading ? 0.25 : 0);
+
+  // 鬼スタンゲージHUD更新
+  if (oniStunFill) {
+    const pct = oni.stunTimer > 0 ? (oni.stunTimer / 2.5) * 100 : oni.stunGauge;
+    oniStunFill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+    oniStunFill.classList.toggle("stunned", oni.stunTimer > 0);
+  }
+}
+
+// 初期武器モデル構築＆設定イベント
+buildWeaponModel(weaponState.currentKey);
+updateWeaponUI();
+
+if (autofireToggleBtn) {
+  autofireToggleBtn.addEventListener("click", () => {
+    autoFireEnabled = !autoFireEnabled;
+    try {
+      localStorage.setItem(AUTOFIRE_STORAGE_KEY, String(autoFireEnabled));
+    } catch {
+      // ignore
+    }
+    updateWeaponUI();
+  });
+}
+
+weaponSelectBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    selectWeapon(btn.dataset.weapon, false);
+  });
+});
 
 // ==========================================
 // ギミック発動関数（PC・スマホ共通）
@@ -1297,11 +1531,14 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyE") {
     triggerZipline();
   }
+  if (e.code === "Digit1") selectWeapon("rifle", true);
+  if (e.code === "Digit2") selectWeapon("shotgun", true);
+  if (e.code === "Digit3") selectWeapon("sniper", true);
   if (e.code === "KeyR") {
-    if (game.over) {
-      resetMatch();
-    } else if (game.active) {
+    if (game.active && !game.over) {
       startReload();
+    } else if (game.over) {
+      resetMatch();
     }
   }
 });
@@ -1309,21 +1546,27 @@ window.addEventListener("keyup", (e) => {
   keys[e.code] = false;
 });
 
-let mouseFireHeld = false;
 window.addEventListener("mousedown", (e) => {
   if (!game.active || controlMode !== "pc") return;
   if (e.button === 0) {
-    mouseFireHeld = true;
-    fireGun();
-  } else if (e.button === 2) {
+    weaponState.manualFireHeld = true;
+    fireWeapon();
+  }
+  if (e.button === 2) {
     triggerGrapple();
   }
 });
 window.addEventListener("mouseup", (e) => {
   if (e.button === 0) {
-    mouseFireHeld = false;
+    weaponState.manualFireHeld = false;
   }
 });
+window.addEventListener("wheel", (e) => {
+  if (!game.active || controlMode !== "pc") return;
+  if (Math.abs(e.deltaY) > 4) {
+    cycleWeapon(e.deltaY > 0 ? 1 : -1);
+  }
+}, { passive: true });
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 
 // ==========================================
@@ -1333,7 +1576,6 @@ const touchInput = {
   moveX: 0,
   moveY: 0,
   slideHeld: false,
-  fireHeld: false,
   joyTouchId: null,
   joyCenterX: 0,
   joyCenterY: 0,
@@ -1552,34 +1794,33 @@ btnFire.addEventListener(
     e.preventDefault();
     e.stopPropagation();
     if (!game.active) return;
-    touchInput.fireHeld = true;
-    fireGun();
+    weaponState.manualFireHeld = true;
+    fireWeapon();
     btnFire.classList.add("pressed");
   },
   { passive: false }
 );
 function endFireTouch() {
-  touchInput.fireHeld = false;
+  weaponState.manualFireHeld = false;
   btnFire.classList.remove("pressed");
 }
 btnFire.addEventListener("touchend", endFireTouch);
 btnFire.addEventListener("touchcancel", endFireTouch);
 
-btnReload.addEventListener(
+btnWeapon.addEventListener(
   "touchstart",
   (e) => {
     if (isEditingLayout) return;
     e.preventDefault();
     e.stopPropagation();
     if (!game.active) return;
-    startReload();
-    btnReload.classList.add("pressed");
+    cycleWeapon(1);
+    btnWeapon.classList.add("pressed");
   },
   { passive: false }
 );
-btnReload.addEventListener("touchend", () => btnReload.classList.remove("pressed"));
-btnReload.addEventListener("touchcancel", () => btnReload.classList.remove("pressed"));
-
+btnWeapon.addEventListener("touchend", () => btnWeapon.classList.remove("pressed"));
+btnWeapon.addEventListener("touchcancel", () => btnWeapon.classList.remove("pressed"));
 
 // ==========================================
 // 開始・停止・リトライ管理
@@ -1588,9 +1829,8 @@ function pauseGame() {
   game.active = false;
   resetJoystickVisual();
   touchInput.slideHeld = false;
-  touchInput.fireHeld = false;
-  mouseFireHeld = false;
   touchInput.lookTouchId = null;
+  weaponState.manualFireHeld = false;
   if (!game.over && !isEditingLayout) {
     modalTitle.textContent = "一時停止";
     modalDesc.innerHTML = "「再開する」を押すと戻ります。<br />キャラコン装備・カメラ感度・ボタン配置も変更できます。";
@@ -1692,25 +1932,24 @@ function resetMatch() {
   resetJoystickVisual();
   touchInput.slideHeld = false;
   touchInput.lookTouchId = null;
+  weaponState.manualFireHeld = false;
 
   oni.pos.set(0, 1, -50);
   oni.vel.set(0, 0, 0);
   oni.jumpCooldown = 0;
   oni.stunGauge = 0;
   oni.stunTimer = 0;
-  oni.hitFlashTimer = 0;
   oni.slowTimer = 0;
+  oni.hitFlashTimer = 0;
+  oni.knockbackVel.set(0, 0, 0);
 
-  player.ammo = CONFIG.gunMaxAmmo;
-  player.fireCooldown = 0;
-  player.isReloading = false;
-  player.reloadTimer = 0;
-  player.gunRecoil = 0;
-  player.muzzleTimer = 0;
-  muzzleFlash.visible = false;
-  touchInput.fireHeld = false;
-  mouseFireHeld = false;
-  updateWeaponHUD();
+  for (const k of WEAPON_ORDER) {
+    weaponState.ammo[k] = WEAPONS[k].maxAmmo;
+  }
+  weaponState.reloading = false;
+  weaponState.reloadTimer = 0;
+  weaponState.fireCooldown = 0;
+  updateWeaponUI();
 
   game.elapsed = 0;
   game.over = false;
@@ -2130,47 +2369,6 @@ function updatePlayer(dt) {
     pcGrappleChip.classList.remove("cooldown");
   }
 
-
-  // 銃の連射・リロード・3Dビューモデルアニメーション更新
-  if (player.fireCooldown > 0) player.fireCooldown = Math.max(0, player.fireCooldown - dt);
-  if (player.muzzleTimer > 0) {
-    player.muzzleTimer -= dt;
-    if (player.muzzleTimer <= 0) muzzleFlash.visible = false;
-  }
-
-  if (player.isReloading) {
-    player.reloadTimer -= dt;
-    if (player.reloadTimer <= 0) {
-      player.isReloading = false;
-      player.ammo = CONFIG.gunMaxAmmo;
-      updateWeaponHUD();
-    }
-  } else if ((mouseFireHeld || touchInput.fireHeld) && player.fireCooldown <= 0) {
-    fireGun();
-  }
-
-  // 銃の揺れ（ボビング）・反動・リロード傾き
-  player.gunRecoil = Math.max(0, player.gunRecoil - dt * 7.5);
-  if (player.onGround && speedNow > 1.0 && !player.isSliding) {
-    player.gunBobTime += dt * Math.min(16, speedNow * 1.1);
-  }
-  const bobX = Math.cos(player.gunBobTime * 0.5) * 0.012;
-  const bobY = Math.abs(Math.sin(player.gunBobTime)) * 0.012;
-  const reloadProgress = player.isReloading
-    ? Math.sin((1 - player.reloadTimer / CONFIG.gunReloadTime) * Math.PI)
-    : 0;
-
-  gunGroup.position.set(
-    GUN_BASE_POS.x + bobX,
-    GUN_BASE_POS.y - bobY - reloadProgress * 0.09,
-    GUN_BASE_POS.z + player.gunRecoil * 0.065
-  );
-  gunGroup.rotation.set(
-    player.gunRecoil * 0.16 - reloadProgress * 0.45,
-    reloadProgress * 0.25,
-    -reloadProgress * 0.55
-  );
-
   // 状態バッジ
   speedDisplay.textContent = speedNow.toFixed(1);
   if (player.isZiplining) {
@@ -2201,24 +2399,36 @@ function updatePlayer(dt) {
 // 鬼（AI）の追跡更新
 // ==========================================
 function updateOni(dt) {
-  if (oni.stunTimer > 0) oni.stunTimer = Math.max(0, oni.stunTimer - dt);
-  if (oni.slowTimer > 0) oni.slowTimer = Math.max(0, oni.slowTimer - dt);
-  if (oni.hitFlashTimer > 0) oni.hitFlashTimer = Math.max(0, oni.hitFlashTimer - dt);
-
-  // 鬼の見た目カラー（スタン中は黄色・被弾時は白フラッシュ・通常は赤）
-  if (oni.hitFlashTimer > 0) {
-    oniBody.material.color.setHex(0xffffff);
-    oniBody.material.emissive.setHex(0xfef08a);
-  } else if (oni.stunTimer > 0) {
-    oniBody.material.color.setHex(0xfacc15);
-    oniBody.material.emissive.setHex(0xa16207);
-  } else {
-    oniBody.material.color.setHex(0xef4444);
-    oniBody.material.emissive.setHex(0x991b1b);
-  }
-
   let currentOniSpeed = oni.baseSpeed + Math.min(6.0, game.elapsed * 0.085);
-  if (oni.slowTimer > 0) currentOniSpeed *= 0.45;
+
+  // スタン・スロー・ヒットフラッシュ更新
+  if (oni.hitFlashTimer > 0) oni.hitFlashTimer = Math.max(0, oni.hitFlashTimer - dt);
+  if (oni.slowTimer > 0) oni.slowTimer = Math.max(0, oni.slowTimer - dt);
+
+  if (oni.stunTimer > 0) {
+    oni.stunTimer = Math.max(0, oni.stunTimer - dt);
+    if (oni.stunTimer <= 0) {
+      oni.stunGauge = 0;
+    }
+    currentOniSpeed = 0;
+    const blink = Math.floor(performance.now() / 80) % 2 === 0;
+    oniBody.material.color.setHex(blink ? 0xfacc15 : 0x38bdf8);
+    oniBody.material.emissive.setHex(blink ? 0xca8a04 : 0x0284c7);
+  } else {
+    if (oni.stunGauge > 0) {
+      oni.stunGauge = Math.max(0, oni.stunGauge - 6.0 * dt);
+    }
+    if (oni.slowTimer > 0) {
+      currentOniSpeed *= 0.55;
+    }
+    if (oni.hitFlashTimer > 0) {
+      oniBody.material.color.setHex(0xffffff);
+      oniBody.material.emissive.setHex(0xf97316);
+    } else {
+      oniBody.material.color.setHex(0xef4444);
+      oniBody.material.emissive.setHex(0x991b1b);
+    }
+  }
 
   const toPlayer = new THREE.Vector3(
     player.pos.x - oni.pos.x,
@@ -2228,14 +2438,11 @@ function updateOni(dt) {
   const distHoriz = toPlayer.length();
   if (distHoriz > 0.01) toPlayer.divideScalar(distHoriz);
 
-  if (oni.stunTimer > 0) {
-    // スタン中は移動停止＆減衰
-    oni.vel.x *= Math.max(0, 1 - dt * 8);
-    oni.vel.z *= Math.max(0, 1 - dt * 8);
-  } else {
-    oni.vel.x = toPlayer.x * currentOniSpeed;
-    oni.vel.z = toPlayer.z * currentOniSpeed;
-  }
+  // ノックバック減衰
+  oni.knockbackVel.multiplyScalar(Math.max(0, 1 - dt * 6.5));
+
+  oni.vel.x = toPlayer.x * currentOniSpeed + oni.knockbackVel.x;
+  oni.vel.z = toPlayer.z * currentOniSpeed + oni.knockbackVel.z;
   oni.vel.y -= CONFIG.gravity * dt;
 
   if (oni.jumpCooldown > 0) oni.jumpCooldown -= dt;
@@ -2262,6 +2469,7 @@ function updateOni(dt) {
 
   const moved = Math.hypot(oni.pos.x - prevX, oni.pos.z - prevZ);
   if (
+    oni.stunTimer <= 0 &&
     oni.onGround &&
     oni.jumpCooldown <= 0 &&
     (moved < currentOniSpeed * dt * 0.45 || player.pos.y > oni.pos.y + 1.5)
@@ -2284,7 +2492,7 @@ function updateOni(dt) {
     showTrick("NEAR MISS!! +1");
   }
 
-  if (totalDist < 1.5 && oni.stunTimer <= 0) {
+  if (oni.stunTimer <= 0 && totalDist < 1.5) {
     triggerGameOver();
   }
 }
@@ -2399,6 +2607,7 @@ function triggerGameOver() {
   resetJoystickVisual();
   touchInput.slideHeld = false;
   touchInput.lookTouchId = null;
+  weaponState.manualFireHeld = false;
   playSfx("caught");
 
   if (game.elapsed > game.best) {
@@ -2433,48 +2642,12 @@ function animate(now) {
     if (trickTimer <= 0) trickFeed.classList.remove("show");
   }
 
-  if (hitmarkerTimer > 0) {
-    hitmarkerTimer -= dt;
-    if (hitmarkerTimer <= 0 && hitmarker) {
-      hitmarker.classList.remove("show", "stun");
-    }
-  }
-
-  for (let i = activeTracers.length - 1; i >= 0; i--) {
-    const tr = activeTracers[i];
-    tr.life -= dt;
-    if (tr.life <= 0) {
-      scene.remove(tr.line);
-      tr.line.geometry.dispose();
-      tr.line.material.dispose();
-      activeTracers.splice(i, 1);
-    } else {
-      tr.line.material.opacity = tr.life / tr.maxLife;
-    }
-  }
-
-  for (let i = activeSparks.length - 1; i >= 0; i--) {
-    const sp = activeSparks[i];
-    sp.life -= dt;
-    if (sp.life <= 0) {
-      scene.remove(sp.mesh);
-      sp.mesh.geometry.dispose();
-      sp.mesh.material.dispose();
-      activeSparks.splice(i, 1);
-    } else {
-      const ratio = sp.life / sp.maxLife;
-      sp.mesh.scale.setScalar(0.5 + ratio * 0.8);
-      sp.mesh.material.opacity = ratio;
-    }
-  }
-
-  updateWeaponHUD();
-
   if (game.active && !game.over) {
     game.elapsed += dt;
     timeDisplay.textContent = game.elapsed.toFixed(1);
     updatePlayer(dt);
     updateOni(dt);
+    updateWeapon(dt);
   }
 
   drawMinimap(now);

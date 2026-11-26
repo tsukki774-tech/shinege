@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコン鬼ごっこ v6 - FPS銃バトル対応 - 広大アリーナ＆全ギミック対応</title>
+  <title>3D キャラコン鬼ごっこ v6 - FPS武器＆オート射撃対応</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -42,21 +42,25 @@
     </div>
 
     <div id="crosshair"></div>
-    <div id="hitmarker"></div>
-    <div id="zip-prompt" class="hidden">ZIPLINE 乗車可能 [E / ZIP]</div>
-    <div id="trick-feed"></div>
+    <div id="hitmarker" class="hidden"></div>
 
-    <!-- 銃・残弾HUD -->
+    <!-- FPS 武器・残弾HUD -->
     <div id="weapon-hud">
-      <div class="weapon-name">PULSE RIFLE</div>
-      <div class="ammo-wrap">
-        <span id="ammo-display">15</span> <small>/ 15</small>
+      <div class="weapon-hud-top">
+        <span id="weapon-name">PULSE RIFLE</span>
+        <span id="autofire-badge">AUTO</span>
+      </div>
+      <div class="weapon-ammo-row">
+        <strong id="ammo-display">18</strong><small id="ammo-max">/ 18</small>
       </div>
       <div id="reload-status" class="hidden">RELOADING...</div>
-      <div class="stun-bar-wrap">
-        <div id="stun-bar-fill"></div>
+      <div class="oni-stun-wrap">
+        <span>ONI STUN</span>
+        <div class="oni-stun-bar"><div id="oni-stun-fill"></div></div>
       </div>
     </div>
+    <div id="zip-prompt" class="hidden">ZIPLINE 乗車可能 [E / ZIP]</div>
+    <div id="trick-feed"></div>
 
     <!-- PC用クールタイム表示 -->
     <div id="pc-ability-bar">
@@ -66,15 +70,15 @@
     </div>
 
     <div class="hud-bottom">
-      <span><strong>左クリック</strong> 射撃</span>
-      <span><strong>R</strong> リロード</span>
       <span><strong>WASD</strong> 移動</span>
       <span><strong>Space</strong> ジャンプ/壁キック</span>
       <span><strong>Shift/C</strong> スライド</span>
       <span><strong>Q</strong> ダッシュ</span>
       <span><strong>右クリック/F</strong> ワイヤー</span>
       <span><strong>E</strong> ジップライン</span>
-      <span><strong>R</strong> リトライ</span>
+      <span><strong>左クリック</strong> 射撃</span>
+      <span><strong>1/2/3</strong> 武器切替</span>
+      <span><strong>R</strong> リロード</span>
     </div>
   </div>
 
@@ -99,8 +103,14 @@
       <small id="btn-grapple-cd"></small>
     </button>
     <button id="btn-zip" class="action-btn zip-btn" type="button">ZIP</button>
-    <button id="btn-fire" class="action-btn fire-btn" type="button">FIRE</button>
-    <button id="btn-reload" class="action-btn reload-btn" type="button">RELOAD</button>
+    <button id="btn-fire" class="action-btn fire-btn" type="button">
+      <span>FIRE</span>
+      <small id="btn-fire-sub">AUTO</small>
+    </button>
+    <button id="btn-weapon" class="action-btn weapon-btn" type="button">
+      <span id="btn-weapon-label">RIFLE</span>
+      <small>切替</small>
+    </button>
   </div>
 
   <!-- ボタン配置編集モード用バー -->
@@ -115,10 +125,10 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコン鬼ごっこ v6 - FPS銃バトル対応</h1>
+      <h1 id="modal-title">3D キャラコン鬼ごっこ v6</h1>
       <p id="modal-desc">
-        広大アリーナで多彩なキャラコンと<strong>FPSパルスライフル</strong>を駆使して逃げ切れ！<br />
-        鬼を撃つとノックバック＆減速、5発命中で<strong>STUN（行動不能）</strong>にできる！
+        広大アリーナでパルクール＆ギミックに加え、<strong>3種類のFPS武器</strong>で鬼を足止め！<br />
+        照準が鬼に合えば<strong>自動で発射（オート射撃）</strong>されるのでスマホでも快適！
       </p>
 
       <!-- キャラコンギミック選択 -->
@@ -149,10 +159,29 @@
         </div>
       </div>
 
+      <!-- FPS武器＆オート射撃設定 -->
+      <div class="weapon-settings-section">
+        <div class="weapon-settings-row">
+          <span class="weapon-settings-title">照準オート射撃（鬼に合うと自動発射）</span>
+          <button id="autofire-toggle-btn" class="autofire-btn active" type="button">ON</button>
+        </div>
+        <div class="weapon-select-grid" id="weapon-select-grid">
+          <button class="weapon-select-btn active" data-weapon="rifle" type="button">
+            パルスライフル<small>連射バランス型</small>
+          </button>
+          <button class="weapon-select-btn" data-weapon="shotgun" type="button">
+            ショットガン<small>近距離・強ノックバック</small>
+          </button>
+          <button class="weapon-select-btn" data-weapon="sniper" type="button">
+            スナイパー<small>超遠距離・即スタン</small>
+          </button>
+        </div>
+      </div>
+
       <div class="controls-box">
-        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ FIRE射撃・RELOAD・JUMP・SLIDE・DASH・WIRE・ZIP</div>
-        <div><strong>【PC】</strong>左クリック射撃 ／ Rリロード ／ WASD移動 ／ Spaceジャンプ ／ Shift・Cスライド ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップ</div>
-        <div><strong>【コツ】</strong>鬼に5発当てると2.5秒スタン！撃って距離を稼ぎながらワイヤーやZIPで逃げ切ろう！</div>
+        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ FIRE・武器切替・JUMP・SLIDE・DASH・WIRE・ZIP</div>
+        <div><strong>【PC】</strong>WASD移動 ／ 左クリック射撃 ／ 1〜3・ホイール武器切替 ／ Rリロード ／ Spaceジャンプ ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップ</div>
+        <div><strong>【コツ】</strong>照準が鬼に合うと赤く光って自動発射！スタンゲージを溜めると鬼を2.5秒間ストップできます！</div>
       </div>
 
       <div class="modal-buttons">
