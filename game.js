@@ -2496,45 +2496,102 @@ function buildActiveViewModel() {
       addPart(weaponRoot, new THREE.ConeGeometry(0.015, 0.055, 4), bladeMat, [0, -0.185, -0.282], [-2.65, Math.PI / 4, 0]);
 
     } else if (m.key === "katana") {
-      // 【サイバーカタナ】菱形柄巻き＋八角透かし鍔＋ハバキ＋反りのある長刀身
-      addPart(weaponRoot, new THREE.CylinderGeometry(0.022, 0.024, 0.026, 12), chromeMat, [0, -0.072, 0.155], [Math.PI / 2.4, 0, 0]);
-      addPart(weaponRoot, new THREE.CylinderGeometry(0.020, 0.023, 0.25, 12), gripMat, [0, -0.040, 0.045], [Math.PI / 2.4, 0, 0]);
-      // 柄巻き（ダイヤモンドラップ）
-      for (let i = 0; i < 6; i++) {
-        const t = i / 5;
-        addPart(weaponRoot, new THREE.BoxGeometry(0.044, 0.012, 0.026), darkMat, [0, -0.062 + t * 0.044, 0.125 - t * 0.16], [Math.PI / 2.4, 0, Math.PI / 4]);
+      // 【サイバーカタナ】単一基準軸＋連続スプライン反り（ソリ）で柄・鍔・刀身・切っ先を完全一体化
+      const katanaGroup = new THREE.Group();
+      katanaGroup.rotation.x = -0.22;
+      katanaGroup.position.set(0, -0.02, 0.02);
+      weaponRoot.add(katanaGroup);
+
+      // 柄頭（カシラ）＆柄（ツカ）
+      addPart(katanaGroup, new THREE.CylinderGeometry(0.019, 0.022, 0.026, 14), chromeMat, [0, 0, 0.175], [-Math.PI / 2, 0, 0]);
+      const tsukaMesh = addPart(katanaGroup, new THREE.CylinderGeometry(0.018, 0.020, 0.245, 14), gripMat, [0, 0, 0.048], [-Math.PI / 2, 0, 0]);
+      tsukaMesh.scale.set(0.78, 1, 1.15);
+
+      // 密着した柄巻き（ツカマキ：8連リング＋発光目貫ライン）
+      for (let i = 0; i < 8; i++) {
+        const zPos = 0.145 - i * 0.028;
+        const wrap = addPart(katanaGroup, new THREE.BoxGeometry(0.034, 0.046, 0.014), darkMat, [0, 0, zPos], [0, 0, (i % 2 === 0 ? 1 : -1) * 0.18]);
+        wrap.scale.set(1, 1, 1);
       }
-      // 透かし八角鍔（ツバ）＆黄金ハバキ金具
-      addPart(weaponRoot, new THREE.CylinderGeometry(0.062, 0.062, 0.014, 8), darkMat, [0, 0.008, -0.075], [Math.PI / 2.4, 0, 0]);
-      addPart(weaponRoot, new THREE.TorusGeometry(0.054, 0.005, 8, 8), bladeMat, [0, 0.008, -0.075], [Math.PI / 2.4, 0, 0]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.024, 0.036, 0.036), chromeMat, [0, 0.018, -0.102], [-0.22, 0, 0]);
-      // 反り（ソリ）を表現した2段構成の長刀身＋切っ先
-      addPart(weaponRoot, new THREE.BoxGeometry(0.014, 0.020, 0.42), steelMat, [0, 0.075, -0.30], [-0.22, 0, 0]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.008, 0.024, 0.43), bladeMat, [0, 0.058, -0.305], [-0.22, 0, 0]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.013, 0.018, 0.34), steelMat, [0, 0.165, -0.66], [-0.28, 0, 0]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.007, 0.022, 0.35), bladeMat, [0, 0.148, -0.665], [-0.28, 0, 0]);
-      addPart(weaponRoot, new THREE.ConeGeometry(0.018, 0.085, 4), bladeMat, [0, 0.205, -0.86], [-1.85, Math.PI / 4, 0]);
+      addPart(katanaGroup, new THREE.BoxGeometry(0.036, 0.008, 0.20), bladeMat, [0, 0, 0.048]);
+
+      // 縁金具（フチ）・八角鍔（ツバ）・ハバキ
+      addPart(katanaGroup, new THREE.CylinderGeometry(0.022, 0.022, 0.018, 14), chromeMat, [0, 0, -0.076], [-Math.PI / 2, 0, 0]);
+      addPart(katanaGroup, new THREE.CylinderGeometry(0.058, 0.058, 0.012, 8), darkMat, [0, 0, -0.090], [-Math.PI / 2, 0, 0]);
+      addPart(katanaGroup, new THREE.TorusGeometry(0.052, 0.0045, 8, 8), bladeMat, [0, 0, -0.090]);
+      addPart(katanaGroup, new THREE.BoxGeometry(0.020, 0.042, 0.034), chromeMat, [0, 0.002, -0.110]);
+
+      // 連続した反り（ソリ）を持つ一体型長刀身（12セグメント連結で隙間ゼロ）
+      const bladeStartZ = -0.122;
+      const bladeLength = 0.72;
+      const segCount = 12;
+      const soriHeight = 0.068;
+      const segLen = (bladeLength / segCount) * 1.14; // わずかに重ねて継ぎ目を完全消去
+
+      for (let i = 0; i < segCount; i++) {
+        const t0 = i / segCount;
+        const t1 = (i + 1) / segCount;
+        const tm = (t0 + t1) * 0.5;
+        const z0 = bladeStartZ - t0 * bladeLength;
+        const z1 = bladeStartZ - t1 * bladeLength;
+        const zm = (z0 + z1) * 0.5;
+        const y0 = soriHeight * t0 * t0;
+        const y1 = soriHeight * t1 * t1;
+        const ym = (y0 + y1) * 0.5;
+        const slopeAngle = Math.atan2(y1 - y0, -(z1 - z0));
+
+        const taper = 1 - tm * 0.26;
+        const spineH = 0.018 * taper;
+        const edgeH = 0.022 * taper;
+        const thick = 0.011 * (1 - tm * 0.22);
+
+        // 棟（鋼ブレード背）
+        addPart(katanaGroup, new THREE.BoxGeometry(thick, spineH, segLen), steelMat, [0, ym + 0.009 * taper, zm], [-slopeAngle, 0, 0]);
+        // 刃（発光プラズマエッジ）
+        addPart(katanaGroup, new THREE.BoxGeometry(thick * 0.62, edgeH, segLen), bladeMat, [0, ym - 0.007 * taper, zm], [-slopeAngle, 0, 0]);
+      }
+
+      // 切っ先（キッサキ：刀身先端の接線角度に完全一致）
+      const tipEndZ = bladeStartZ - bladeLength;
+      const tipEndY = soriHeight;
+      const tipSlope = Math.atan2(2 * soriHeight, bladeLength);
+      const tipLen = 0.078;
+      const tipCenterZ = tipEndZ - Math.cos(tipSlope) * (tipLen * 0.45);
+      const tipCenterY = tipEndY + Math.sin(tipSlope) * (tipLen * 0.45) + 0.002;
+      const kissaki = addPart(
+        katanaGroup,
+        new THREE.ConeGeometry(0.017, tipLen, 4),
+        bladeMat,
+        [0, tipCenterY, tipCenterZ],
+        [-Math.PI / 2 - tipSlope, Math.PI / 4, 0]
+      );
+      kissaki.scale.set(0.45, 1, 1.15);
 
     } else {
-      // 【プラズマバトルアックス】ヘビーテックシャフト＋冷却ラジエーター＋両刃エネルギーブレード
-      addPart(weaponRoot, new THREE.CylinderGeometry(0.026, 0.022, 0.04, 12), chromeMat, [0, -0.085, 0.135], [Math.PI / 2.2, 0, 0]);
-      addPart(weaponRoot, new THREE.CylinderGeometry(0.020, 0.024, 0.60, 14), gripMat, [0, -0.020, -0.14], [Math.PI / 2.2, 0, 0]);
+      // 【プラズマバトルアックス】単一シャフト軸上に柄・リアクター・三日月大刃を完全固定
+      const axeGroup = new THREE.Group();
+      axeGroup.rotation.x = -0.20;
+      axeGroup.position.set(0, -0.02, 0.02);
+      weaponRoot.add(axeGroup);
+
+      addPart(axeGroup, new THREE.CylinderGeometry(0.025, 0.021, 0.038, 12), chromeMat, [0, 0, 0.165], [-Math.PI / 2, 0, 0]);
+      addPart(axeGroup, new THREE.CylinderGeometry(0.019, 0.023, 0.60, 14), gripMat, [0, 0, -0.14], [-Math.PI / 2, 0, 0]);
       // シャフト補強バンド（3箇所）
       for (let i = 0; i < 3; i++) {
-        addPart(weaponRoot, new THREE.CylinderGeometry(0.025, 0.025, 0.022, 14), chromeMat, [0, -0.055 + i * 0.036, 0.03 - i * 0.16], [Math.PI / 2.2, 0, 0]);
+        addPart(axeGroup, new THREE.CylinderGeometry(0.024, 0.024, 0.022, 14), chromeMat, [0, 0, 0.04 - i * 0.16], [-Math.PI / 2, 0, 0]);
       }
-      // 斧頭コアハウジング＆エネルギーリアクター
-      addPart(weaponRoot, new THREE.BoxGeometry(0.042, 0.145, 0.18), darkMat, [0, 0.072, -0.33]);
-      addPart(weaponRoot, new THREE.CylinderGeometry(0.030, 0.030, 0.050, 16), bladeMat, [0, 0.072, -0.33], [0, 0, Math.PI / 2]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.048, 0.048, 0.14), chromeMat, [0, 0.072, -0.33]);
+      // 斧頭コアハウジング＆エネルギーリアクター（シャフト中心に密着）
+      addPart(axeGroup, new THREE.BoxGeometry(0.042, 0.145, 0.18), darkMat, [0, 0.012, -0.34]);
+      addPart(axeGroup, new THREE.CylinderGeometry(0.030, 0.030, 0.050, 16), bladeMat, [0, 0.012, -0.34], [0, 0, Math.PI / 2]);
+      addPart(axeGroup, new THREE.BoxGeometry(0.048, 0.048, 0.14), chromeMat, [0, 0.012, -0.34]);
       // 前方三日月プラズマ大刃（3段構成）
-      addPart(weaponRoot, new THREE.BoxGeometry(0.016, 0.24, 0.065), steelMat, [0, 0.072, -0.41]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.009, 0.29, 0.055), bladeMat, [0, 0.072, -0.455]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.008, 0.09, 0.048), bladeMat, [0, 0.215, -0.435], [0.45, 0, 0]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.008, 0.09, 0.048), bladeMat, [0, -0.071, -0.435], [-0.45, 0, 0]);
+      addPart(axeGroup, new THREE.BoxGeometry(0.016, 0.24, 0.065), steelMat, [0, 0.012, -0.42]);
+      addPart(axeGroup, new THREE.BoxGeometry(0.009, 0.29, 0.055), bladeMat, [0, 0.012, -0.465]);
+      addPart(axeGroup, new THREE.BoxGeometry(0.008, 0.09, 0.048), bladeMat, [0, 0.155, -0.445], [0.45, 0, 0]);
+      addPart(axeGroup, new THREE.BoxGeometry(0.008, 0.09, 0.048), bladeMat, [0, -0.131, -0.445], [-0.45, 0, 0]);
       // 後方アーマーピアシングスパイク
-      addPart(weaponRoot, new THREE.ConeGeometry(0.024, 0.11, 4), chromeMat, [0, 0.088, -0.21], [Math.PI / 2.2, Math.PI / 4, 0]);
-      addPart(weaponRoot, new THREE.BoxGeometry(0.012, 0.032, 0.075), bladeMat, [0, 0.085, -0.23], [-0.15, 0, 0]);
+      addPart(axeGroup, new THREE.ConeGeometry(0.024, 0.11, 4), chromeMat, [0, 0.018, -0.22], [Math.PI / 2, Math.PI / 4, 0]);
+      addPart(axeGroup, new THREE.BoxGeometry(0.012, 0.032, 0.075), bladeMat, [0, 0.015, -0.24]);
     }
   }
 }
