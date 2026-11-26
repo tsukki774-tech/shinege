@@ -2189,21 +2189,53 @@ function updateWeapon(dt) {
         -0.46 * env
       );
     } else {
-      // 近接武器（カラムビットは指リングでクルッと1回転スピン！）
-      const isKarambit = profile.equippedMelee === "karambit";
-      const spinAngle = isKarambit
-        ? Math.min(1, progress * 1.45) * Math.PI * 2
-        : Math.sin(progress * Math.PI * 2) * 0.45;
-      weaponRoot.position.set(
-        weaponBasePos.x - 0.12 * env + bobX * 0.5,
-        weaponBasePos.y + 0.08 * env - bobY * 0.5,
-        weaponBasePos.z + 0.06 * env
-      );
-      weaponRoot.rotation.set(
-        (isKarambit ? spinAngle : 0.25 * env),
-        0.78 * env,
-        -0.38 * env + (isKarambit ? 0 : spinAngle * 0.4)
-      );
+      // 近接武器のインスペクト（ナイフ＆カラムビットはクルクル回す動作！）
+      const meleeKey = profile.equippedMelee;
+      const isSpinWeapon = meleeKey === "knife" || meleeKey === "karambit";
+
+      if (meleeKey === "knife") {
+        // コンバットナイフ：トスして2回転スピン＋逆手キャッチ風モーション
+        const spinT = Math.min(1, progress * 1.35);
+        const smoothSpin = spinT * spinT * (3 - 2 * spinT);
+        const spinAngle = smoothSpin * Math.PI * 4; // 2回転
+        const tossArc = Math.sin(spinT * Math.PI) * 0.065;
+        weaponRoot.position.set(
+          weaponBasePos.x - 0.12 * env + bobX * 0.5,
+          weaponBasePos.y + (0.09 + tossArc) * env - bobY * 0.5,
+          weaponBasePos.z + 0.06 * env
+        );
+        weaponRoot.rotation.set(
+          spinAngle,
+          0.72 * env + Math.sin(progress * Math.PI) * 0.25,
+          -0.35 * env + Math.sin(spinT * Math.PI * 2) * 0.22
+        );
+      } else if (meleeKey === "karambit") {
+        // カラムビット：フィンガーリングを軸にクルッと回転スピン
+        const spinAngle = Math.min(1, progress * 1.45) * Math.PI * 2;
+        weaponRoot.position.set(
+          weaponBasePos.x - 0.12 * env + bobX * 0.5,
+          weaponBasePos.y + 0.08 * env - bobY * 0.5,
+          weaponBasePos.z + 0.06 * env
+        );
+        weaponRoot.rotation.set(
+          spinAngle,
+          0.78 * env,
+          -0.38 * env
+        );
+      } else {
+        // サイバーカタナ・プラズマアックス：刀身をかざして見せるモーション
+        const wave = Math.sin(progress * Math.PI * 2) * 0.45;
+        weaponRoot.position.set(
+          weaponBasePos.x - 0.12 * env + bobX * 0.5,
+          weaponBasePos.y + 0.08 * env - bobY * 0.5,
+          weaponBasePos.z + 0.06 * env
+        );
+        weaponRoot.rotation.set(
+          0.25 * env,
+          0.78 * env,
+          -0.38 * env + wave * 0.4
+        );
+      }
     }
   } else if (isGun) {
     const reloadDrop = weaponState.reloading ? -0.14 : 0;
