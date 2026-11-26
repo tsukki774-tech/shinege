@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
 // ==========================================
 // DOM要素
@@ -55,7 +55,7 @@ const CONFIG = {
 };
 
 // ==========================================
-// タッチモード判定＆切替
+// タッチモード判定＆切替（iPadデスクトップ表示にも対応）
 // ==========================================
 const isCoarsePointer =
   window.matchMedia("(pointer: coarse)").matches ||
@@ -68,7 +68,7 @@ function applyControlMode() {
   if (controlMode === "touch") {
     document.body.classList.add("touch-mode");
     touchLayer.classList.remove("hidden");
-    modeToggleBtn.textContent = "操作モード: スマホ（タッチ）";
+    modeToggleBtn.textContent = "操作モード: スマホ・iPad（タッチ）";
   } else {
     document.body.classList.remove("touch-mode");
     touchLayer.classList.add("hidden");
@@ -167,7 +167,7 @@ const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerH
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = !isCoarsePointer; // スマホでは影を軽くして60fps維持
+renderer.shadowMap.enabled = !isCoarsePointer; // スマホ・iPadでは影を軽くして60fps維持
 document.body.appendChild(renderer.domElement);
 
 // ライト
@@ -551,23 +551,43 @@ function pauseGame() {
   }
 }
 
-startBtn.addEventListener("click", () => {
+function startOrResumeGame() {
   ensureAudio();
   if (game.over) {
     resetMatch();
   }
   if (controlMode === "pc" && document.body.requestPointerLock) {
-    document.body.requestPointerLock();
+    try {
+      const res = document.body.requestPointerLock();
+      if (res && typeof res.catch === "function") {
+        res.catch(() => {
+          overlay.classList.add("hidden");
+          game.active = true;
+        });
+      }
+    } catch {
+      overlay.classList.add("hidden");
+      game.active = true;
+    }
   } else {
     overlay.classList.add("hidden");
     game.active = true;
   }
-});
+}
+
+startBtn.addEventListener("click", startOrResumeGame);
 
 hudRetryBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   ensureAudio();
   resetMatch();
+  if (controlMode === "pc" && document.body.requestPointerLock) {
+    try {
+      document.body.requestPointerLock();
+    } catch {
+      // fallback
+    }
+  }
   overlay.classList.add("hidden");
   game.active = true;
 });
@@ -627,7 +647,7 @@ function resetMatch() {
 // ==========================================
 // 衝突判定＆移動解決（AABB）
 // ==========================================
-function resolveCollisions(pos, vel, radius, height) {
+function resolveCollisions(pos, vel, radius, height, dt = 0.016) {
   let onGround = false;
   let hitWallNormal = null;
 
@@ -643,8 +663,8 @@ function resolveCollisions(pos, vel, radius, height) {
     const distSq = dx * dx + dz * dz;
 
     if (distSq < radius * radius) {
-      const prevBottom = pos.y - vel.y * 0.016;
-      if (vel.y <= 0 && pos.y >= c.maxY - 0.45 && prevBottom >= c.maxY - 0.55) {
+      const prevBottom = pos.y - vel.y * dt;
+      if (vel.y <= 0 && pos.y >= c.maxY - 0.55 && prevBottom >= c.maxY - 0.65) {
         pos.y = c.maxY;
         vel.y = 0;
         onGround = true;
@@ -849,7 +869,7 @@ function updatePlayer(dt) {
   const targetH = player.isSliding ? CONFIG.slideHeight : CONFIG.standHeight;
   player.currentHeight += (targetH - player.currentHeight) * Math.min(1, dt * 16);
 
-  const col = resolveCollisions(player.pos, player.vel, CONFIG.playerRadius, player.currentHeight);
+  const col = resolveCollisions(player.pos, player.vel, CONFIG.playerRadius, player.currentHeight, dt);
   player.onGround = col.onGround;
 
   // ジャンプパッド判定
@@ -927,7 +947,7 @@ function updateOni(dt) {
   oni.pos.y += oni.vel.y * dt;
   oni.pos.z += oni.vel.z * dt;
 
-  const col = resolveCollisions(oni.pos, oni.vel, 0.65, 1.9);
+  const col = resolveCollisions(oni.pos, oni.vel, 0.65, 1.9, dt);
   oni.onGround = col.onGround;
 
   const moved = Math.hypot(oni.pos.x - prevX, oni.pos.z - prevZ);

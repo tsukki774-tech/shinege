@@ -65,28 +65,20 @@
       <h1 id="modal-title">3D キャラコン鬼ごっこ</h1>
       <p id="modal-desc">
         スライディング・バニホ・ウォールランを駆使して鬼から逃げ切れ！<br />
-        PC（マウス＋キーボード）とスマホ（タッチ操作）の両方に対応しています。
+        PC（マウス＋キーボード）とスマホ・iPad（タッチ操作）の両方に対応しています。
       </p>
       <div class="controls-box">
-        <div><strong>【スマホ】</strong>左スティック：移動 ／ 右画面スワイプ：視点 ／ 右下：JUMP・SLIDE</div>
+        <div><strong>【スマホ・iPad】</strong>左スティック：移動 ／ 右画面スワイプ：視点 ／ 右下：JUMP・SLIDE</div>
         <div><strong>【PC】</strong>WASD：移動 ／ マウス：視点 ／ Space：ジャンプ ／ Shift・C：スライディング</div>
         <div><strong>【コツ】</strong>空中で紫の壁に向かって前進するとウォールラン → JUMPで壁キック！</div>
       </div>
       <div class="modal-buttons">
         <button id="start-btn" type="button">プレイ開始</button>
-        <button id="mode-toggle-btn" class="secondary-btn" type="button">操作モード: 自動</button>
+        <button id="mode-toggle-btn" class="secondary-btn" type="button">操作モード: 読み込み中...</button>
       </div>
     </div>
   </div>
 
-  <!-- Three.js (CDN) -->
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-      }
-    }
-  </script>
   <script type="module" src="game.js"></script>
 </body>
 </html>
