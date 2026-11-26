@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコン鬼ごっこ - スマホ＆PC両対応版 v3</title>
+  <title>3D キャラコン鬼ごっこ v5 - 広大アリーナ＆全ギミック対応</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -33,22 +33,33 @@
 
     <!-- ミニマップ -->
     <div id="minimap-wrap">
-      <canvas id="minimap" width="140" height="140"></canvas>
+      <canvas id="minimap" width="144" height="144"></canvas>
       <div class="minimap-legend">
         <span class="leg-p">●自分</span>
         <span class="leg-o">●鬼</span>
+        <span class="leg-z">━ZIP</span>
       </div>
     </div>
 
     <div id="crosshair"></div>
+    <div id="zip-prompt" class="hidden">ZIPLINE 乗車可能 [E / ZIP]</div>
     <div id="trick-feed"></div>
+
+    <!-- PC用クールタイム表示 -->
+    <div id="pc-ability-bar">
+      <div id="pc-dash-chip" class="ability-chip"><strong>Q</strong> DASH: <span id="pc-dash-cd">READY</span></div>
+      <div id="pc-grapple-chip" class="ability-chip"><strong>右クリック/F</strong> WIRE: <span id="pc-grapple-cd">READY</span></div>
+      <div id="pc-zip-chip" class="ability-chip"><strong>E</strong> ZIPLINE</div>
+    </div>
 
     <div class="hud-bottom">
       <span><strong>WASD</strong> 移動</span>
-      <span><strong>Space</strong> ジャンプ / 壁キック</span>
-      <span><strong>Shift / C</strong> スライディング</span>
-      <span><strong>壁際+空中</strong> ウォールラン</span>
-      <span><strong>R</strong> 即リトライ</span>
+      <span><strong>Space</strong> ジャンプ/壁キック</span>
+      <span><strong>Shift/C</strong> スライド</span>
+      <span><strong>Q</strong> ダッシュ</span>
+      <span><strong>右クリック/F</strong> ワイヤー</span>
+      <span><strong>E</strong> ジップライン</span>
+      <span><strong>R</strong> リトライ</span>
     </div>
   </div>
 
@@ -62,13 +73,22 @@
       </div>
     </div>
 
-    <button id="btn-slide" class="action-btn slide-btn" type="button">SLIDE</button>
     <button id="btn-jump" class="action-btn jump-btn" type="button">JUMP</button>
+    <button id="btn-slide" class="action-btn slide-btn" type="button">SLIDE</button>
+    <button id="btn-dash" class="action-btn dash-btn" type="button">
+      <span>DASH</span>
+      <small id="btn-dash-cd"></small>
+    </button>
+    <button id="btn-grapple" class="action-btn grapple-btn" type="button">
+      <span>WIRE</span>
+      <small id="btn-grapple-cd"></small>
+    </button>
+    <button id="btn-zip" class="action-btn zip-btn" type="button">ZIP</button>
   </div>
 
   <!-- ボタン配置編集モード用バー -->
   <div id="layout-editor-bar" class="hidden">
-    <div class="editor-msg">JUMP / SLIDE / スティックをドラッグして好きな位置へ移動</div>
+    <div class="editor-msg">各ボタン・左スティックをドラッグして好きな位置へ移動</div>
     <div class="editor-actions">
       <button id="layout-reset-btn" class="secondary-btn" type="button">初期位置に戻す</button>
       <button id="layout-save-btn" class="primary-small-btn" type="button">保存して戻る</button>
@@ -78,20 +98,52 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコン鬼ごっこ</h1>
+      <h1 id="modal-title">3D キャラコン鬼ごっこ v5</h1>
       <p id="modal-desc">
-        スライディング・バニホ・ウォールランを駆使して鬼から逃げ切れ！<br />
-        PC（マウス＋キーボード）とスマホ・iPad（タッチ操作）の両方に対応しています。
+        広大アリーナで、スライディング・バニホ・ウォールランに加え<br />
+        <strong>空中ダッシュ・ワイヤー・ジップライン</strong>を駆使して鬼から逃げ切れ！
       </p>
-      <div class="controls-box">
-        <div><strong>【スマホ・iPad】</strong>左画面：移動スティック ／ 右画面スワイプ：視点 ／ JUMP・SLIDE</div>
-        <div><strong>【PC】</strong>WASD：移動 ／ マウス：視点 ／ Space：ジャンプ ／ Shift・C：スライディング</div>
-        <div><strong>【コツ】</strong>空中で紫の壁に向かって前進するとウォールラン → JUMPで壁キック！</div>
+
+      <!-- キャラコンギミック選択 -->
+      <div class="loadout-section">
+        <div class="loadout-title">キャラコン装備（ギミック選択）</div>
+        <div class="loadout-grid" id="loadout-grid">
+          <button class="loadout-btn active" data-loadout="all" type="button">全部盛り<small>ダッシュ+ワイヤー+ZIP</small></button>
+          <button class="loadout-btn" data-loadout="dash" type="button">空中ダッシュ<small>DASH + ZIP</small></button>
+          <button class="loadout-btn" data-loadout="grapple" type="button">ワイヤー機動<small>WIRE + ZIP</small></button>
+          <button class="loadout-btn" data-loadout="classic" type="button">クラシック<small>基本パルクールのみ</small></button>
+        </div>
       </div>
+
+      <!-- カメラ感度設定 -->
+      <div class="sensitivity-section">
+        <div class="sensitivity-header">
+          <span class="sensitivity-title">カメラ感度（視点移動）</span>
+          <div class="sensitivity-right">
+            <strong id="sens-value">1.0x</strong>
+            <button id="sens-reset-btn" class="sens-reset-btn" type="button">標準</button>
+          </div>
+        </div>
+        <input id="sens-slider" type="range" min="0.2" max="3.0" step="0.1" value="1.0" />
+        <div class="sensitivity-scale">
+          <span>遅い</span>
+          <span>標準 (1.0)</span>
+          <span>速い</span>
+        </div>
+      </div>
+
+      <div class="controls-box">
+        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ JUMP・SLIDE・DASH・WIRE・ZIP</div>
+        <div><strong>【PC】</strong>WASD移動 ／ Spaceジャンプ ／ Shift・Cスライド ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップライン</div>
+        <div><strong>【コツ】</strong>照準が水色に光ったらWIREが届く合図！黄色のロープに近づいてZIPで高速滑走！</div>
+      </div>
+
       <div class="modal-buttons">
         <button id="start-btn" type="button">プレイ開始</button>
-        <button id="layout-btn" class="secondary-btn" type="button">ボタン配置を変更</button>
-        <button id="mode-toggle-btn" class="secondary-btn" type="button">操作モード: 読み込み中...</button>
+        <div class="sub-btn-row">
+          <button id="layout-btn" class="secondary-btn" type="button">ボタン配置を変更</button>
+          <button id="mode-toggle-btn" class="secondary-btn" type="button">操作モード: 読み込み中...</button>
+        </div>
       </div>
     </div>
   </div>
