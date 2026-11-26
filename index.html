@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v18 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
+  <title>3D キャラコンFPS v19 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -166,7 +166,7 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v18</h1>
+      <h1 id="modal-title">3D キャラコンFPS v19</h1>
       <p id="modal-desc">
         パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
         ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
@@ -214,14 +214,23 @@
       <!-- オンライン対戦ロビー -->
       <div class="multiplayer-section">
         <div class="mp-header">
-          <span class="mp-title">対戦モード（最大4人対戦 / ソロ4人乱戦）</span>
-          <div class="mp-goal-wrap">
-            <label for="goal-kills-select">勝利条件:</label>
-            <select id="goal-kills-select">
-              <option value="3">3キル先取</option>
-              <option value="5" selected>5キル先取</option>
-              <option value="10">10キル先取</option>
-            </select>
+          <span class="mp-title">対戦モード（2人 1v1 / 4人乱戦 切替）</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div class="mp-goal-wrap">
+              <label for="player-count-select">人数:</label>
+              <select id="player-count-select">
+                <option value="2">2人モード (1v1)</option>
+                <option value="4" selected>4人モード (乱戦)</option>
+              </select>
+            </div>
+            <div class="mp-goal-wrap">
+              <label for="goal-kills-select">勝利条件:</label>
+              <select id="goal-kills-select">
+                <option value="3">3キル先取</option>
+                <option value="5" selected>5キル先取</option>
+                <option value="10">10キル先取</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -253,7 +262,7 @@
 
         <!-- ソロ練習パネル -->
         <div id="mp-solo-panel" class="mp-panel">
-          <div class="mp-status">縦横メガアリーナで3体の個性派BOT（計4人）とハイスピード乱戦練習できます。</div>
+          <div id="solo-mode-desc" class="mp-status">【4人モード】縦横メガアリーナで3体のBOT（計4人）と乱戦！敵を倒すとHP・残弾が回復します。</div>
         </div>
       </div>
 

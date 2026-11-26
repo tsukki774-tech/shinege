@@ -59,6 +59,8 @@ const finishRewardLine = document.getElementById("finish-reward-line");
 const modalBox = overlay ? overlay.querySelector(".modal") : null;
 
 const goalKillsSelect = document.getElementById("goal-kills-select");
+const playerCountSelect = document.getElementById("player-count-select");
+const soloModeDesc = document.getElementById("solo-mode-desc");
 const mpTabHost = document.getElementById("mp-tab-host");
 const mpTabJoin = document.getElementById("mp-tab-join");
 const mpTabSolo = document.getElementById("mp-tab-solo");
@@ -1262,6 +1264,7 @@ function getAllParticipantsScoreList() {
 // ==========================================
 const ROOM_PREFIX = "parkourfps-v15-";
 const MAX_ROOM_PLAYERS = 4;
+let matchPlayerCount = 4; // 2 (1v1) または 4 (4人乱戦)
 const net = {
   mode: "solo",
   peer: null,
@@ -1294,7 +1297,8 @@ function updateStartButtonLabel() {
     const count = getActiveRivals().length + 1;
     startBtn.textContent = game.elapsed > 0 ? "対戦に戻る" : `${count}人で対戦スタート！`;
   } else if (net.mode === "solo") {
-    startBtn.textContent = game.elapsed > 0 ? "再開する" : "4人乱戦スタート（ソロ練習）";
+    const modeLabel = matchPlayerCount === 2 ? "2人対戦(1v1)" : "4人乱戦";
+    startBtn.textContent = game.elapsed > 0 ? "再開する" : `${modeLabel}スタート（ソロ練習）`;
   } else {
     startBtn.textContent = "接続待機中（ソロ練習も可）";
   }
@@ -1327,7 +1331,7 @@ function updateScoreAndHpUI() {
     netStatusPill.textContent = `ONLINE ${totalPlayers}人 #${net.roomCode}`;
     netStatusPill.className = "net-pill online";
   } else {
-    netStatusPill.textContent = "4人乱戦(SOLO)";
+    netStatusPill.textContent = matchPlayerCount === 2 ? "2人1v1(SOLO)" : "4人乱戦(SOLO)";
     netStatusPill.className = "net-pill solo";
   }
 }
@@ -1360,15 +1364,39 @@ function sendToSpecificPeer(targetPeerId, payload) {
 }
 
 function configureSoloBotsMode() {
+  const botLimit = matchPlayerCount === 2 ? 1 : 3;
   rivals.forEach((r, idx) => {
     const preset = BOT_PRESETS[idx];
-    r.active = true;
+    const enabled = idx < botLimit;
+    r.active = enabled;
     r.isRemotePlayer = false;
     r.peerId = null;
     r.name = preset.name;
     r.kills = 0;
+    r.dead = false;
+    r.respawnTimer = 0;
     applyRivalVisual(r, preset.charKey);
-    r.group.visible = true;
+    r.group.visible = enabled;
+  });
+  if (soloModeDesc) {
+    soloModeDesc.textContent =
+      matchPlayerCount === 2
+        ? "【2人モード (1v1)】1対1のタイマン勝負！素早いキャラコンとエイムで撃ち勝とう。"
+        : "【4人モード (乱戦)】3体のBOTとハイスピード乱戦！敵を倒すとHP+45＆残弾フル回復！";
+  }
+}
+
+if (playerCountSelect) {
+  playerCountSelect.addEventListener("change", () => {
+    matchPlayerCount = Number(playerCountSelect.value) === 2 ? 2 : 4;
+    if (!net.connected) {
+      configureSoloBotsMode();
+      resetMatch(false);
+    } else if (net.mode === "host") {
+      syncRemoteRosterFromHost();
+    }
+    updateScoreAndHpUI();
+    updateStartButtonLabel();
   });
 }
 
@@ -1509,7 +1537,8 @@ function handleIncomingNetPacket(senderPeerId, data) {
     if (data.killerPeer === net.myPeerId) {
       game.myKills += 1;
       playSfx("stun");
-      showTrick(`KILL!! (${game.myKills} / ${game.targetKills})`);
+      const healMsg = applyKillRecoveryToSelf();
+      showTrick(`KILL!! (${game.myKills} / ${game.targetKills})${healMsg}`);
       updateScoreAndHpUI();
       if (game.myKills >= game.targetKills) {
         triggerMatchEnd(true, "YOU");
@@ -1542,7 +1571,8 @@ function handleIncomingNetPacket(senderPeerId, data) {
 }
 
 function setupHostClientConnection(conn) {
-  if (net.conns.length >= MAX_ROOM_PLAYERS - 1) {
+  const maxOthers = Math.max(1, matchPlayerCount - 1);
+  if (net.conns.length >= maxOthers) {
     try { conn.close(); } catch {}
     return;
   }
@@ -2506,6 +2536,20 @@ function checkAimOnRival(maxRange) {
   return null;
 }
 
+function applyKillRecoveryToSelf() {
+  // 4人モード（3人以上の乱戦）で敵を撃破するとHP回復＆残弾フルチャージ
+  const isFourPlayerMatch = net.connected ? (getActiveRivals().length + 1 >= 3) : (matchPlayerCount === 4);
+  if (!isFourPlayerMatch || player.dead) return "";
+  const prevHp = player.hp;
+  player.hp = Math.min(player.maxHp, player.hp + 45);
+  const healed = Math.max(0, Math.round(player.hp - prevHp));
+  weaponState.ammo = GUNS[profile.equippedGun].maxAmmo;
+  weaponState.reloading = false;
+  weaponState.reloadTimer = 0;
+  updateWeaponUI();
+  return healed > 0 ? ` / HP+${healed} & 全弾回復!` : " / 全弾回復!";
+}
+
 function dealDamageToRival(targetRival, totalDmg, weaponShortName) {
   if (!targetRival || !targetRival.active || targetRival.dead) return;
   weaponState.hitmarkerTimer = 0.14;
@@ -2530,7 +2574,8 @@ function dealDamageToRival(targetRival, totalDmg, weaponShortName) {
       targetRival.group.visible = false;
       game.myKills += 1;
       playSfx("stun");
-      showTrick(`${targetRival.name} K.O.!! (${game.myKills} / ${game.targetKills})`);
+      const healMsg = applyKillRecoveryToSelf();
+      showTrick(`${targetRival.name} K.O.!! (${game.myKills} / ${game.targetKills})${healMsg}`);
       updateScoreAndHpUI();
       if (game.myKills >= game.targetKills) {
         triggerMatchEnd(true, "YOU");
@@ -3230,6 +3275,7 @@ if (autofireToggleBtn) {
 }
 
 // 初期モデル・UI構築
+configureSoloBotsMode();
 buildActiveViewModel();
 updateWeaponUI();
 updateEconomyAndLoadoutUI();
@@ -3859,12 +3905,20 @@ function getSpawnPoint(preferFarFromEnemy = false) {
   if (!preferFarFromEnemy) {
     return SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)].clone();
   }
+  const activeEnemies = getActiveRivals().filter((r) => !r.dead);
+  if (activeEnemies.length === 0) {
+    return SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)].clone();
+  }
   let bestSp = SPAWN_POINTS[0];
-  let bestDist = -1;
+  let bestMinDist = -1;
   for (const sp of SPAWN_POINTS) {
-    const d = sp.distanceTo(rival.pos);
-    if (d > bestDist) {
-      bestDist = d;
+    let minDist = Infinity;
+    for (const r of activeEnemies) {
+      const d = sp.distanceTo(r.pos);
+      if (d < minDist) minDist = d;
+    }
+    if (minDist > bestMinDist) {
+      bestMinDist = minDist;
       bestSp = sp;
     }
   }
@@ -4757,6 +4811,9 @@ function updateSingleRival(r, dt) {
               targetBot.respawnTimer = 2.6;
               targetBot.group.visible = false;
               r.kills += 1;
+              if (matchPlayerCount === 4) {
+                r.hp = Math.min(r.maxHp, r.hp + 45);
+              }
               updateScoreAndHpUI();
               if (r.kills >= game.targetKills) {
                 triggerMatchEnd(false, r.name);
