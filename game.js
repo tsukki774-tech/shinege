@@ -103,6 +103,16 @@ const btnSlide = document.getElementById("btn-slide");
 const btnDash = document.getElementById("btn-dash");
 const btnDashCd = document.getElementById("btn-dash-cd");
 const btnGrapple = document.getElementById("btn-grapple");
+const btnSkillLabel = document.getElementById("btn-skill-label");
+const pcSkillName = document.getElementById("pc-skill-name");
+const hudCharPill = document.getElementById("hud-char-pill");
+const hudCharName = document.getElementById("hud-char-name");
+const skillActiveBanner = document.getElementById("skill-active-banner");
+const characterGrid = document.getElementById("character-grid");
+const selectedCharDetail = document.getElementById("selected-char-detail");
+const charDetailName = document.getElementById("char-detail-name");
+const charDetailSkillBadge = document.getElementById("char-detail-skill-badge");
+const charDetailDesc = document.getElementById("char-detail-desc");
 const btnGrappleCd = document.getElementById("btn-grapple-cd");
 const btnZip = document.getElementById("btn-zip");
 const btnFire = document.getElementById("btn-fire");
@@ -200,48 +210,187 @@ if (sensResetBtn) {
 }
 
 // ==========================================
-// キャラコン装備（ギミック選択）
+// キャラクター定義（4キャラ＆固有スキル・ワイヤーはHOOK固有スキル）
 // ==========================================
-const LOADOUTS = {
-  all: { dash: true, grapple: true, zipline: true },
-  dash: { dash: true, grapple: false, zipline: true },
-  grapple: { dash: false, grapple: true, zipline: true },
-  classic: { dash: false, grapple: false, zipline: false },
+const CHARACTERS = {
+  hook: {
+    id: "hook",
+    name: "HOOK",
+    fullName: "HOOK（フック）",
+    role: "GRAPPLER",
+    cssColor: "#38bdf8",
+    bodyColor: 0x0284c7,
+    emissiveColor: 0x0369a1,
+    visorColor: 0x7dd3fc,
+    maxHp: 100,
+    speedMult: 1.04,
+    slideBoostAdd: 0,
+    meleeBonus: 0,
+    skillName: "ワイヤーグラップル",
+    skillShort: "WIRE",
+    skillCooldown: 2.8,
+    desc: "固有スキル【ワイヤーグラップル】で建物やタワーへワイヤーを射出し、高速スイング＆スリングショット移動する。",
+  },
+  blitz: {
+    id: "blitz",
+    name: "BLITZ",
+    fullName: "BLITZ（ブリッツ）",
+    role: "SPEEDSTER",
+    cssColor: "#facc15",
+    bodyColor: 0xd97706,
+    emissiveColor: 0x92400e,
+    visorColor: 0xfef08a,
+    maxHp: 100,
+    speedMult: 1.12,
+    slideBoostAdd: 3.5,
+    meleeBonus: 0,
+    skillName: "オーバードライブ",
+    skillShort: "BOOST",
+    skillCooldown: 9.0,
+    desc: "スライディング強化パッシブ持ち。固有スキル【オーバードライブ】で5秒間、移動速度・連射速度・リロード速度を超加速する。",
+  },
+  vanguard: {
+    id: "vanguard",
+    name: "VANGUARD",
+    fullName: "VANGUARD（ヴァンガード）",
+    role: "DEFENDER",
+    cssColor: "#34d399",
+    bodyColor: 0x059669,
+    emissiveColor: 0x065f46,
+    visorColor: 0x6ee7b7,
+    maxHp: 135,
+    speedMult: 0.96,
+    slideBoostAdd: 0,
+    meleeBonus: 0,
+    skillName: "イージスバリア",
+    skillShort: "SHIELD",
+    skillCooldown: 10.0,
+    desc: "最大HP135の重装ファイター。固有スキル【イージスバリア】でHPを30即時回復し、4秒間受けるダメージを75%軽減する。",
+  },
+  spectre: {
+    id: "spectre",
+    name: "SPECTRE",
+    fullName: "SPECTRE（スペクター）",
+    role: "ASSASSIN",
+    cssColor: "#c084fc",
+    bodyColor: 0x7e22ce,
+    emissiveColor: 0x581c87,
+    visorColor: 0xf0abfc,
+    maxHp: 95,
+    speedMult: 1.08,
+    slideBoostAdd: 1.5,
+    meleeBonus: 20,
+    skillName: "シャドウステップ",
+    skillShort: "BLINK",
+    skillCooldown: 7.5,
+    desc: "近接攻撃威力+20（計75）のアサシン。固有スキル【シャドウステップ】で視線方向へ18m瞬間転移し、2.5秒間ステルス化する。",
+  },
 };
 
-let currentLoadoutKey = localStorage.getItem("parkour_tag_loadout") || "all";
-if (!LOADOUTS[currentLoadoutKey]) currentLoadoutKey = "all";
+const CHAR_ORDER = ["hook", "blitz", "vanguard", "spectre"];
+let selectedCharKey = localStorage.getItem("parkour_fps_character") || "hook";
+if (!CHARACTERS[selectedCharKey]) selectedCharKey = "hook";
+
+function getSelectedChar() {
+  return CHARACTERS[selectedCharKey] || CHARACTERS.hook;
+}
 
 function getLoadout() {
-  return LOADOUTS[currentLoadoutKey];
+  const ch = getSelectedChar();
+  return {
+    dash: true,
+    grapple: ch.id === "hook",
+    zipline: true,
+  };
+}
+
+function renderCharacterSelector() {
+  const activeCh = getSelectedChar();
+  if (characterGrid) {
+    characterGrid.innerHTML = "";
+    for (const key of CHAR_ORDER) {
+      const ch = CHARACTERS[key];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "char-card" + (key === selectedCharKey ? " active" : "");
+      btn.style.setProperty("--char-color", ch.cssColor);
+      btn.innerHTML =
+        `<div class="char-card-role">${ch.role}</div>` +
+        `<div class="char-card-name">${ch.name}</div>` +
+        `<div class="char-card-skill">⚡ ${ch.skillName}</div>` +
+        `<div class="char-card-hp">HP ${ch.maxHp} / 速度 ${Math.round(ch.speedMult * 100)}%</div>`;
+      btn.addEventListener("click", () => {
+        selectedCharKey = key;
+        try {
+          localStorage.setItem("parkour_fps_character", selectedCharKey);
+        } catch {}
+        applyCharacterStatsToPlayer(true);
+        applyCharacterStatsToPlayer(true);
+applyLoadoutUI();
+        renderCharacterSelector();
+      });
+      characterGrid.appendChild(btn);
+    }
+  }
+  if (selectedCharDetail) {
+    selectedCharDetail.style.setProperty("--char-color", activeCh.cssColor);
+  }
+  if (charDetailName) {
+    charDetailName.textContent = activeCh.fullName;
+  }
+  if (charDetailSkillBadge) {
+    charDetailSkillBadge.textContent = `固有スキル: ${activeCh.skillName} (CD ${activeCh.skillCooldown}s)`;
+    charDetailSkillBadge.style.setProperty("--char-color", activeCh.cssColor);
+  }
+  if (charDetailDesc) {
+    charDetailDesc.textContent = activeCh.desc;
+  }
+}
+
+function applyCharacterStatsToPlayer(refillHp = false) {
+  const ch = getSelectedChar();
+  player.maxHp = ch.maxHp;
+  if (refillHp || player.hp > player.maxHp) {
+    clearSkillEffects();
+  applyCharacterStatsToPlayer(true);
+  player.hp = player.maxHp;
+  }
+  if (hudCharName) {
+    hudCharName.textContent = ch.name;
+    hudCharName.style.color = ch.cssColor;
+  }
+  if (btnSkillLabel) {
+    btnSkillLabel.textContent = ch.skillShort;
+  }
+  if (pcSkillName) {
+    pcSkillName.textContent = ch.skillShort;
+  }
+  if (btnGrapple) {
+    btnGrapple.classList.remove("skill-hook", "skill-blitz", "skill-vanguard", "skill-spectre");
+    btnGrapple.classList.add(`skill-${ch.id}`);
+  }
+  updateScoreAndHpUI();
 }
 
 function applyLoadoutUI() {
-  const lo = getLoadout();
-  loadoutBtns.forEach((b) => {
-    b.classList.toggle("active", b.dataset.loadout === currentLoadoutKey);
-  });
+  const ch = getSelectedChar();
+  btnDash.classList.remove("hidden");
+  btnGrapple.classList.remove("hidden");
+  btnZip.classList.remove("hidden");
 
-  btnDash.classList.toggle("hidden", !lo.dash);
-  btnGrapple.classList.toggle("hidden", !lo.grapple);
-  btnZip.classList.toggle("hidden", !lo.zipline);
+  pcDashChip.classList.remove("hidden");
+  pcGrappleChip.classList.remove("hidden");
+  pcZipChip.classList.remove("hidden");
 
-  pcDashChip.classList.toggle("hidden", !lo.dash);
-  pcGrappleChip.classList.toggle("hidden", !lo.grapple);
-  pcZipChip.classList.toggle("hidden", !lo.zipline);
+  if (btnSkillLabel) btnSkillLabel.textContent = ch.skillShort;
+  if (pcSkillName) pcSkillName.textContent = ch.skillShort;
+  if (hudCharName) {
+    hudCharName.textContent = ch.name;
+    hudCharName.style.color = ch.cssColor;
+  }
 }
 
-loadoutBtns.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    currentLoadoutKey = btn.dataset.loadout;
-    try {
-      localStorage.setItem("parkour_tag_loadout", currentLoadoutKey);
-    } catch {
-      // ignore
-    }
-    applyLoadoutUI();
-  });
-});
+renderCharacterSelector();
 
 // ==========================================
 // タッチモード判定＆切替
@@ -1065,7 +1214,20 @@ const rival = {
   botStrafeDir: 1,
   botStrafeTimer: 1.5,
   weaponKey: "rifle",
+  charKey: "vanguard",
+  shieldActive: false,
+  stealthActive: false,
 };
+
+function applyRivalCharacterVisual(charKey) {
+  const ch = CHARACTERS[charKey] || CHARACTERS.vanguard;
+  rival.charKey = ch.id;
+  rival.maxHp = ch.maxHp;
+  visorMesh.material.color.setHex(ch.visorColor);
+  rivalBody.material.transparent = rival.stealthActive;
+  rivalBody.material.opacity = rival.stealthActive ? 0.22 : 1.0;
+}
+applyRivalCharacterVisual("vanguard");
 
 // ==========================================
 // オンライン対戦（PeerJS ルームコード接続）
@@ -1192,6 +1354,11 @@ function setupConnection(conn, isHost) {
       rival.hp = typeof data.hp === "number" ? data.hp : rival.hp;
       rival.dead = Boolean(data.dead);
       rival.weaponKey = data.w || "rifle";
+      if (data.ch && CHARACTERS[data.ch] && rival.charKey !== data.ch) {
+        applyRivalCharacterVisual(data.ch);
+      }
+      rival.shieldActive = Boolean(data.sh);
+      rival.stealthActive = Boolean(data.st);
       rivalGroup.visible = !rival.dead;
       updateScoreAndHpUI();
     } else if (data.type === "shot") {
@@ -1975,13 +2142,27 @@ function toggleWeaponSlot(showNotice = true) {
   switchWeaponSlot(weaponState.activeSlot === "gun" ? "melee" : "gun", showNotice);
 }
 
+const skillState = {
+  cooldown: 0,
+  overdriveTimer: 0,
+  shieldTimer: 0,
+  stealthTimer: 0,
+};
+
+function clearSkillEffects() {
+  skillState.overdriveTimer = 0;
+  skillState.shieldTimer = 0;
+  skillState.stealthTimer = 0;
+  if (skillActiveBanner) skillActiveBanner.classList.add("hidden");
+}
+
 function startReload() {
   if (weaponState.activeSlot !== "gun") return;
   const g = GUNS[profile.equippedGun];
   if (weaponState.reloading || weaponState.ammo >= g.maxAmmo) return;
   weaponState.inspectTimer = 0;
   weaponState.reloading = true;
-  weaponState.reloadTimer = g.reloadTime;
+  weaponState.reloadTimer = skillState.overdriveTimer > 0 ? g.reloadTime * 0.55 : g.reloadTime;
   playSfx("reload");
   updateWeaponUI();
 }
@@ -2039,7 +2220,8 @@ function performMeleeAttack() {
   spawnTracer(slashStart, slashEnd, accentHex);
 
   if (checkAimOnRival(MELEE_COMMON_STATS.range)) {
-    dealDamageToRival(MELEE_COMMON_STATS.damage, m.shortName);
+    const meleeDmg = MELEE_COMMON_STATS.damage + (getSelectedChar().meleeBonus || 0);
+    dealDamageToRival(meleeDmg, m.shortName);
   }
 }
 
@@ -2061,7 +2243,7 @@ function fireWeapon() {
 
   const tracerColor = getEffectiveAccentColor(g.defaultColor, profile.equippedGunSkin);
   weaponState.ammo -= 1;
-  weaponState.fireCooldown = g.fireRate;
+  weaponState.fireCooldown = skillState.overdriveTimer > 0 ? g.fireRate * 0.68 : g.fireRate;
   weaponState.recoilOffset = Math.min(0.2, weaponState.recoilOffset + g.recoilZ);
   weaponState.recoilRot = Math.min(0.28, weaponState.recoilRot + g.recoilPitch);
   weaponState.muzzleFlashTimer = 0.045;
@@ -2617,15 +2799,13 @@ function findGrappleHit() {
   return null;
 }
 
-function triggerGrapple() {
-  if (!game.active || !getLoadout().grapple) return;
+function triggerWireGrappleSkill(ch) {
   if (player.isGrappling) {
-    // もう一度押すと解除
     player.isGrappling = false;
     wireLine.visible = false;
     return;
   }
-  if (player.grappleCooldown > 0) return;
+  if (skillState.cooldown > 0) return;
 
   const hitPoint = findGrappleHit();
   if (!hitPoint) {
@@ -2638,11 +2818,75 @@ function triggerGrapple() {
   player.isGrappling = true;
   player.grapplePoint.copy(hitPoint);
   player.grappleTimer = CONFIG.grappleMaxTime;
-  player.grappleCooldown = CONFIG.grappleCooldown;
+  skillState.cooldown = ch.skillCooldown;
+  player.grappleCooldown = ch.skillCooldown;
   player.onGround = false;
 
   playSfx("grapple");
-  showTrick("WIRE GRAPPLE!");
+  showTrick("HOOK: WIRE GRAPPLE!");
+}
+
+function triggerOverdriveSkill(ch) {
+  if (skillState.cooldown > 0) return;
+  skillState.cooldown = ch.skillCooldown;
+  skillState.overdriveTimer = 5.0;
+  player.dashCooldown = 0;
+  playSfx("boost");
+  showTrick("BLITZ: OVERDRIVE!! (5.0s)");
+}
+
+function triggerAegisBarrierSkill(ch) {
+  if (skillState.cooldown > 0) return;
+  skillState.cooldown = ch.skillCooldown;
+  skillState.shieldTimer = 4.0;
+  player.hp = Math.min(player.maxHp, player.hp + 30);
+  updateScoreAndHpUI();
+  playSfx("stun");
+  showTrick("VANGUARD: AEGIS BARRIER! (+30 HP / 75%軽減)");
+}
+
+function triggerShadowStepSkill(ch) {
+  if (skillState.cooldown > 0) return;
+  const eyePos = new THREE.Vector3(player.pos.x, player.pos.y + 1.2, player.pos.z);
+  const look = getLookDirection();
+  const blinkDir = new THREE.Vector3(look.x, Math.max(-0.15, look.y * 0.45), look.z).normalize();
+
+  raycaster.set(eyePos, blinkDir);
+  raycaster.far = 18.0;
+  const hits = raycaster.intersectObjects(worldMeshes, false);
+  const travelDist = hits.length > 0 ? Math.max(1.5, hits[0].distance - 1.1) : 18.0;
+
+  const startTrace = eyePos.clone();
+  player.pos.addScaledVector(blinkDir, travelDist);
+  player.pos.y = Math.max(0.2, player.pos.y);
+  player.vel.x = blinkDir.x * 16;
+  player.vel.z = blinkDir.z * 16;
+  player.vel.y = Math.max(player.vel.y, 4.5);
+  player.isGrappling = false;
+  player.isZiplining = false;
+  wireLine.visible = false;
+
+  const endTrace = new THREE.Vector3(player.pos.x, player.pos.y + 1.2, player.pos.z);
+  spawnTracer(startTrace, endTrace, 0xc084fc);
+
+  skillState.cooldown = ch.skillCooldown;
+  skillState.stealthTimer = 2.5;
+  playSfx("dash");
+  showTrick("SPECTRE: SHADOW STEP! (ステルス 2.5s)");
+}
+
+function triggerGrapple() {
+  if (!game.active || game.over || player.dead) return;
+  const ch = getSelectedChar();
+  if (ch.id === "hook") {
+    triggerWireGrappleSkill(ch);
+  } else if (ch.id === "blitz") {
+    triggerOverdriveSkill(ch);
+  } else if (ch.id === "vanguard") {
+    triggerAegisBarrierSkill(ch);
+  } else if (ch.id === "spectre") {
+    triggerShadowStepSkill(ch);
+  }
 }
 
 function findNearbyZipline() {
@@ -3157,6 +3401,9 @@ function respawnSelf() {
   const sp = getSpawnPoint(true);
   player.pos.copy(sp);
   player.vel.set(0, 0, 0);
+  clearSkillEffects();
+  skillState.cooldown = 0;
+  applyCharacterStatsToPlayer(true);
   player.hp = player.maxHp;
   player.dead = false;
   player.respawnTimer = 0;
@@ -3180,7 +3427,8 @@ function respawnSelf() {
 
 function applyDamageToSelf(dmg, weaponName = "WEAPON") {
   if (player.dead || game.over) return;
-  player.hp = Math.max(0, player.hp - dmg);
+  const mitigatedDmg = skillState.shieldTimer > 0 ? Math.max(1, Math.round(dmg * 0.25)) : dmg;
+  player.hp = Math.max(0, player.hp - mitigatedDmg);
   player.damageFlash = 0.35;
   playSfx("hit");
   updateScoreAndHpUI();
@@ -3496,8 +3744,31 @@ function updatePlayer(dt) {
   // クールタイム更新
   if (player.slideCooldown > 0) player.slideCooldown -= dt;
   if (player.jumpBuffer > 0) player.jumpBuffer -= dt;
+  const activeCh = getSelectedChar();
+  const overdriveMult = skillState.overdriveTimer > 0 ? 1.28 : 1.0;
+  const charMoveMult = activeCh.speedMult * overdriveMult;
+
   if (player.dashCooldown > 0) player.dashCooldown = Math.max(0, player.dashCooldown - dt);
-  if (player.grappleCooldown > 0) player.grappleCooldown = Math.max(0, player.grappleCooldown - dt);
+  if (skillState.cooldown > 0) skillState.cooldown = Math.max(0, skillState.cooldown - dt);
+  player.grappleCooldown = skillState.cooldown;
+  if (skillState.overdriveTimer > 0) skillState.overdriveTimer = Math.max(0, skillState.overdriveTimer - dt);
+  if (skillState.shieldTimer > 0) skillState.shieldTimer = Math.max(0, skillState.shieldTimer - dt);
+  if (skillState.stealthTimer > 0) skillState.stealthTimer = Math.max(0, skillState.stealthTimer - dt);
+
+  if (skillActiveBanner) {
+    if (skillState.overdriveTimer > 0) {
+      skillActiveBanner.classList.remove("hidden");
+      skillActiveBanner.textContent = `OVERDRIVE ACTIVE ${skillState.overdriveTimer.toFixed(1)}s`;
+    } else if (skillState.shieldTimer > 0) {
+      skillActiveBanner.classList.remove("hidden");
+      skillActiveBanner.textContent = `AEGIS SHIELD 75%軽減 ${skillState.shieldTimer.toFixed(1)}s`;
+    } else if (skillState.stealthTimer > 0) {
+      skillActiveBanner.classList.remove("hidden");
+      skillActiveBanner.textContent = `SHADOW STEALTH ${skillState.stealthTimer.toFixed(1)}s`;
+    } else {
+      skillActiveBanner.classList.add("hidden");
+    }
+  }
   if (player.zipCooldown > 0) player.zipCooldown = Math.max(0, player.zipCooldown - dt);
   if (player.boostPadCooldown > 0) player.boostPadCooldown = Math.max(0, player.boostPadCooldown - dt);
 
@@ -3595,7 +3866,7 @@ function updatePlayer(dt) {
         player.slideCooldown = CONFIG.slideCooldown;
         const dir =
           wishDir.lengthSq() > 0.05 ? wishDir.clone().normalize() : horizVel.clone().normalize();
-        const boost = Math.max(currentSpeed + 3.5, CONFIG.slideBoost);
+        const boost = Math.max(currentSpeed + 3.5, (CONFIG.slideBoost + (activeCh.slideBoostAdd || 0)) * charMoveMult);
         player.vel.x = dir.x * Math.min(boost, CONFIG.maxSpeed);
         player.vel.z = dir.z * Math.min(boost, CONFIG.maxSpeed);
         playSfx("slide");
@@ -3620,12 +3891,13 @@ function updatePlayer(dt) {
           player.vel.z *= newSpeed / speed;
         }
 
+        const effBaseSpeed = CONFIG.baseSpeed * charMoveMult;
         if (!player.isSliding && wishDir.lengthSq() > 0.01) {
-          player.vel.x += wishDir.x * CONFIG.groundAccel * dt;
-          player.vel.z += wishDir.z * CONFIG.groundAccel * dt;
+          player.vel.x += wishDir.x * CONFIG.groundAccel * charMoveMult * dt;
+          player.vel.z += wishDir.z * CONFIG.groundAccel * charMoveMult * dt;
           const sp = Math.hypot(player.vel.x, player.vel.z);
-          if (sp > CONFIG.baseSpeed && !player.isSliding) {
-            const target = Math.max(CONFIG.baseSpeed, sp - 12 * dt);
+          if (sp > effBaseSpeed && !player.isSliding) {
+            const target = Math.max(effBaseSpeed, sp - 12 * dt);
             player.vel.x *= target / sp;
             player.vel.z *= target / sp;
           }
@@ -3788,11 +4060,14 @@ function updatePlayer(dt) {
     wireLine.visible = false;
   }
 
-  // グラップル照準アシスト表示
-  const canGrapple = lo.grapple && player.grappleCooldown <= 0 && !player.isGrappling && Boolean(findGrappleHit());
-  player.canGrappleNow = canGrapple;
-  crosshair.classList.toggle("can-grapple", canGrapple);
-  btnGrapple.classList.toggle("ready-target", canGrapple);
+  // 固有スキル照準アシスト表示（HOOKはワイヤー射程内、他キャラはCD完了でREADY発光）
+  const isHookChar = activeCh.id === "hook";
+  const canUseSkill = isHookChar
+    ? (skillState.cooldown <= 0 && !player.isGrappling && Boolean(findGrappleHit()))
+    : (skillState.cooldown <= 0);
+  player.canGrappleNow = isHookChar && canUseSkill;
+  crosshair.classList.toggle("can-grapple", isHookChar && canUseSkill);
+  btnGrapple.classList.toggle("ready-target", canUseSkill);
 
   // ジップライン近接表示
   const nearZip = !player.isZiplining ? findNearbyZipline() : null;
@@ -3862,8 +4137,11 @@ function updateRival(dt) {
     rivalBody.material.color.setHex(0xffffff);
     rivalBody.material.emissive.setHex(0xf59e0b);
   } else {
-    rivalBody.material.color.setHex(net.connected ? 0xf97316 : 0xef4444);
-    rivalBody.material.emissive.setHex(0x991b1b);
+    const rCh = CHARACTERS[rival.charKey] || CHARACTERS.vanguard;
+    rivalBody.material.color.setHex(rCh.bodyColor);
+    rivalBody.material.emissive.setHex(rCh.emissiveColor);
+    rivalBody.material.transparent = Boolean(rival.stealthActive);
+    rivalBody.material.opacity = rival.stealthActive ? 0.22 : 1.0;
   }
 
   if (net.connected) {
@@ -3947,7 +4225,8 @@ function updateRival(dt) {
           raycaster.far = d;
           const wallHits = raycaster.intersectObjects(worldMeshes, false);
           if (wallHits.length === 0) {
-            const hitPlayer = Math.random() < 0.42;
+            const hitProb = skillState.stealthTimer > 0 ? 0.08 : 0.42;
+            const hitPlayer = Math.random() < hitProb;
             const endPt = hitPlayer
               ? playerTarget
               : playerTarget.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 3));
@@ -4193,6 +4472,9 @@ function animate(now) {
         hp: player.hp,
         dead: player.dead,
         w: weaponState.activeSlot,
+        ch: selectedCharKey,
+        sh: skillState.shieldTimer > 0,
+        st: skillState.stealthTimer > 0,
       });
     }
   }

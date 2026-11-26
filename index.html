@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v13 - リロードボタン＆3D勝利カメラ演出対応</title>
+  <title>3D キャラコンFPS v14 - キャラクター4体＆固有スキル（ワイヤー固有化）対応</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -20,6 +20,7 @@
       </div>
 
       <div class="panel center-panel">
+        <div class="char-hud-tag" id="hud-char-pill">CHAR: <strong id="hud-char-name">HOOK</strong></div>
         <div id="state-badge">RUN</div>
         <div class="speed-wrap">
           <span id="speed-display">0.0</span> <small>m/s</small>
@@ -70,6 +71,7 @@
         <div class="oni-stun-bar"><div id="enemy-hp-hud-fill"></div></div>
       </div>
     </div>
+    <div id="skill-active-banner" class="hidden">OVERDRIVE ACTIVE!</div>
     <div id="zip-prompt" class="hidden">ZIPLINE 乗車可能 [E / ZIP]</div>
     <div id="trick-feed"></div>
     <div id="damage-vignette"></div>
@@ -92,7 +94,7 @@
     <!-- PC用クールタイム表示 -->
     <div id="pc-ability-bar">
       <div id="pc-dash-chip" class="ability-chip"><strong>Q</strong> DASH: <span id="pc-dash-cd">READY</span></div>
-      <div id="pc-grapple-chip" class="ability-chip"><strong>右クリック/F</strong> WIRE: <span id="pc-grapple-cd">READY</span></div>
+      <div id="pc-grapple-chip" class="ability-chip"><strong>右クリック/F</strong> <span id="pc-skill-name">WIRE</span>: <span id="pc-grapple-cd">READY</span></div>
       <div id="pc-zip-chip" class="ability-chip"><strong>E</strong> ZIPLINE</div>
     </div>
 
@@ -101,7 +103,7 @@
       <span><strong>Space</strong> ジャンプ/壁キック</span>
       <span><strong>Shift/C</strong> スライド</span>
       <span><strong>Q</strong> ダッシュ</span>
-      <span><strong>右クリック/F</strong> ワイヤー</span>
+      <span><strong>右クリック/F</strong> 固有スキル</span>
       <span><strong>E</strong> ジップライン</span>
       <span><strong>左クリック</strong> 攻撃</span>
       <span><strong>1/2・ホイール</strong> 銃↔近接切替</span>
@@ -127,7 +129,7 @@
       <small id="btn-dash-cd"></small>
     </button>
     <button id="btn-grapple" class="action-btn grapple-btn" type="button">
-      <span>WIRE</span>
+      <span id="btn-skill-label">WIRE</span>
       <small id="btn-grapple-cd"></small>
     </button>
     <button id="btn-zip" class="action-btn zip-btn" type="button">ZIP</button>
@@ -161,7 +163,7 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v13</h1>
+      <h1 id="modal-title">3D キャラコンFPS v14</h1>
       <p id="modal-desc">
         パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
         ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
@@ -176,6 +178,19 @@
         <button id="open-shop-btn" class="shop-open-btn" type="button">ショップ / スキンガチャ</button>
       </div>
 
+      <!-- キャラクター選択（4キャラ・固有スキル） -->
+      <div class="character-select-section">
+        <div class="slots-title">キャラクター選択（キャラごとに固有スキル・ステータスが変化）</div>
+        <div id="character-grid" class="character-grid"></div>
+        <div id="selected-char-detail" class="selected-char-detail">
+          <div class="char-detail-head">
+            <strong id="char-detail-name">HOOK（フック）</strong>
+            <span id="char-detail-skill-badge" class="char-skill-badge">固有スキル: ワイヤーグラップル</span>
+          </div>
+          <div id="char-detail-desc" class="char-detail-desc">建物やタワーへワイヤーを射出して高速スイング＆スリングショット移動する。</div>
+        </div>
+      </div>
+
       <!-- 2枠ロードアウト（メイン銃 + 近接武器） -->
       <div class="loadout-slots-section">
         <div class="slots-title">バトル装備（試合中に 1 / 2 キー・切替ボタンで持ち替え）</div>
@@ -186,7 +201,7 @@
             <div class="slot-skin-name" id="equipped-gun-skin">スキン: スタンダード</div>
           </div>
           <div class="slot-card melee">
-            <div class="slot-badge">SLOT 2 : 近接武器（共通性能）</div>
+            <div class="slot-badge">SLOT 2 : 近接武器</div>
             <div class="slot-item-name" id="equipped-melee-name">コンバットナイフ</div>
             <div class="slot-skin-name" id="equipped-melee-skin">スキン: スタンダード</div>
           </div>

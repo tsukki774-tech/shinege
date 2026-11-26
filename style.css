@@ -1925,3 +1925,154 @@ body.touch-mode #weapon-hud {
 #match-finish-banner {
   background: radial-gradient(circle at center, rgba(250, 204, 21, 0.22), rgba(2, 6, 23, 0.48));
 }
+
+
+/* ==========================================
+   v14: キャラクター選択カード＆固有スキル演出
+   ========================================== */
+.char-hud-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #cbd5e1;
+  margin-bottom: 2px;
+}
+
+.character-select-section {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  text-align: left;
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .character-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.char-card {
+  appearance: none;
+  background: rgba(30, 41, 59, 0.85);
+  border: 2px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  padding: 8px 8px;
+  color: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.char-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.char-card.active {
+  background: rgba(15, 23, 42, 0.96);
+  border-color: var(--char-color, #38bdf8);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--char-color, #38bdf8) 45%, transparent);
+}
+
+.char-card-role {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--char-color, #38bdf8);
+}
+
+.char-card-name {
+  font-size: 0.88rem;
+  font-weight: 900;
+  margin-top: 2px;
+}
+
+.char-card-skill {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.char-card-hp {
+  margin-top: 3px;
+  font-size: 0.64rem;
+  color: #94a3b8;
+}
+
+.selected-char-detail {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.6);
+  border-left: 3px solid var(--char-color, #38bdf8);
+}
+
+.char-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.char-skill-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid var(--char-color, #38bdf8);
+  color: var(--char-color, #38bdf8);
+}
+
+.char-detail-desc {
+  margin-top: 4px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: #e2e8f0;
+}
+
+#skill-active-banner {
+  position: fixed;
+  top: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 16;
+  padding: 5px 16px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #0f172a;
+  background: linear-gradient(90deg, #fde047, #38bdf8);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.55);
+  pointer-events: none;
+}
+
+.grapple-btn.skill-hook {
+  background: rgba(2, 132, 199, 0.45);
+  border-color: #38bdf8;
+}
+.grapple-btn.skill-blitz {
+  background: rgba(217, 119, 6, 0.48);
+  border-color: #facc15;
+}
+.grapple-btn.skill-vanguard {
+  background: rgba(5, 150, 105, 0.48);
+  border-color: #34d399;
+}
+.grapple-btn.skill-spectre {
+  background: rgba(126, 34, 206, 0.48);
+  border-color: #c084fc;
+}
