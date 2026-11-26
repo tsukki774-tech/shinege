@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v24 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
-  <link rel="stylesheet" href="style.css?v=24" />
+  <title>3D キャラコンFPS v25 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
+  <link rel="stylesheet" href="style.css?v=25" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -38,6 +38,7 @@
         <div>通貨: <strong id="hud-coins-display" class="coin-text">0</strong> CR</div>
         <div>最近敵: <strong id="dist-display">--</strong>m / 高度:<strong id="alt-display">0</strong>m</div>
         <div class="hud-actions">
+          <button id="hud-sound-btn" class="mini-btn" type="button" title="BGM・効果音 ON/OFF">音:ON</button>
           <button id="hud-retry-btn" class="mini-btn" type="button">リセット</button>
           <button id="hud-pause-btn" class="mini-btn" type="button">メニュー</button>
         </div>
@@ -167,7 +168,7 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v24</h1>
+      <h1 id="modal-title">3D キャラコンFPS v25</h1>
       <p id="modal-desc">
         パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
         ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
@@ -370,6 +371,6 @@
     </div>
   </div>
 
-  <script type="module" src="game.js?v=24"></script>
+  <script type="module" src="game.js?v=25"></script>
 </body>
 </html>

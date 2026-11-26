@@ -84,6 +84,7 @@ const stateBadge = document.getElementById("state-badge");
 const trickFeed = document.getElementById("trick-feed");
 const crosshair = document.getElementById("crosshair");
 const zipPrompt = document.getElementById("zip-prompt");
+const hudSoundBtn = document.getElementById("hud-sound-btn");
 const hudRetryBtn = document.getElementById("hud-retry-btn");
 const hudPauseBtn = document.getElementById("hud-pause-btn");
 
@@ -598,182 +599,263 @@ layoutResetBtn.addEventListener("click", () => {
 });
 
 // ==========================================
-// 効果音（Web Audio API）
+// フルサウンドシステム（Web Audio API 効果音＆バトルBGM）
 // ==========================================
 let audioCtx = null;
+let noiseBuffer = null;
+let soundEnabled = localStorage.getItem("parkour_fps_sound") !== "off";
+let bgmStepIndex = 0;
+let bgmNextNoteTime = 0;
+
+function updateSoundButtonUI() {
+  if (!hudSoundBtn) return;
+  hudSoundBtn.textContent = soundEnabled ? "音:ON" : "音:OFF";
+  hudSoundBtn.style.opacity = soundEnabled ? "1" : "0.62";
+}
+
 function ensureAudio() {
   if (!audioCtx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (AC) audioCtx = new AC();
   }
   if (audioCtx && audioCtx.state === "suspended") {
-    audioCtx.resume();
+    audioCtx.resume().catch(() => {});
+  }
+  if (audioCtx && !noiseBuffer) {
+    const sampleRate = audioCtx.sampleRate;
+    const len = Math.floor(sampleRate * 1.2);
+    noiseBuffer = audioCtx.createBuffer(1, len, sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
   }
 }
 
-function playSfx(type) {
+// 最初の画面タップ・クリック・キー入力で即座にオーディオを有効化
+["pointerdown", "keydown", "touchstart"].forEach((evt) => {
+  window.addEventListener(evt, () => ensureAudio(), { passive: true });
+});
+
+if (hudSoundBtn) {
+  updateSoundButtonUI();
+  hudSoundBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    soundEnabled = !soundEnabled;
+    localStorage.setItem("parkour_fps_sound", soundEnabled ? "on" : "off");
+    updateSoundButtonUI();
+    if (soundEnabled) {
+      ensureAudio();
+      playSfx("ui_click");
+    }
+  });
+}
+
+// 汎用のボタンクリック音（全画面のボタン操作に自動対応）
+document.addEventListener("click", (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest("button") : null;
+  if (!btn) return;
+  if (btn.id === "hud-sound-btn") return;
+  ensureAudio();
+  if (btn.classList.contains("shop-open-btn") || btn.classList.contains("gacha-btn")) {
+    playSfx("equip");
+  } else {
+    playSfx("ui_click");
+  }
+});
+
+function playNoiseBurst(t, duration, filterType, freqStart, freqEnd, peakGain, q = 1.2) {
+  if (!audioCtx || !noiseBuffer) return;
+  const src = audioCtx.createBufferSource();
+  src.buffer = noiseBuffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = filterType;
+  filter.frequency.setValueAtTime(Math.max(40, freqStart), t);
+  if (freqEnd && freqEnd !== freqStart) {
+    filter.frequency.exponentialRampToValueAtTime(Math.max(40, freqEnd), t + duration);
+  }
+  filter.Q.value = q;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.001, t);
+  g.gain.linearRampToValueAtTime(peakGain, t + Math.min(0.015, duration * 0.25));
+  g.gain.exponentialRampToValueAtTime(0.0008, t + duration);
+  src.connect(filter);
+  filter.connect(g);
+  g.connect(audioCtx.destination);
+  src.start(t);
+  src.stop(t + duration + 0.02);
+}
+
+function playTone(t, waveType, freqStart, freqEnd, duration, peakGain, delay = 0) {
   if (!audioCtx) return;
-  if (audioCtx.state === "suspended") audioCtx.resume();
-
+  const st = t + delay;
   const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  const t = audioCtx.currentTime;
+  const g = audioCtx.createGain();
+  osc.type = waveType;
+  osc.frequency.setValueAtTime(Math.max(20, freqStart), st);
+  if (freqEnd && freqEnd !== freqStart) {
+    osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), st + duration);
+  }
+  g.gain.setValueAtTime(0.001, st);
+  g.gain.linearRampToValueAtTime(peakGain, st + Math.min(0.012, duration * 0.2));
+  g.gain.exponentialRampToValueAtTime(0.0008, st + duration);
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start(st);
+  osc.stop(st + duration + 0.02);
+}
 
-  if (type === "jump") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(220, t);
-    osc.frequency.exponentialRampToValueAtTime(480, t + 0.1);
-    gain.gain.setValueAtTime(0.08, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
-    osc.start(t);
-    osc.stop(t + 0.11);
+function playSfx(type, volumeScale = 1.0) {
+  if (!soundEnabled) return;
+  ensureAudio();
+  if (!audioCtx) return;
+  if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+
+  const t = audioCtx.currentTime;
+  const v = Math.max(0.05, Math.min(1.5, volumeScale));
+
+  if (type === "ui_click") {
+    playTone(t, "sine", 780, 1080, 0.045, 0.045 * v);
+  } else if (type === "equip") {
+    playTone(t, "triangle", 460, 740, 0.07, 0.07 * v);
+    playTone(t, "sine", 920, 1240, 0.09, 0.06 * v, 0.045);
+  } else if (type === "buy") {
+    [587.33, 880, 1174.66].forEach((f, idx) => {
+      playTone(t, "triangle", f, f * 1.02, 0.16, 0.09 * v, idx * 0.055);
+    });
+  } else if (type === "gacha_pull") {
+    [330, 440, 554.37, 659.25, 880].forEach((f, idx) => {
+      playTone(t, "sine", f, f * 1.15, 0.14, 0.08 * v, idx * 0.065);
+    });
+  } else if (type === "step") {
+    playNoiseBurst(t, 0.055, "bandpass", 420, 220, 0.048 * v, 1.8);
+    playTone(t, "sine", 115, 58, 0.05, 0.045 * v);
+  } else if (type === "land") {
+    playNoiseBurst(t, 0.13, "lowpass", 360, 95, 0.11 * v, 1.0);
+    playTone(t, "sine", 145, 44, 0.14, 0.11 * v);
+  } else if (type === "jump") {
+    playTone(t, "triangle", 220, 510, 0.12, 0.085 * v);
+    playNoiseBurst(t, 0.08, "bandpass", 650, 1200, 0.04 * v, 1.5);
   } else if (type === "walljump") {
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(340, t);
-    osc.frequency.exponentialRampToValueAtTime(760, t + 0.14);
-    gain.gain.setValueAtTime(0.1, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-    osc.start(t);
-    osc.stop(t + 0.15);
+    playTone(t, "sine", 340, 790, 0.14, 0.10 * v);
+    playNoiseBurst(t, 0.09, "bandpass", 900, 1800, 0.05 * v, 1.6);
   } else if (type === "slide") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(140, t);
-    osc.frequency.exponentialRampToValueAtTime(70, t + 0.16);
-    gain.gain.setValueAtTime(0.06, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
-    osc.start(t);
-    osc.stop(t + 0.17);
+    playNoiseBurst(t, 0.24, "bandpass", 1150, 420, 0.085 * v, 2.2);
+    playTone(t, "sawtooth", 150, 68, 0.18, 0.05 * v);
   } else if (type === "pad") {
-    osc.type = "square";
-    osc.frequency.setValueAtTime(280, t);
-    osc.frequency.exponentialRampToValueAtTime(920, t + 0.22);
-    gain.gain.setValueAtTime(0.08, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
-    osc.start(t);
-    osc.stop(t + 0.24);
+    playTone(t, "square", 280, 960, 0.22, 0.085 * v);
+    playTone(t, "sine", 560, 1420, 0.24, 0.07 * v, 0.02);
   } else if (type === "boost") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(300, t);
-    osc.frequency.exponentialRampToValueAtTime(1100, t + 0.18);
-    gain.gain.setValueAtTime(0.08, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
-    osc.start(t);
-    osc.stop(t + 0.19);
+    playTone(t, "sawtooth", 300, 1180, 0.19, 0.085 * v);
+    playNoiseBurst(t, 0.16, "bandpass", 800, 2400, 0.06 * v, 1.8);
   } else if (type === "dash") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(620, t);
-    osc.frequency.exponentialRampToValueAtTime(180, t + 0.16);
-    gain.gain.setValueAtTime(0.11, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
-    osc.start(t);
-    osc.stop(t + 0.17);
+    playNoiseBurst(t, 0.18, "bandpass", 1600, 380, 0.11 * v, 1.6);
+    playTone(t, "triangle", 640, 175, 0.16, 0.10 * v);
   } else if (type === "grapple") {
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(900, t);
-    osc.frequency.exponentialRampToValueAtTime(420, t + 0.14);
-    gain.gain.setValueAtTime(0.09, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-    osc.start(t);
-    osc.stop(t + 0.15);
+    playTone(t, "sine", 980, 420, 0.15, 0.09 * v);
+    playTone(t, "triangle", 1560, 2100, 0.08, 0.05 * v);
   } else if (type === "zip") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(480, t);
-    osc.frequency.exponentialRampToValueAtTime(880, t + 0.12);
-    gain.gain.setValueAtTime(0.08, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
-    osc.start(t);
-    osc.stop(t + 0.13);
+    playTone(t, "triangle", 520, 940, 0.13, 0.08 * v);
+    playNoiseBurst(t, 0.12, "bandpass", 2200, 2800, 0.035 * v, 4.0);
   } else if (type === "shot_rifle") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(520, t);
-    osc.frequency.exponentialRampToValueAtTime(120, t + 0.08);
-    gain.gain.setValueAtTime(0.08, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-    osc.start(t);
-    osc.stop(t + 0.09);
+    playNoiseBurst(t, 0.09, "bandpass", 1450, 320, 0.12 * v, 1.1);
+    playTone(t, "sawtooth", 480, 95, 0.085, 0.085 * v);
+  } else if (type === "shot_smg") {
+    playNoiseBurst(t, 0.065, "bandpass", 1900, 480, 0.10 * v, 1.4);
+    playTone(t, "triangle", 620, 140, 0.06, 0.075 * v);
   } else if (type === "shot_shotgun") {
-    osc.type = "square";
-    osc.frequency.setValueAtTime(210, t);
-    osc.frequency.exponentialRampToValueAtTime(48, t + 0.18);
-    gain.gain.setValueAtTime(0.14, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
-    osc.start(t);
-    osc.stop(t + 0.19);
+    playNoiseBurst(t, 0.22, "lowpass", 980, 140, 0.18 * v, 0.9);
+    playTone(t, "square", 195, 42, 0.19, 0.14 * v);
   } else if (type === "shot_sniper") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(980, t);
-    osc.frequency.exponentialRampToValueAtTime(90, t + 0.24);
-    gain.gain.setValueAtTime(0.13, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-    osc.start(t);
-    osc.stop(t + 0.25);
-  } else if (type === "hit") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(1250, t);
-    osc.frequency.exponentialRampToValueAtTime(820, t + 0.06);
-    gain.gain.setValueAtTime(0.09, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-    osc.start(t);
-    osc.stop(t + 0.07);
-  } else if (type === "stun") {
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(420, t);
-    osc.frequency.exponentialRampToValueAtTime(1320, t + 0.24);
-    gain.gain.setValueAtTime(0.12, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-    osc.start(t);
-    osc.stop(t + 0.25);
+    playNoiseBurst(t, 0.28, "bandpass", 2400, 260, 0.18 * v, 1.3);
+    playTone(t, "sawtooth", 1120, 72, 0.26, 0.14 * v);
+    playTone(t, "sine", 2200, 680, 0.18, 0.06 * v, 0.02);
+  } else if (type === "shot_lmg") {
+    playNoiseBurst(t, 0.11, "bandpass", 1100, 240, 0.13 * v, 1.0);
+    playTone(t, "sawtooth", 340, 74, 0.10, 0.10 * v);
+  } else if (type === "katana_draw") {
+    // 刀の抜刀音：「シャキーン！」（金属擦れ＋高音倍音シマー）
+    playNoiseBurst(t, 0.22, "bandpass", 2600, 5200, 0.11 * v, 3.2);
+    playTone(t, "sine", 1480, 2960, 0.26, 0.08 * v);
+    playTone(t, "triangle", 2220, 3520, 0.34, 0.065 * v, 0.03);
+    playTone(t, "sine", 4180, 3920, 0.38, 0.04 * v, 0.05);
+  } else if (type === "katana_slash") {
+    // 刀の斬撃音：「シュバッ！」（鋭い風切り＋刀鳴り）
+    playNoiseBurst(t, 0.17, "bandpass", 2400, 420, 0.15 * v, 1.9);
+    playTone(t, "triangle", 760, 180, 0.13, 0.09 * v);
+    playTone(t, "sine", 2680, 1920, 0.15, 0.045 * v);
+  } else if (type === "katana_hit") {
+    // 刀の斬撃ヒット音：「ズバッ＋キィン！」（重厚な衝撃＋鋼の残響）
+    playNoiseBurst(t, 0.16, "bandpass", 1800, 320, 0.17 * v, 1.3);
+    playTone(t, "sawtooth", 540, 110, 0.14, 0.13 * v);
+    playTone(t, "sine", 1980, 2640, 0.24, 0.095 * v);
+    playTone(t, "triangle", 3120, 2840, 0.28, 0.06 * v, 0.02);
+  } else if (type === "melee_draw") {
+    playNoiseBurst(t, 0.12, "bandpass", 1800, 3400, 0.07 * v, 2.5);
+    playTone(t, "triangle", 920, 1560, 0.13, 0.065 * v);
   } else if (type === "melee_swing") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(360, t);
-    osc.frequency.exponentialRampToValueAtTime(110, t + 0.11);
-    gain.gain.setValueAtTime(0.09, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    osc.start(t);
-    osc.stop(t + 0.12);
+    playNoiseBurst(t, 0.13, "bandpass", 1300, 320, 0.11 * v, 1.7);
+    playTone(t, "triangle", 380, 115, 0.11, 0.085 * v);
   } else if (type === "melee_hit") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(780, t);
-    osc.frequency.exponentialRampToValueAtTime(190, t + 0.14);
-    gain.gain.setValueAtTime(0.14, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-    osc.start(t);
-    osc.stop(t + 0.15);
+    playNoiseBurst(t, 0.13, "bandpass", 1200, 260, 0.14 * v, 1.2);
+    playTone(t, "sawtooth", 780, 190, 0.14, 0.13 * v);
+  } else if (type === "inspect") {
+    playTone(t, "sine", 860, 1340, 0.11, 0.05 * v);
+    playNoiseBurst(t, 0.12, "bandpass", 2200, 3800, 0.045 * v, 3.0);
+  } else if (type === "hit") {
+    playTone(t, "triangle", 1320, 860, 0.065, 0.095 * v);
+  } else if (type === "stun") {
+    // 敵撃破（キル確定）チャイム
+    playTone(t, "sine", 523.25, 1046.5, 0.16, 0.11 * v);
+    playTone(t, "triangle", 783.99, 1567.98, 0.24, 0.10 * v, 0.06);
+  } else if (type === "respawn") {
+    playTone(t, "sine", 260, 680, 0.22, 0.08 * v);
+    playTone(t, "triangle", 520, 1040, 0.24, 0.06 * v, 0.06);
+  } else if (type === "skill_shield") {
+    playTone(t, "sine", 240, 580, 0.25, 0.10 * v);
+    playTone(t, "triangle", 480, 720, 0.28, 0.07 * v, 0.04);
+  } else if (type === "skill_stealth") {
+    playNoiseBurst(t, 0.26, "bandpass", 2400, 620, 0.09 * v, 2.8);
+    playTone(t, "sine", 880, 310, 0.24, 0.07 * v);
+  } else if (type === "skill_overdrive") {
+    playTone(t, "sawtooth", 220, 880, 0.26, 0.09 * v);
+    playTone(t, "square", 440, 1320, 0.26, 0.06 * v, 0.04);
+  } else if (type === "reload") {
+    playTone(t, "triangle", 320, 520, 0.11, 0.07 * v);
+    playNoiseBurst(t, 0.07, "bandpass", 1600, 2400, 0.05 * v, 2.5);
+  } else if (type === "reload_done") {
+    playTone(t, "triangle", 580, 920, 0.08, 0.08 * v);
+    playTone(t, "sine", 1160, 1480, 0.07, 0.06 * v, 0.045);
+  } else if (type === "caught") {
+    playTone(t, "sawtooth", 220, 62, 0.35, 0.13 * v);
+    playNoiseBurst(t, 0.25, "lowpass", 420, 90, 0.10 * v, 1.0);
   } else if (type === "victory") {
     const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, idx) => {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = "triangle";
-      const st = t + idx * 0.085;
-      o.frequency.setValueAtTime(freq, st);
-      g.gain.setValueAtTime(0.001, st);
-      g.gain.linearRampToValueAtTime(0.16, st + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, st + 0.42);
-      o.connect(g);
-      g.connect(audioCtx.destination);
-      o.start(st);
-      o.stop(st + 0.44);
+      playTone(t, "triangle", freq, freq * 1.01, 0.42, 0.14 * v, idx * 0.085);
     });
-    return;
-  } else if (type === "reload") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(300, t);
-    osc.frequency.linearRampToValueAtTime(520, t + 0.14);
-    gain.gain.setValueAtTime(0.07, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-    osc.start(t);
-    osc.stop(t + 0.15);
-  } else if (type === "caught") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(220, t);
-    osc.frequency.linearRampToValueAtTime(65, t + 0.35);
-    gain.gain.setValueAtTime(0.14, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.36);
-    osc.start(t);
-    osc.stop(t + 0.36);
+  }
+}
+
+// バトル中の軽快なサイバーシンセBGMパルス（音量控えめ・ON/OFF連動）
+function updateBattleBgm(dt) {
+  if (!soundEnabled || !audioCtx || !game.active || game.over || player.dead) return;
+  if (audioCtx.state === "suspended") return;
+  const t = audioCtx.currentTime;
+  if (bgmNextNoteTime < t) {
+    bgmNextNoteTime = t + 0.04;
+  }
+  const stepDur = 0.24; // 約125 BPM 8分音符
+  const bassNotes = [110, 110, 130.81, 146.83, 110, 110, 164.81, 146.83];
+  const arpNotes = [440, 523.25, 659.25, 587.33, 440, 659.25, 783.99, 659.25];
+  while (bgmNextNoteTime < t + 0.12) {
+    const idx = bgmStepIndex % bassNotes.length;
+    playTone(bgmNextNoteTime, "triangle", bassNotes[idx], bassNotes[idx] * 0.98, 0.17, 0.018);
+    if (bgmStepIndex % 2 === 0) {
+      playTone(bgmNextNoteTime, "sine", arpNotes[idx], arpNotes[idx], 0.13, 0.011);
+    }
+    bgmStepIndex += 1;
+    bgmNextNoteTime += stepDur;
   }
 }
 
@@ -1855,7 +1937,7 @@ const GUNS = {
     defaultColor: 0x22d3ee,
     recoilZ: 0.036,
     recoilPitch: 0.032,
-    sfx: "shot_rifle",
+    sfx: "shot_smg",
   },
   shotgun: {
     key: "shotgun",
@@ -1912,7 +1994,7 @@ const GUNS = {
     defaultColor: 0xfacc15,
     recoilZ: 0.048,
     recoilPitch: 0.042,
-    sfx: "shot_rifle",
+    sfx: "shot_lmg",
   },
 };
 
@@ -2130,6 +2212,7 @@ const weaponState = {
 };
 
 function triggerWeaponInspect() {
+  playSfx("inspect");
   if (!game.active || game.over || player.dead) return;
   if (weaponState.reloading) return;
   if (weaponState.activeSlot === "melee") {
@@ -2496,37 +2579,40 @@ function buildActiveViewModel() {
       addPart(weaponRoot, new THREE.ConeGeometry(0.015, 0.055, 4), bladeMat, [0, -0.185, -0.282], [-2.65, Math.PI / 4, 0]);
 
     } else if (m.key === "katana") {
-      // 【サイバーカタナ】単一基準軸＋連続スプライン反り（ソリ）で柄・鍔・刀身・切っ先を完全一体化
+      // 【重厚サイバーカタナ】太めの幅広刀身＋鎬（しのぎ）＋血抜き樋（ひ）＋高輝度プラズマ刃文＋大型透かし鍔
       const katanaGroup = new THREE.Group();
-      katanaGroup.rotation.x = -0.22;
-      katanaGroup.position.set(0, -0.02, 0.02);
+      katanaGroup.rotation.set(-0.26, 0.14, -0.22);
+      katanaGroup.position.set(-0.02, -0.02, 0.03);
       weaponRoot.add(katanaGroup);
 
-      // 柄頭（カシラ）＆柄（ツカ）
-      addPart(katanaGroup, new THREE.CylinderGeometry(0.019, 0.022, 0.026, 14), chromeMat, [0, 0, 0.175], [-Math.PI / 2, 0, 0]);
-      const tsukaMesh = addPart(katanaGroup, new THREE.CylinderGeometry(0.018, 0.020, 0.245, 14), gripMat, [0, 0, 0.048], [-Math.PI / 2, 0, 0]);
-      tsukaMesh.scale.set(0.78, 1, 1.15);
+      // 重厚な柄頭（カシラ）＆楕円太柄（ツカ）
+      const kashira = addPart(katanaGroup, new THREE.CylinderGeometry(0.025, 0.028, 0.032, 14), chromeMat, [0, 0, 0.185], [-Math.PI / 2, 0, 0]);
+      kashira.scale.set(0.85, 1, 1.25);
+      const tsukaMesh = addPart(katanaGroup, new THREE.CylinderGeometry(0.023, 0.026, 0.265, 14), gripMat, [0, 0, 0.052], [-Math.PI / 2, 0, 0]);
+      tsukaMesh.scale.set(0.84, 1, 1.25);
 
-      // 密着した柄巻き（ツカマキ：8連リング＋発光目貫ライン）
-      for (let i = 0; i < 8; i++) {
-        const zPos = 0.145 - i * 0.028;
-        const wrap = addPart(katanaGroup, new THREE.BoxGeometry(0.034, 0.046, 0.014), darkMat, [0, 0, zPos], [0, 0, (i % 2 === 0 ? 1 : -1) * 0.18]);
-        wrap.scale.set(1, 1, 1);
+      // 立体的な柄巻き（ツカマキ：9連ダイヤクロス＋発光目貫コア）
+      for (let i = 0; i < 9; i++) {
+        const zPos = 0.158 - i * 0.027;
+        addPart(katanaGroup, new THREE.BoxGeometry(0.042, 0.062, 0.016), darkMat, [0, 0, zPos], [0, 0, (i % 2 === 0 ? 1 : -1) * 0.24]);
       }
-      addPart(katanaGroup, new THREE.BoxGeometry(0.036, 0.008, 0.20), bladeMat, [0, 0, 0.048]);
+      addPart(katanaGroup, new THREE.BoxGeometry(0.044, 0.012, 0.22), bladeMat, [0, 0, 0.052]);
 
-      // 縁金具（フチ）・八角鍔（ツバ）・ハバキ
-      addPart(katanaGroup, new THREE.CylinderGeometry(0.022, 0.022, 0.018, 14), chromeMat, [0, 0, -0.076], [-Math.PI / 2, 0, 0]);
-      addPart(katanaGroup, new THREE.CylinderGeometry(0.058, 0.058, 0.012, 8), darkMat, [0, 0, -0.090], [-Math.PI / 2, 0, 0]);
-      addPart(katanaGroup, new THREE.TorusGeometry(0.052, 0.0045, 8, 8), bladeMat, [0, 0, -0.090]);
-      addPart(katanaGroup, new THREE.BoxGeometry(0.020, 0.042, 0.034), chromeMat, [0, 0.002, -0.110]);
+      // 縁金具（フチ）・大型八角透かし鍔（ツバ）・重厚ハバキ
+      const fuchi = addPart(katanaGroup, new THREE.CylinderGeometry(0.028, 0.028, 0.022, 14), chromeMat, [0, 0, -0.082], [-Math.PI / 2, 0, 0]);
+      fuchi.scale.set(0.86, 1, 1.25);
+      addPart(katanaGroup, new THREE.CylinderGeometry(0.074, 0.074, 0.015, 8), darkMat, [0, 0, -0.098], [-Math.PI / 2, 0, 0]);
+      addPart(katanaGroup, new THREE.TorusGeometry(0.066, 0.006, 8, 8), bladeMat, [0, 0, -0.098]);
+      addPart(katanaGroup, new THREE.TorusGeometry(0.044, 0.004, 8, 8), chromeMat, [0, 0, -0.098]);
+      addPart(katanaGroup, new THREE.BoxGeometry(0.028, 0.062, 0.044), chromeMat, [0, 0.003, -0.122]);
+      addPart(katanaGroup, new THREE.BoxGeometry(0.030, 0.014, 0.038), bladeMat, [0, 0.003, -0.122]);
 
-      // 連続した反り（ソリ）を持つ一体型長刀身（12セグメント連結で隙間ゼロ）
-      const bladeStartZ = -0.122;
-      const bladeLength = 0.72;
-      const segCount = 12;
-      const soriHeight = 0.068;
-      const segLen = (bladeLength / segCount) * 1.14; // わずかに重ねて継ぎ目を完全消去
+      // 連続した反り（ソリ）を持つ幅広・重厚な一体型刀身（14セグメント連結）
+      const bladeStartZ = -0.138;
+      const bladeLength = 0.78;
+      const segCount = 14;
+      const soriHeight = 0.082;
+      const segLen = (bladeLength / segCount) * 1.16;
 
       for (let i = 0; i < segCount; i++) {
         const t0 = i / segCount;
@@ -2540,32 +2626,39 @@ function buildActiveViewModel() {
         const ym = (y0 + y1) * 0.5;
         const slopeAngle = Math.atan2(y1 - y0, -(z1 - z0));
 
-        const taper = 1 - tm * 0.26;
-        const spineH = 0.018 * taper;
-        const edgeH = 0.022 * taper;
-        const thick = 0.011 * (1 - tm * 0.22);
+        const taper = 1 - tm * 0.22;
+        const spineH = 0.028 * taper;
+        const fullerH = 0.010 * taper;
+        const edgeH = 0.034 * taper;
+        const thick = 0.020 * (1 - tm * 0.18);
 
-        // 棟（鋼ブレード背）
-        addPart(katanaGroup, new THREE.BoxGeometry(thick, spineH, segLen), steelMat, [0, ym + 0.009 * taper, zm], [-slopeAngle, 0, 0]);
-        // 刃（発光プラズマエッジ）
-        addPart(katanaGroup, new THREE.BoxGeometry(thick * 0.62, edgeH, segLen), bladeMat, [0, ym - 0.007 * taper, zm], [-slopeAngle, 0, 0]);
+        // 棟（鏡面クローム鋼の背）
+        addPart(katanaGroup, new THREE.BoxGeometry(thick, spineH, segLen), chromeMat, [0, ym + 0.016 * taper, zm], [-slopeAngle, 0, 0]);
+        // 血抜き溝（樋：ダーク鋼の立体段差）
+        if (i < segCount - 2) {
+          addPart(katanaGroup, new THREE.BoxGeometry(thick * 1.08, fullerH, segLen), darkMat, [0, ym + 0.007 * taper, zm], [-slopeAngle, 0, 0]);
+        }
+        // 地鉄（スチール層）
+        addPart(katanaGroup, new THREE.BoxGeometry(thick * 0.88, edgeH * 0.82, segLen), steelMat, [0, ym - 0.004 * taper, zm], [-slopeAngle, 0, 0]);
+        // 刃文（高輝度プラズマエッジ：幅広で視認性抜群）
+        addPart(katanaGroup, new THREE.BoxGeometry(thick * 0.62, edgeH, segLen), bladeMat, [0, ym - 0.014 * taper, zm], [-slopeAngle, 0, 0]);
       }
 
-      // 切っ先（キッサキ：刀身先端の接線角度に完全一致）
+      // 大鋒（おおきっさき：刀身先端の幅と角度に完全一致する鋭利な切っ先）
       const tipEndZ = bladeStartZ - bladeLength;
       const tipEndY = soriHeight;
       const tipSlope = Math.atan2(2 * soriHeight, bladeLength);
-      const tipLen = 0.078;
+      const tipLen = 0.095;
       const tipCenterZ = tipEndZ - Math.cos(tipSlope) * (tipLen * 0.45);
       const tipCenterY = tipEndY + Math.sin(tipSlope) * (tipLen * 0.45) + 0.002;
       const kissaki = addPart(
         katanaGroup,
-        new THREE.ConeGeometry(0.017, tipLen, 4),
+        new THREE.ConeGeometry(0.030, tipLen, 4),
         bladeMat,
         [0, tipCenterY, tipCenterZ],
         [-Math.PI / 2 - tipSlope, Math.PI / 4, 0]
       );
-      kissaki.scale.set(0.45, 1, 1.15);
+      kissaki.scale.set(0.42, 1, 1.15);
 
     } else {
       // 【プラズマバトルアックス】単一シャフト軸上に柄・リアクター・三日月大刃を完全固定
@@ -2667,6 +2760,9 @@ function switchWeaponSlot(slot, showNotice = false) {
       mKey === "katana" ? 0.68 : 0.64;
     weaponState.equipAnimDuration = dur;
     weaponState.equipAnimTimer = dur;
+    playSfx(mKey === "katana" ? "katana_draw" : "melee_draw");
+  } else if (slot === "gun" && game.active && !player.dead) {
+    playSfx("equip");
   }
 
   if (showNotice) {
@@ -2739,7 +2835,11 @@ function dealDamageToRival(targetRival, totalDmg, weaponShortName) {
   weaponState.hitmarkerTimer = 0.14;
   hitmarker.classList.remove("hidden");
   targetRival.hitFlashTimer = 0.12;
-  playSfx(weaponState.activeSlot === "melee" ? "melee_hit" : "hit");
+  if (weaponState.activeSlot === "melee") {
+    playSfx(profile.equippedMelee === "katana" ? "katana_hit" : "melee_hit");
+  } else {
+    playSfx("hit");
+  }
 
   if (targetRival.isRemotePlayer && net.connected) {
     targetRival.hp = Math.max(1, targetRival.hp - totalDmg);
@@ -2781,7 +2881,7 @@ function performMeleeAttack() {
   weaponState.meleeCombo = (weaponState.meleeCombo + 1) % 2;
   weaponState.inspectTimer = 0;
   weaponState.equipAnimTimer = 0;
-  playSfx("melee_swing");
+  playSfx(m.key === "katana" ? "katana_slash" : "melee_swing");
 
   const accentHex = getEffectiveAccentColor(m.defaultColor, profile.equippedMeleeSkin);
   const eyePos = camera.getWorldPosition(new THREE.Vector3());
@@ -2930,6 +3030,7 @@ function updateWeapon(dt) {
     if (weaponState.reloadTimer <= 0) {
       weaponState.reloading = false;
       weaponState.ammo = g.maxAmmo;
+      playSfx("reload_done");
       updateWeaponUI();
     }
   }
@@ -2949,7 +3050,12 @@ function updateWeapon(dt) {
   // ビューモデルのボビング・リコイル・近接スイングアニメーション
   const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
   if (player.onGround && horizSpeed > 1.0) {
+    const prevStepCycle = Math.floor(weaponState.bobTime / Math.PI);
     weaponState.bobTime += dt * Math.min(14, 6 + horizSpeed * 0.45);
+    const nextStepCycle = Math.floor(weaponState.bobTime / Math.PI);
+    if (game.active && !player.dead && !player.isSliding && nextStepCycle > prevStepCycle) {
+      playSfx("step", Math.min(1.15, 0.55 + horizSpeed * 0.035));
+    }
   } else {
     weaponState.bobTime += dt * 1.6;
   }
@@ -3535,6 +3641,7 @@ function triggerOverdriveSkill(ch) {
   if (skillState.cooldown > 0) return;
   skillState.cooldown = ch.skillCooldown;
   skillState.overdriveTimer = 5.0;
+    playSfx("skill_overdrive");
   player.dashCooldown = 0;
   playSfx("boost");
   showTrick("BLITZ: OVERDRIVE!! (5.0s)");
@@ -4157,6 +4264,7 @@ function respawnSelf() {
   weaponState.reloadTimer = 0;
   updateWeaponUI();
   updateScoreAndHpUI();
+  playSfx("respawn");
   showTrick("RESPAWN!");
 
   if (net.connected) {
@@ -4790,8 +4898,13 @@ function updatePlayer(dt) {
     const targetH = player.isSliding ? CONFIG.slideHeight : CONFIG.standHeight;
     player.currentHeight += (targetH - player.currentHeight) * Math.min(1, dt * 16);
 
+    const wasOnGround = player.onGround;
+    const preLandVelY = player.vel.y;
     const col = resolveCollisions(player.pos, player.vel, CONFIG.playerRadius, player.currentHeight, dt);
     player.onGround = col.onGround;
+    if (!wasOnGround && player.onGround && preLandVelY < -6.5) {
+      playSfx("land", Math.min(1.3, Math.abs(preLandVelY) / 18));
+    }
 
     // ジャンプパッド判定
     for (const pad of jumpPads) {
@@ -5528,6 +5641,7 @@ function animate(now) {
     updateVictory3DCelebration(dt);
   }
 
+  updateBattleBgm(dt);
   drawMinimap(now);
   renderer.render(scene, camera);
 }
