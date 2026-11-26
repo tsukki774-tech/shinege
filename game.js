@@ -1811,7 +1811,7 @@ const SKINS = {
     key: "default",
     name: "スタンダード",
     rarity: "COMMON",
-    bodyColor: 0x1e293b,
+    bodyColor: 0x242f40,
     accentColor: null, // 武器固有色を使用
     metalness: 0.65,
     cssColor: "#64748b",
@@ -1960,6 +1960,10 @@ const weaponState = {
   recoilOffset: 0,
   recoilRot: 0,
   meleeSwingTimer: 0,
+  meleeSwingDuration: 0.22,
+  meleeCombo: 0,
+  equipAnimTimer: 0,
+  equipAnimDuration: 0.55,
   inspectTimer: 0,
   inspectDuration: 2.8,
   bobTime: 0,
@@ -1971,7 +1975,16 @@ const weaponState = {
 function triggerWeaponInspect() {
   if (!game.active || game.over || player.dead) return;
   if (weaponState.reloading) return;
-  weaponState.inspectDuration = weaponState.activeSlot === "melee" ? 2.4 : 2.8;
+  if (weaponState.activeSlot === "melee") {
+    const mKey = profile.equippedMelee;
+    weaponState.inspectDuration =
+      mKey === "karambit" ? 1.65 :
+      mKey === "knife" ? 2.1 :
+      mKey === "katana" ? 2.6 : 2.45;
+  } else {
+    weaponState.inspectDuration = 2.8;
+  }
+  weaponState.equipAnimTimer = 0;
   weaponState.inspectTimer = weaponState.inspectDuration;
   playSfx("melee_swing");
 }
@@ -2012,147 +2025,236 @@ function buildActiveViewModel() {
   }
   muzzleFlashMesh = null;
 
+  // パーツ配置ヘルパー（コード量を抑えつつ多層ディテールを構築）
+  const addPart = (parent, geo, mat, pos, rot = null) => {
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    if (rot) mesh.rotation.set(rot[0], rot[1], rot[2]);
+    parent.add(mesh);
+    return mesh;
+  };
+
   if (weaponState.activeSlot === "gun") {
     const g = GUNS[profile.equippedGun];
     const skin = SKINS[profile.equippedGunSkin] || SKINS.default;
+    const isDefaultSkin = (profile.equippedGunSkin || "default") === "default";
     const accentHex = getEffectiveAccentColor(g.defaultColor, profile.equippedGunSkin);
 
+    // 素の見た目でも重厚な質感が出る多層マテリアル
     const bodyMat = new THREE.MeshStandardMaterial({
-      color: skin.bodyColor,
-      roughness: 0.28,
-      metalness: Math.min(0.95, skin.metalness + 0.08),
+      color: isDefaultSkin ? 0x273344 : skin.bodyColor,
+      roughness: isDefaultSkin ? 0.30 : 0.26,
+      metalness: isDefaultSkin ? 0.78 : Math.min(0.95, skin.metalness + 0.10),
+    });
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: isDefaultSkin ? 0x161e2b : 0x111827,
+      roughness: 0.38,
+      metalness: 0.82,
     });
     const darkTrimMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.35,
-      metalness: 0.85,
+      color: 0x0b101b,
+      roughness: 0.44,
+      metalness: 0.72,
+    });
+    const chromeMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      roughness: 0.18,
+      metalness: 0.94,
+    });
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0x526277,
+      roughness: 0.24,
+      metalness: 0.90,
     });
     const accentMat = new THREE.MeshStandardMaterial({
       color: accentHex,
       emissive: accentHex,
-      emissiveIntensity: 0.95,
-      roughness: 0.16,
+      emissiveIntensity: 1.05,
+      roughness: 0.14,
+      metalness: 0.35,
     });
-    const metalMat = new THREE.MeshStandardMaterial({
-      color: 0x64748b,
-      roughness: 0.24,
-      metalness: 0.88,
+    const lensMat = new THREE.MeshStandardMaterial({
+      color: accentHex,
+      emissive: accentHex,
+      emissiveIntensity: 1.35,
+      roughness: 0.08,
+      transparent: true,
+      opacity: 0.86,
     });
 
     if (g.key === "rifle") {
-      const upper = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.075, 0.54), bodyMat);
-      upper.position.set(0, 0.025, -0.02);
-      const lower = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.065, 0.38), darkTrimMat);
-      lower.position.set(0, -0.032, 0.03);
-      const shroud = new THREE.Mesh(new THREE.BoxGeometry(0.104, 0.082, 0.26), bodyMat);
-      shroud.position.set(0, 0.022, -0.22);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.024, 0.38, 12), metalMat);
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0, 0.024, -0.38);
-      const brake = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.056, 0.075), darkTrimMat);
-      brake.position.set(0, 0.024, -0.55);
-      const sideCoreL = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.024, 0.34), accentMat);
-      sideCoreL.position.set(-0.053, 0.026, -0.10);
-      const sideCoreR = sideCoreL.clone();
-      sideCoreR.position.x = 0.053;
-      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.18, 0.078), darkTrimMat);
-      mag.position.set(0, -0.125, -0.05);
-      mag.rotation.x = 0.26;
-      const magStripe = new THREE.Mesh(new THREE.BoxGeometry(0.060, 0.12, 0.022), accentMat);
-      magStripe.position.set(0, -0.125, -0.05);
-      magStripe.rotation.x = 0.26;
-      const sightFrame = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.052, 0.11), darkTrimMat);
-      sightFrame.position.set(0, 0.088, 0.02);
-      const sightGlass = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.034, 0.015), accentMat);
-      sightGlass.position.set(0, 0.092, -0.02);
-      weaponRoot.add(upper, lower, shroud, barrel, brake, sideCoreL, sideCoreR, mag, magStripe, sightFrame, sightGlass);
-      muzzlePoint.position.set(0, 0.024, -0.60);
+      // 【パルスライフル】タクティカル・モジュラーアサルトライフル造形
+      // アッパー＆ロアレシーバー + 面取り装甲
+      addPart(weaponRoot, new THREE.BoxGeometry(0.088, 0.068, 0.48), bodyMat, [0, 0.028, -0.02]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.066, 0.018, 0.46), frameMat, [0, 0.068, -0.02]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.078, 0.056, 0.32), frameMat, [0, -0.026, 0.04]);
+      // チークパッド＆スケルトンストック
+      addPart(weaponRoot, new THREE.BoxGeometry(0.064, 0.068, 0.19), darkTrimMat, [0, 0.012, 0.27]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.070, 0.024, 0.14), bodyMat, [0, 0.048, 0.25]);
+      // ピストルグリップ（角度付き）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.048, 0.125, 0.058), darkTrimMat, [0, -0.095, 0.13], [0.32, 0, 0]);
+      // トップピカティニーレール刻み（6連ラグ）
+      for (let i = 0; i < 7; i++) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.044, 0.010, 0.024), chromeMat, [0, 0.080, -0.28 + i * 0.055]);
+      }
+      // フローティングM-LOKハンドガード＋放熱スリット
+      addPart(weaponRoot, new THREE.BoxGeometry(0.092, 0.074, 0.26), bodyMat, [0, 0.024, -0.25]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.072, 0.022, 0.24), darkTrimMat, [0, -0.016, -0.25]);
+      for (let i = 0; i < 4; i++) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.098, 0.014, 0.026), darkTrimMat, [0, 0.036, -0.17 - i * 0.052]);
+      }
+      // サイドエネルギーコア＆放熱フィン
+      for (const side of [-1, 1]) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.012, 0.020, 0.28), accentMat, [side * 0.049, 0.018, -0.14]);
+        addPart(weaponRoot, new THREE.BoxGeometry(0.014, 0.034, 0.09), chromeMat, [side * 0.048, 0.032, 0.02]);
+      }
+      // ヘビーバレル＋ガスチューブ＋コンペンセイター
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.016, 0.020, 0.34, 14), chromeMat, [0, 0.026, -0.42], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.008, 0.008, 0.26, 10), metalMat, [0, 0.050, -0.36], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.046, 0.048, 0.078), darkTrimMat, [0, 0.026, -0.57]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.050, 0.014, 0.044), accentMat, [0, 0.026, -0.57]);
+      // アングルフォアグリップ
+      addPart(weaponRoot, new THREE.BoxGeometry(0.042, 0.046, 0.095), darkTrimMat, [0, -0.042, -0.26], [-0.42, 0, 0]);
+      // 湾曲タクティカルマガジン（2段構造＋残弾インジケータ）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.052, 0.11, 0.074), darkTrimMat, [0, -0.09, -0.04], [0.18, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.050, 0.10, 0.072), frameMat, [0, -0.165, -0.068], [0.38, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.055, 0.13, 0.016), accentMat, [0, -0.125, -0.055], [0.28, 0, 0]);
+      // ホログラフィックサイト（フード＋バッテリーケース＋発光レティクル）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.058, 0.016, 0.115), darkTrimMat, [0, 0.084, 0.01]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.056, 0.044, 0.078), frameMat, [0, 0.108, 0.00]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.044, 0.032, 0.008), lensMat, [0, 0.110, -0.01]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.012, 0.012, 0.010), accentMat, [0, 0.110, -0.012]);
+
+      muzzlePoint.position.set(0, 0.026, -0.62);
+
     } else if (g.key === "smg") {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.092, 0.125, 0.38), bodyMat);
-      const foregrip = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.085, 0.052), darkTrimMat);
-      foregrip.position.set(0, -0.085, -0.15);
-      foregrip.rotation.x = -0.25;
-      const suppressor = new THREE.Mesh(new THREE.CylinderGeometry(0.030, 0.032, 0.25, 14), darkTrimMat);
-      suppressor.rotation.x = Math.PI / 2;
-      suppressor.position.set(0, 0.022, -0.27);
-      const barrelRing = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.025, 14), accentMat);
-      barrelRing.rotation.x = Math.PI / 2;
-      barrelRing.position.set(0, 0.022, -0.36);
-      const topRail = new THREE.Mesh(new THREE.BoxGeometry(0.098, 0.024, 0.30), accentMat);
-      topRail.position.set(0, 0.072, -0.02);
-      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.23, 0.062), darkTrimMat);
-      mag.position.set(0, -0.13, -0.05);
-      mag.rotation.x = -0.22;
-      const magGlow = new THREE.Mesh(new THREE.BoxGeometry(0.050, 0.18, 0.018), accentMat);
-      magGlow.position.set(0, -0.13, -0.05);
-      magGlow.rotation.x = -0.22;
-      weaponRoot.add(body, foregrip, suppressor, barrelRing, topRail, mag, magGlow);
-      muzzlePoint.position.set(0, 0.022, -0.42);
+      // 【ボルトSMG】近未来コンパクトPDW・インテグラルサプレッサー造形
+      addPart(weaponRoot, new THREE.BoxGeometry(0.084, 0.105, 0.36), bodyMat, [0, 0.012, 0.0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.090, 0.042, 0.28), frameMat, [0, -0.024, -0.02]);
+      // ワイヤーストック＆コンパクトグリップ
+      addPart(weaponRoot, new THREE.BoxGeometry(0.056, 0.078, 0.14), darkTrimMat, [0, 0.005, 0.22]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.044, 0.11, 0.052), darkTrimMat, [0, -0.088, 0.11], [0.28, 0, 0]);
+      // トップフレーム＆発光アークライン
+      addPart(weaponRoot, new THREE.BoxGeometry(0.068, 0.020, 0.32), darkTrimMat, [0, 0.072, -0.02]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.074, 0.012, 0.26), accentMat, [0, 0.064, -0.02]);
+      // サイドボルトハンドル＆通気スリット
+      for (const side of [-1, 1]) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.012, 0.018, 0.20), accentMat, [side * 0.046, 0.026, -0.05]);
+        addPart(weaponRoot, new THREE.BoxGeometry(0.010, 0.045, 0.08), chromeMat, [side * 0.045, 0.008, 0.06]);
+      }
+      // 角型シュラウド＋円筒サプレッサー＋発光マズルリング
+      addPart(weaponRoot, new THREE.BoxGeometry(0.072, 0.072, 0.14), frameMat, [0, 0.020, -0.21]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.028, 0.030, 0.24, 16), darkTrimMat, [0, 0.020, -0.32], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.031, 0.031, 0.018, 16), accentMat, [0, 0.020, -0.40], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.031, 0.031, 0.014, 16), chromeMat, [0, 0.020, -0.27], [Math.PI / 2, 0, 0]);
+      // ハンドストップ（フォアグリップ）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.040, 0.075, 0.046), darkTrimMat, [0, -0.072, -0.17], [-0.25, 0, 0]);
+      // マイクロドットサイト
+      addPart(weaponRoot, new THREE.BoxGeometry(0.046, 0.034, 0.064), darkTrimMat, [0, 0.096, 0.01]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.034, 0.022, 0.008), lensMat, [0, 0.098, -0.005]);
+      // ロングスティックマガジン（斜め前方傾斜＋ネオンコア）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.042, 0.23, 0.058), darkTrimMat, [0, -0.135, -0.05], [-0.22, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.046, 0.18, 0.015), accentMat, [0, -0.135, -0.05], [-0.22, 0, 0]);
+
+      muzzlePoint.position.set(0, 0.020, -0.45);
+
     } else if (g.key === "shotgun") {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.135, 0.46), bodyMat);
-      const heatShield = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.045, 0.34), darkTrimMat);
-      heatShield.position.set(0, 0.068, -0.22);
-      const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.030, 0.42, 12), metalMat);
-      barrelTop.rotation.x = Math.PI / 2;
-      barrelTop.position.set(0, 0.035, -0.34);
-      const barrelBot = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.38, 12), darkTrimMat);
-      barrelBot.rotation.x = Math.PI / 2;
-      barrelBot.position.set(0, -0.020, -0.32);
-      const pump = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.068, 0.19), bodyMat);
-      pump.position.set(0, -0.022, -0.24);
-      const pumpGlowL = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.032, 0.16), accentMat);
-      pumpGlowL.position.set(-0.074, -0.022, -0.24);
-      const pumpGlowR = pumpGlowL.clone();
-      pumpGlowR.position.x = 0.074;
-      weaponRoot.add(body, heatShield, barrelTop, barrelBot, pump, pumpGlowL, pumpGlowR);
-      muzzlePoint.position.set(0, 0.035, -0.56);
+      // 【スキャッターショットガン】重装甲タクティカル・ブリーチャー造形
+      addPart(weaponRoot, new THREE.BoxGeometry(0.118, 0.118, 0.44), bodyMat, [0, 0.012, 0.02]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.124, 0.036, 0.36), frameMat, [0, 0.058, -0.02]);
+      // シェルホルダー（側面に4発のショットシェル装填）
+      for (let i = 0; i < 4; i++) {
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.011, 0.011, 0.054, 10), accentMat, [-0.066, 0.014, 0.06 - i * 0.032]);
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.0115, 0.0115, 0.014, 10), chromeMat, [-0.066, -0.012, 0.06 - i * 0.032]);
+      }
+      // パンチングヒートシールド（通気スリット付き）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.096, 0.034, 0.36), darkTrimMat, [0, 0.066, -0.24]);
+      for (let i = 0; i < 5; i++) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.100, 0.010, 0.024), accentMat, [0, 0.066, -0.12 - i * 0.058]);
+      }
+      // 上下2連ヘビーバレル＆チューブマガジン
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.026, 0.028, 0.44, 14), chromeMat, [0, 0.036, -0.35], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.024, 0.024, 0.40, 14), metalMat, [0, -0.016, -0.33], [Math.PI / 2, 0, 0]);
+      // マズルクランプ
+      addPart(weaponRoot, new THREE.BoxGeometry(0.064, 0.088, 0.036), darkTrimMat, [0, 0.010, -0.50]);
+      // 肉厚ポンプアクションフォアエンド＋リブ加工
+      addPart(weaponRoot, new THREE.BoxGeometry(0.132, 0.064, 0.21), bodyMat, [0, -0.020, -0.25]);
+      for (let i = 0; i < 4; i++) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.136, 0.068, 0.016), darkTrimMat, [0, -0.020, -0.18 - i * 0.044]);
+      }
+      for (const side of [-1, 1]) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.012, 0.022, 0.17), accentMat, [side * 0.068, -0.020, -0.25]);
+      }
+      // グリップ＆ストック
+      addPart(weaponRoot, new THREE.BoxGeometry(0.054, 0.12, 0.064), darkTrimMat, [0, -0.09, 0.16], [0.34, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.086, 0.10, 0.18), frameMat, [0, -0.01, 0.29]);
+
+      muzzlePoint.position.set(0, 0.036, -0.58);
+
     } else if (g.key === "sniper") {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.125, 0.62), bodyMat);
-      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.105, 0.22), darkTrimMat);
-      stock.position.set(0, -0.015, 0.34);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.022, 0.72, 12), metalMat);
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0, 0.022, -0.56);
-      const railTop = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.018, 0.56), accentMat);
-      railTop.position.set(0, 0.052, -0.42);
-      const railBot = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.018, 0.56), accentMat);
-      railBot.position.set(0, -0.008, -0.42);
-      const muzzleTip = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.068, 0.09), darkTrimMat);
-      muzzleTip.position.set(0, 0.022, -0.89);
-      const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.028, 0.30, 14), darkTrimMat);
-      scope.rotation.x = Math.PI / 2;
-      scope.position.set(0, 0.112, -0.04);
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.022, 14), accentMat);
-      lens.rotation.x = Math.PI / 2;
-      lens.position.set(0, 0.112, -0.195);
-      const bipodL = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 8), metalMat);
-      bipodL.position.set(-0.048, -0.075, -0.44);
-      bipodL.rotation.z = 0.25;
-      const bipodR = bipodL.clone();
-      bipodR.position.x = 0.048;
-      bipodR.rotation.z = -0.25;
-      weaponRoot.add(body, stock, barrel, railTop, railBot, muzzleTip, scope, lens, bipodL, bipodR);
-      muzzlePoint.position.set(0, 0.022, -0.95);
+      // 【レイルスナイパー】電磁加速レイルガン・精密長距離ライフル造形
+      addPart(weaponRoot, new THREE.BoxGeometry(0.088, 0.112, 0.58), bodyMat, [0, 0.008, 0.02]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.094, 0.042, 0.46), frameMat, [0, -0.026, -0.02]);
+      // 精密アジャスタブルストック＆モノポッド
+      addPart(weaponRoot, new THREE.BoxGeometry(0.072, 0.096, 0.22), darkTrimMat, [0, -0.010, 0.35]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.078, 0.026, 0.14), bodyMat, [0, 0.048, 0.34]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.048, 0.12, 0.058), darkTrimMat, [0, -0.095, 0.18], [0.30, 0, 0]);
+      // ツイン電磁加速レイル（上下二層＋プラズマコアギャップ）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.052, 0.024, 0.64), frameMat, [0, 0.056, -0.46]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.052, 0.024, 0.64), frameMat, [0, -0.014, -0.46]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.013, 0.016, 0.72, 12), chromeMat, [0, 0.021, -0.54], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.024, 0.012, 0.60), accentMat, [0, 0.041, -0.45]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.024, 0.012, 0.60), accentMat, [0, 0.001, -0.45]);
+      // 加速コイルリング（4基の電磁リング）
+      for (let i = 0; i < 4; i++) {
+        const zPos = -0.32 - i * 0.14;
+        addPart(weaponRoot, new THREE.BoxGeometry(0.064, 0.092, 0.024), darkTrimMat, [0, 0.021, zPos]);
+        addPart(weaponRoot, new THREE.BoxGeometry(0.068, 0.022, 0.012), accentMat, [0, 0.021, zPos]);
+      }
+      // 大型マズルブレーキ
+      addPart(weaponRoot, new THREE.BoxGeometry(0.060, 0.076, 0.095), darkTrimMat, [0, 0.021, -0.88]);
+      // ロングレンジ可変倍率スコープ（マウントリング＋タレット＋対物レンズ）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.036, 0.034, 0.032), darkTrimMat, [0, 0.082, -0.10]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.036, 0.034, 0.032), darkTrimMat, [0, 0.082, 0.06]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.024, 0.024, 0.34, 16), darkTrimMat, [0, 0.114, -0.03], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.036, 0.026, 0.10, 16), frameMat, [0, 0.114, -0.18], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.030, 0.030, 0.014, 16), lensMat, [0, 0.114, -0.232], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.012, 0.012, 0.024, 12), chromeMat, [0, 0.142, -0.03]);
+      // 折りたたみバイポッド
+      for (const side of [-1, 1]) {
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.008, 0.008, 0.17, 10), metalMat, [side * 0.048, -0.075, -0.44], [0, 0, side * 0.26]);
+      }
+
+      muzzlePoint.position.set(0, 0.021, -0.95);
+
     } else {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.155, 0.56), bodyMat);
-      const shroud = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.062, 0.32, 12), darkTrimMat);
-      shroud.rotation.x = Math.PI / 2;
-      shroud.position.set(0, 0.028, -0.34);
-      const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.48, 10), metalMat);
-      barrelTop.rotation.x = Math.PI / 2;
-      barrelTop.position.set(0, 0.046, -0.44);
-      const barrelBot = barrelTop.clone();
-      barrelBot.position.y = 0.010;
-      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.13, 16), darkTrimMat);
-      drum.rotation.z = Math.PI / 2;
-      drum.position.set(0, -0.105, -0.06);
-      const drumCore = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.138, 16), accentMat);
-      drumCore.rotation.z = Math.PI / 2;
-      drumCore.position.set(0, -0.105, -0.06);
-      const topCover = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.032, 0.36), accentMat);
-      topCover.position.set(0, 0.088, -0.04);
-      weaponRoot.add(body, shroud, barrelTop, barrelBot, drum, drumCore, topCover);
-      muzzlePoint.position.set(0, 0.028, -0.69);
+      // 【タイタンLMG】重装分隊支援火器・ロータリーヘビーマシンガン造形
+      addPart(weaponRoot, new THREE.BoxGeometry(0.142, 0.138, 0.54), bodyMat, [0, 0.008, 0.02]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.150, 0.034, 0.42), frameMat, [0, 0.078, -0.02]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.112, 0.022, 0.34), accentMat, [0, 0.098, -0.02]);
+      // キャリングハンドル
+      addPart(weaponRoot, new THREE.BoxGeometry(0.024, 0.044, 0.16), darkTrimMat, [0, 0.125, -0.05]);
+      // ヘビーバレルシュラウド＋3連ガトリング風バレル束
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.056, 0.062, 0.32, 16), darkTrimMat, [0, 0.026, -0.34], [Math.PI / 2, 0, 0]);
+      for (let i = 0; i < 3; i++) {
+        const ang = (i * Math.PI * 2) / 3 - Math.PI / 2;
+        const bx = Math.cos(ang) * 0.022;
+        const by = 0.026 + Math.sin(ang) * 0.022;
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.014, 0.014, 0.50, 12), chromeMat, [bx, by, -0.44], [Math.PI / 2, 0, 0]);
+      }
+      // バレルクランプバンド
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.044, 0.044, 0.024, 16), accentMat, [0, 0.026, -0.60], [Math.PI / 2, 0, 0]);
+      // ツインドラム＆ボックスマガジン＋弾帯ベルト
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.096, 0.096, 0.135, 20), darkTrimMat, [0, -0.105, -0.06], [0, 0, Math.PI / 2]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.062, 0.062, 0.142, 20), accentMat, [0, -0.105, -0.06], [0, 0, Math.PI / 2]);
+      for (let i = 0; i < 4; i++) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.022, 0.016, 0.032), chromeMat, [-0.082, -0.05 + i * 0.018, -0.06]);
+      }
+      // ストック＆グリップ
+      addPart(weaponRoot, new THREE.BoxGeometry(0.096, 0.115, 0.20), frameMat, [0, -0.005, 0.33]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.056, 0.125, 0.066), darkTrimMat, [0, -0.095, 0.17], [0.30, 0, 0]);
+
+      muzzlePoint.position.set(0, 0.026, -0.71);
     }
 
     muzzleFlashMesh = new THREE.Mesh(
@@ -2165,83 +2267,122 @@ function buildActiveViewModel() {
   } else {
     const m = MELEES[profile.equippedMelee];
     const skin = SKINS[profile.equippedMeleeSkin] || SKINS.default;
+    const isDefaultSkin = (profile.equippedMeleeSkin || "default") === "default";
     const accentHex = getEffectiveAccentColor(m.defaultColor, profile.equippedMeleeSkin);
 
     const gripMat = new THREE.MeshStandardMaterial({
-      color: skin.bodyColor,
-      roughness: 0.30,
-      metalness: skin.metalness,
+      color: isDefaultSkin ? 0x1e293b : skin.bodyColor,
+      roughness: 0.38,
+      metalness: isDefaultSkin ? 0.65 : skin.metalness,
     });
     const steelMat = new THREE.MeshStandardMaterial({
-      color: 0x334155,
-      roughness: 0.22,
-      metalness: 0.9,
+      color: 0x3b4859,
+      roughness: 0.20,
+      metalness: 0.92,
+    });
+    const chromeMat = new THREE.MeshStandardMaterial({
+      color: 0xcbd5e1,
+      roughness: 0.14,
+      metalness: 0.96,
+    });
+    const darkMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      roughness: 0.42,
+      metalness: 0.78,
     });
     const bladeMat = new THREE.MeshStandardMaterial({
       color: accentHex,
       emissive: accentHex,
-      emissiveIntensity: 0.92,
-      roughness: 0.14,
-      metalness: 0.88,
+      emissiveIntensity: 1.05,
+      roughness: 0.12,
+      metalness: 0.85,
     });
 
     if (m.key === "knife") {
-      const pommel = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.03, 12), steelMat);
-      pommel.rotation.x = Math.PI / 2;
-      pommel.position.set(0, 0, 0.09);
-      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.028, 0.16, 12), gripMat);
-      grip.rotation.x = Math.PI / 2;
-      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.095, 0.024), steelMat);
-      guard.position.set(0, 0, -0.085);
-      const bladeSpine = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.032, 0.29), steelMat);
-      bladeSpine.position.set(0, 0.012, -0.24);
-      const bladeEdge = new THREE.Mesh(new THREE.BoxGeometry(0.010, 0.024, 0.31), bladeMat);
-      bladeEdge.position.set(0, -0.010, -0.25);
-      weaponRoot.add(pommel, grip, guard, bladeSpine, bladeEdge);
+      // 【コンバットナイフ】ダマスカス鋼ブレード＋フラー溝＋ノコギリ背刃＋プラズマエッジ
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.024, 0.022, 0.032, 14), chromeMat, [0, 0, 0.095], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.022, 0.026, 0.165, 14), gripMat, [0, 0, 0.0], [Math.PI / 2, 0, 0]);
+      // グリップ滑り止めリング（4本）
+      for (let i = 0; i < 4; i++) {
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.0255, 0.0255, 0.012, 14), darkMat, [0, 0, -0.05 + i * 0.032], [Math.PI / 2, 0, 0]);
+      }
+      // クロスガード（ツバ）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.088, 0.092, 0.022), steelMat, [0, 0, -0.088]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.092, 0.022, 0.026), chromeMat, [0, 0, -0.088]);
+      // 多層ブレード（峰・血抜きフラー溝・発光刃・クリップポイント切っ先）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.015, 0.026, 0.27), steelMat, [0, 0.012, -0.23]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.018, 0.008, 0.21), darkMat, [0, 0.004, -0.21]);
+      // 背刃セレーション（ギザギザ）
+      for (let i = 0; i < 5; i++) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.012, 0.010, 0.016), chromeMat, [0, 0.027, -0.14 - i * 0.024], [0.4, 0, 0]);
+      }
+      addPart(weaponRoot, new THREE.BoxGeometry(0.009, 0.020, 0.29), bladeMat, [0, -0.009, -0.24]);
+      // 鋭利な切っ先（先端テーパー）
+      addPart(weaponRoot, new THREE.ConeGeometry(0.022, 0.075, 4), bladeMat, [0, 0.001, -0.405], [-Math.PI / 2, Math.PI / 4, 0]);
+
     } else if (m.key === "karambit") {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.011, 12, 24), bladeMat);
-      ring.rotation.y = Math.PI / 2;
-      ring.position.set(0, -0.012, 0.085);
-      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.048, 0.15), gripMat);
-      handle.rotation.x = 0.24;
-      handle.position.set(0, 0.01, -0.01);
-      const bolster = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.056, 0.028), steelMat);
-      bolster.position.set(0, 0.005, -0.085);
-      const blade1 = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.044, 0.16), steelMat);
-      blade1.rotation.x = -0.35;
-      blade1.position.set(0, -0.018, -0.15);
-      const blade2 = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.034, 0.16), bladeMat);
-      blade2.rotation.x = -0.92;
-      blade2.position.set(0, -0.105, -0.24);
-      weaponRoot.add(ring, handle, bolster, blade1, blade2);
+      // 【カラムビット】人間工学エルゴグリップ＋フィンガーリング＋3段湾曲クローブレード
+      addPart(weaponRoot, new THREE.TorusGeometry(0.036, 0.011, 14, 28), chromeMat, [0, -0.012, 0.088], [0, Math.PI / 2, 0]);
+      addPart(weaponRoot, new THREE.TorusGeometry(0.036, 0.006, 12, 28), bladeMat, [0, -0.012, 0.088], [0, Math.PI / 2, 0]);
+      // フィンガーグルーブ付き湾曲ハンドル
+      addPart(weaponRoot, new THREE.BoxGeometry(0.032, 0.044, 0.145), gripMat, [0, 0.010, -0.008], [0.24, 0, 0]);
+      for (let i = 0; i < 3; i++) {
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.017, 0.017, 0.036, 12), darkMat, [0, -0.012 + i * 0.008, 0.028 - i * 0.036], [0, 0, Math.PI / 2]);
+      }
+      // センター発光インレイ＆ボルスター
+      addPart(weaponRoot, new THREE.BoxGeometry(0.036, 0.012, 0.11), bladeMat, [0, 0.014, -0.01], [0.24, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.040, 0.052, 0.028), chromeMat, [0, 0.004, -0.084]);
+      // 3段階の滑らかな鉤爪（クロー）湾曲ブレード
+      addPart(weaponRoot, new THREE.BoxGeometry(0.014, 0.042, 0.11), steelMat, [0, -0.014, -0.135], [-0.30, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.011, 0.036, 0.11), chromeMat, [0, -0.058, -0.205], [-0.68, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.009, 0.028, 0.12), bladeMat, [0, -0.122, -0.255], [-1.05, 0, 0]);
+      addPart(weaponRoot, new THREE.ConeGeometry(0.015, 0.055, 4), bladeMat, [0, -0.185, -0.282], [-2.65, Math.PI / 4, 0]);
+
     } else if (m.key === "katana") {
-      const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.025, 0.26, 12), gripMat);
-      hilt.rotation.x = Math.PI / 2.4;
-      hilt.position.set(0, -0.04, 0.045);
-      const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.018, 8), steelMat);
-      tsuba.rotation.x = Math.PI / 2.4;
-      tsuba.position.set(0, 0.01, -0.075);
-      const spine = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.022, 0.72), steelMat);
-      spine.rotation.x = -0.22;
-      spine.position.set(0, 0.125, -0.41);
-      const plasmaBlade = new THREE.Mesh(new THREE.BoxGeometry(0.010, 0.026, 0.74), bladeMat);
-      plasmaBlade.rotation.x = -0.22;
-      plasmaBlade.position.set(0, 0.105, -0.42);
-      weaponRoot.add(hilt, tsuba, spine, plasmaBlade);
+      // 【サイバーカタナ】菱形柄巻き＋八角透かし鍔＋ハバキ＋反りのある長刀身
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.022, 0.024, 0.026, 12), chromeMat, [0, -0.072, 0.155], [Math.PI / 2.4, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.020, 0.023, 0.25, 12), gripMat, [0, -0.040, 0.045], [Math.PI / 2.4, 0, 0]);
+      // 柄巻き（ダイヤモンドラップ）
+      for (let i = 0; i < 6; i++) {
+        const t = i / 5;
+        addPart(weaponRoot, new THREE.BoxGeometry(0.044, 0.012, 0.026), darkMat, [0, -0.062 + t * 0.044, 0.125 - t * 0.16], [Math.PI / 2.4, 0, Math.PI / 4]);
+      }
+      // 透かし八角鍔（ツバ）＆黄金ハバキ金具
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.062, 0.062, 0.014, 8), darkMat, [0, 0.008, -0.075], [Math.PI / 2.4, 0, 0]);
+      addPart(weaponRoot, new THREE.TorusGeometry(0.054, 0.005, 8, 8), bladeMat, [0, 0.008, -0.075], [Math.PI / 2.4, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.024, 0.036, 0.036), chromeMat, [0, 0.018, -0.102], [-0.22, 0, 0]);
+      // 反り（ソリ）を表現した2段構成の長刀身＋切っ先
+      addPart(weaponRoot, new THREE.BoxGeometry(0.014, 0.020, 0.42), steelMat, [0, 0.075, -0.30], [-0.22, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.008, 0.024, 0.43), bladeMat, [0, 0.058, -0.305], [-0.22, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.013, 0.018, 0.34), steelMat, [0, 0.165, -0.66], [-0.28, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.007, 0.022, 0.35), bladeMat, [0, 0.148, -0.665], [-0.28, 0, 0]);
+      addPart(weaponRoot, new THREE.ConeGeometry(0.018, 0.085, 4), bladeMat, [0, 0.205, -0.86], [-1.85, Math.PI / 4, 0]);
+
     } else {
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.025, 0.58, 12), gripMat);
-      shaft.rotation.x = Math.PI / 2.2;
-      shaft.position.set(0, -0.02, -0.14);
-      const headCore = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.16, 0.15), steelMat);
-      headCore.position.set(0, 0.075, -0.34);
-      const frontEdge = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.27, 0.075), bladeMat);
-      frontEdge.position.set(0, 0.075, -0.43);
-      const backSpike = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.11, 0.08), bladeMat);
-      backSpike.position.set(0, 0.085, -0.25);
-      weaponRoot.add(shaft, headCore, frontEdge, backSpike);
+      // 【プラズマバトルアックス】ヘビーテックシャフト＋冷却ラジエーター＋両刃エネルギーブレード
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.026, 0.022, 0.04, 12), chromeMat, [0, -0.085, 0.135], [Math.PI / 2.2, 0, 0]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.020, 0.024, 0.60, 14), gripMat, [0, -0.020, -0.14], [Math.PI / 2.2, 0, 0]);
+      // シャフト補強バンド（3箇所）
+      for (let i = 0; i < 3; i++) {
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.025, 0.025, 0.022, 14), chromeMat, [0, -0.055 + i * 0.036, 0.03 - i * 0.16], [Math.PI / 2.2, 0, 0]);
+      }
+      // 斧頭コアハウジング＆エネルギーリアクター
+      addPart(weaponRoot, new THREE.BoxGeometry(0.042, 0.145, 0.18), darkMat, [0, 0.072, -0.33]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.030, 0.030, 0.050, 16), bladeMat, [0, 0.072, -0.33], [0, 0, Math.PI / 2]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.048, 0.048, 0.14), chromeMat, [0, 0.072, -0.33]);
+      // 前方三日月プラズマ大刃（3段構成）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.016, 0.24, 0.065), steelMat, [0, 0.072, -0.41]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.009, 0.29, 0.055), bladeMat, [0, 0.072, -0.455]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.008, 0.09, 0.048), bladeMat, [0, 0.215, -0.435], [0.45, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.008, 0.09, 0.048), bladeMat, [0, -0.071, -0.435], [-0.45, 0, 0]);
+      // 後方アーマーピアシングスパイク
+      addPart(weaponRoot, new THREE.ConeGeometry(0.024, 0.11, 4), chromeMat, [0, 0.088, -0.21], [Math.PI / 2.2, Math.PI / 4, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.012, 0.032, 0.075), bladeMat, [0, 0.085, -0.23], [-0.15, 0, 0]);
     }
   }
-}const activeTracers = [];
+}
+
+const activeTracers = [];
 function spawnTracer(startPos, endPos, colorHex) {
   const geo = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
   const mat = new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.95 });
@@ -2301,8 +2442,18 @@ function switchWeaponSlot(slot, showNotice = false) {
   weaponState.reloadTimer = 0;
   weaponState.fireCooldown = 0.12;
   weaponState.inspectTimer = 0;
+  weaponState.equipAnimTimer = 0;
   buildActiveViewModel();
   updateWeaponUI();
+  if (slot === "melee" && game.active && !player.dead) {
+    const mKey = profile.equippedMelee;
+    const dur =
+      mKey === "karambit" ? 0.62 :
+      mKey === "knife" ? 0.52 :
+      mKey === "katana" ? 0.68 : 0.64;
+    weaponState.equipAnimDuration = dur;
+    weaponState.equipAnimTimer = dur;
+  }
 
   if (showNotice) {
     const label = slot === "gun" ? GUNS[profile.equippedGun].name : MELEES[profile.equippedMelee].name;
@@ -2390,8 +2541,16 @@ function dealDamageToRival(targetRival, totalDmg, weaponShortName) {
 
 function performMeleeAttack() {
   const m = MELEES[profile.equippedMelee];
+  const swingDur =
+    m.key === "katana" ? 0.28 :
+    m.key === "axe" ? 0.32 :
+    m.key === "karambit" ? 0.20 : 0.21;
   weaponState.fireCooldown = MELEE_COMMON_STATS.attackRate;
-  weaponState.meleeSwingTimer = 0.22;
+  weaponState.meleeSwingDuration = swingDur;
+  weaponState.meleeSwingTimer = swingDur;
+  weaponState.meleeCombo = (weaponState.meleeCombo + 1) % 2;
+  weaponState.inspectTimer = 0;
+  weaponState.equipAnimTimer = 0;
   playSfx("melee_swing");
 
   const accentHex = getEffectiveAccentColor(m.defaultColor, profile.equippedMeleeSkin);
@@ -2574,15 +2733,60 @@ function updateWeapon(dt) {
   if (weaponState.inspectTimer > 0) {
     weaponState.inspectTimer = Math.max(0, weaponState.inspectTimer - dt);
   }
+  if (weaponState.equipAnimTimer > 0) {
+    weaponState.equipAnimTimer = Math.max(0, weaponState.equipAnimTimer - dt);
+  }
 
-  if (weaponState.inspectTimer > 0 && !weaponState.reloading && weaponState.meleeSwingTimer <= 0) {
+  if (!isGun && weaponState.equipAnimTimer > 0 && weaponState.meleeSwingTimer <= 0 && weaponState.inspectTimer <= 0) {
+    // 近接武器4種それぞれの固有抜刀（持ち替え）モーション
+    const ep = 1 - weaponState.equipAnimTimer / weaponState.equipAnimDuration;
+    const easeOut = 1 - Math.pow(1 - ep, 2.5);
+    const arc = Math.sin(ep * Math.PI);
+    const meleeKey = profile.equippedMelee;
+
+    if (meleeKey === "karambit") {
+      // カラムビット：縦に素早く1回転フィンガースピン抜刀
+      const spin = -(1 - easeOut) * Math.PI * 2;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - arc * 0.05,
+        weaponBasePos.y - bobY + arc * 0.055,
+        weaponBasePos.z + arc * 0.04
+      );
+      weaponRoot.rotation.set(spin, 0.08 * arc, -0.08 * arc);
+    } else if (meleeKey === "knife") {
+      // コンバットナイフ：空中フリップ1回転＋逆手キャッチ抜刀
+      const flip = (1 - easeOut) * Math.PI * 2;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - arc * 0.06,
+        weaponBasePos.y - bobY + arc * 0.095,
+        weaponBasePos.z - arc * 0.03
+      );
+      weaponRoot.rotation.set(flip, 0.35 * arc, -0.45 * arc);
+    } else if (meleeKey === "katana") {
+      // サイバーカタナ：腰元から斜め上へ閃光居合抜き（イアイドロー）
+      const remain = 1 - easeOut;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - remain * 0.24,
+        weaponBasePos.y - bobY - remain * 0.16 + arc * 0.04,
+        weaponBasePos.z + remain * 0.12
+      );
+      weaponRoot.rotation.set(remain * 0.65, -remain * 0.85, remain * 1.15);
+    } else {
+      // プラズマバトルアックス：大きく振り上げて地面へ叩きつけるヘビー構え
+      const remain = 1 - easeOut;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX + remain * 0.06,
+        weaponBasePos.y - bobY + arc * 0.12 - remain * 0.05,
+        weaponBasePos.z + remain * 0.08
+      );
+      weaponRoot.rotation.set(-remain * 1.25, remain * 0.25, -remain * 0.55);
+    }
+  } else if (weaponState.inspectTimer > 0 && !weaponState.reloading && weaponState.meleeSwingTimer <= 0) {
     // 武器・近接武器の「眺める（インスペクト）」アニメーション
     const progress = 1 - weaponState.inspectTimer / weaponState.inspectDuration;
-    // 最初と最後を滑らかに補間するエンベロープ
     const env = Math.min(1, progress * 5) * Math.min(1, (1 - progress) * 5);
 
     if (isGun) {
-      // 銃を画面中央寄りに持ち上げ、側面とスキンをじっくり見せる動き
       const tiltWave = Math.sin(progress * Math.PI * 2);
       weaponRoot.position.set(
         weaponBasePos.x - 0.11 * env + bobX * 0.5,
@@ -2595,16 +2799,15 @@ function updateWeapon(dt) {
         -0.46 * env
       );
     } else {
-      // 近接武器のインスペクト（ナイフ＆カラムビットはクルクル回す動作！）
       const meleeKey = profile.equippedMelee;
-      const isSpinWeapon = meleeKey === "knife" || meleeKey === "karambit";
 
       if (meleeKey === "knife") {
-        // コンバットナイフ：トスして2回転スピン＋逆手キャッチ風モーション
-        const spinT = Math.min(1, progress * 1.35);
+        // コンバットナイフ：空中トス2回転スピン＋バタフライ風ロールキャッチ
+        const spinT = Math.min(1, progress * 1.32);
         const smoothSpin = spinT * spinT * (3 - 2 * spinT);
-        const spinAngle = smoothSpin * Math.PI * 4; // 2回転
-        const tossArc = Math.sin(spinT * Math.PI) * 0.065;
+        const spinAngle = smoothSpin * Math.PI * 4;
+        const rollAngle = Math.sin(spinT * Math.PI * 2) * 0.65;
+        const tossArc = Math.sin(spinT * Math.PI) * 0.085;
         weaponRoot.position.set(
           weaponBasePos.x - 0.12 * env + bobX * 0.5,
           weaponBasePos.y + (0.09 + tossArc) * env - bobY * 0.5,
@@ -2612,34 +2815,56 @@ function updateWeapon(dt) {
         );
         weaponRoot.rotation.set(
           spinAngle,
-          0.72 * env + Math.sin(progress * Math.PI) * 0.25,
-          -0.35 * env + Math.sin(spinT * Math.PI * 2) * 0.22
+          0.72 * env + Math.sin(progress * Math.PI) * 0.28,
+          -0.35 * env + rollAngle * env
         );
       } else if (meleeKey === "karambit") {
-        // カラムビット：フィンガーリングを軸にクルッと回転スピン
-        const spinAngle = Math.min(1, progress * 1.45) * Math.PI * 2;
+        // カラムビット：フィンガーリングを支点に縦方向へ素早く4回転高速スピン！
+        const fastPhase = Math.min(1, progress * 1.15);
+        const eased = 1 - Math.pow(1 - fastPhase, 2.3);
+        const verticalSpinAngle = -eased * Math.PI * 8;
+        const ringOrbitY = Math.sin(verticalSpinAngle) * 0.032 * env;
+        const ringOrbitZ = (1 - Math.cos(verticalSpinAngle)) * 0.028 * env;
+
         weaponRoot.position.set(
-          weaponBasePos.x - 0.12 * env + bobX * 0.5,
-          weaponBasePos.y + 0.08 * env - bobY * 0.5,
-          weaponBasePos.z + 0.06 * env
+          weaponBasePos.x - 0.10 * env + bobX * 0.4,
+          weaponBasePos.y + 0.085 * env + ringOrbitY - bobY * 0.4,
+          weaponBasePos.z + 0.065 * env + ringOrbitZ
         );
         weaponRoot.rotation.set(
-          spinAngle,
-          0.78 * env,
-          -0.38 * env
+          verticalSpinAngle,
+          0.14 * env,
+          -0.10 * env
+        );
+      } else if (meleeKey === "katana") {
+        // サイバーカタナ：片手回転納刀風の優雅な剣舞＋刀身チェック
+        const flourishT = Math.min(1, progress * 1.6);
+        const flourishSpin = (1 - Math.pow(1 - flourishT, 2)) * Math.PI * 2;
+        const gazeWave = Math.sin(progress * Math.PI * 2) * 0.22;
+        weaponRoot.position.set(
+          weaponBasePos.x - 0.14 * env + bobX * 0.4,
+          weaponBasePos.y + 0.095 * env - bobY * 0.4,
+          weaponBasePos.z + 0.07 * env
+        );
+        weaponRoot.rotation.set(
+          0.35 * env + gazeWave * env,
+          0.95 * env,
+          -0.42 * env + flourishSpin
         );
       } else {
-        // サイバーカタナ・プラズマアックス：刀身をかざして見せるモーション
-        const wave = Math.sin(progress * Math.PI * 2) * 0.45;
+        // プラズマバトルアックス：両手持ち風の重厚な持ち替えスピン＆刃面点検
+        const heavyTurn = Math.sin(progress * Math.PI * 2);
+        const flipPhase = Math.min(1, Math.max(0, (progress - 0.2) * 1.8));
+        const axeRoll = (1 - Math.pow(1 - flipPhase, 2)) * Math.PI * 2;
         weaponRoot.position.set(
-          weaponBasePos.x - 0.12 * env + bobX * 0.5,
-          weaponBasePos.y + 0.08 * env - bobY * 0.5,
-          weaponBasePos.z + 0.06 * env
+          weaponBasePos.x - 0.11 * env + bobX * 0.4,
+          weaponBasePos.y + (0.07 + Math.abs(heavyTurn) * 0.03) * env - bobY * 0.4,
+          weaponBasePos.z + 0.05 * env
         );
         weaponRoot.rotation.set(
-          0.25 * env,
-          0.78 * env,
-          -0.38 * env + wave * 0.4
+          -0.32 * env + heavyTurn * 0.25 * env,
+          0.62 * env,
+          -0.28 * env + axeRoll
         );
       }
     }
@@ -2653,13 +2878,69 @@ function updateWeapon(dt) {
     );
     weaponRoot.rotation.set(weaponState.recoilRot + reloadTilt, 0, weaponState.reloading ? 0.25 : 0);
   } else {
-    const swingPhase = weaponState.meleeSwingTimer > 0 ? Math.sin((weaponState.meleeSwingTimer / 0.22) * Math.PI) : 0;
-    weaponRoot.position.set(
-      weaponBasePos.x + bobX - swingPhase * 0.16,
-      weaponBasePos.y - bobY - swingPhase * 0.04,
-      weaponBasePos.z - swingPhase * 0.14
-    );
-    weaponRoot.rotation.set(-swingPhase * 0.85, swingPhase * 0.65, swingPhase * 0.45);
+    // 近接武器4種それぞれの固有攻撃（スイング）モーション
+    const dur = weaponState.meleeSwingDuration || 0.22;
+    const rawT = weaponState.meleeSwingTimer > 0 ? 1 - weaponState.meleeSwingTimer / dur : 0;
+    const swingPhase = weaponState.meleeSwingTimer > 0 ? Math.sin(rawT * Math.PI) : 0;
+    const meleeKey = profile.equippedMelee;
+    const combo = weaponState.meleeCombo;
+
+    if (meleeKey === "karambit") {
+      // カラムビット：素早い逆手クロス斬り＆回転切り上げ
+      const dir = combo === 0 ? 1 : -1;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - swingPhase * 0.15 * dir,
+        weaponBasePos.y - bobY + swingPhase * 0.04,
+        weaponBasePos.z - swingPhase * 0.14
+      );
+      weaponRoot.rotation.set(
+        -swingPhase * 0.95,
+        swingPhase * 0.85 * dir,
+        swingPhase * 1.25 * dir
+      );
+    } else if (meleeKey === "knife") {
+      // コンバットナイフ：1段目は横薙ぎスラッシュ、2段目は鋭いフォワード刺突（スタブ）
+      if (combo === 0) {
+        weaponRoot.position.set(
+          weaponBasePos.x + bobX - swingPhase * 0.18,
+          weaponBasePos.y - bobY - swingPhase * 0.03,
+          weaponBasePos.z - swingPhase * 0.14
+        );
+        weaponRoot.rotation.set(-swingPhase * 0.55, swingPhase * 0.95, swingPhase * 0.85);
+      } else {
+        weaponRoot.position.set(
+          weaponBasePos.x + bobX - swingPhase * 0.09,
+          weaponBasePos.y - bobY + swingPhase * 0.02,
+          weaponBasePos.z - swingPhase * 0.26
+        );
+        weaponRoot.rotation.set(-swingPhase * 0.18, swingPhase * 0.18, -swingPhase * 0.35);
+      }
+    } else if (meleeKey === "katana") {
+      // サイバーカタナ：大振りの袈裟斬り（右斜め上→左下）＆逆袈裟切り上げ
+      const dir = combo === 0 ? 1 : -1;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - swingPhase * 0.24 * dir,
+        weaponBasePos.y - bobY + swingPhase * (combo === 0 ? -0.09 : 0.09),
+        weaponBasePos.z - swingPhase * 0.18
+      );
+      weaponRoot.rotation.set(
+        -swingPhase * 0.95 * dir,
+        swingPhase * 1.15 * dir,
+        swingPhase * 1.05 * dir
+      );
+    } else {
+      // プラズマバトルアックス：頭上から全力で叩き割るオーバーヘッドスマッシュ
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - swingPhase * 0.11,
+        weaponBasePos.y - bobY - swingPhase * 0.12,
+        weaponBasePos.z - swingPhase * 0.19
+      );
+      weaponRoot.rotation.set(
+        -swingPhase * 1.45,
+        swingPhase * 0.28,
+        swingPhase * 0.22
+      );
+    }
   }
 }
 
