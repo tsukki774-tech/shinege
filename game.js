@@ -19,15 +19,39 @@ const autofireBadge = document.getElementById("autofire-badge");
 const ammoDisplay = document.getElementById("ammo-display");
 const ammoMaxDisplay = document.getElementById("ammo-max");
 const reloadStatus = document.getElementById("reload-status");
-const oniStunFill = document.getElementById("oni-stun-fill");
 const autofireToggleBtn = document.getElementById("autofire-toggle-btn");
 const weaponSelectBtns = document.querySelectorAll(".weapon-select-btn");
 
-const timeDisplay = document.getElementById("time-display");
-const bestDisplay = document.getElementById("best-display");
+const myKillsDisplay = document.getElementById("my-kills-display");
+const enemyKillsDisplay = document.getElementById("enemy-kills-display");
+const enemyTagLabel = document.getElementById("enemy-tag-label");
+const targetKillsDisplay = document.getElementById("target-kills-display");
+const netStatusPill = document.getElementById("net-status-pill");
+const myHpDisplay = document.getElementById("my-hp-display");
+const myHpFill = document.getElementById("my-hp-fill");
+const enemyHpDisplay = document.getElementById("enemy-hp-display");
+const enemyHpHudFill = document.getElementById("enemy-hp-hud-fill");
+const damageVignette = document.getElementById("damage-vignette");
+const respawnBanner = document.getElementById("respawn-banner");
+const respawnTimerDisplay = document.getElementById("respawn-timer-display");
+
+const goalKillsSelect = document.getElementById("goal-kills-select");
+const mpTabHost = document.getElementById("mp-tab-host");
+const mpTabJoin = document.getElementById("mp-tab-join");
+const mpTabSolo = document.getElementById("mp-tab-solo");
+const mpHostPanel = document.getElementById("mp-host-panel");
+const mpJoinPanel = document.getElementById("mp-join-panel");
+const mpSoloPanel = document.getElementById("mp-solo-panel");
+const hostRoomCodeEl = document.getElementById("host-room-code");
+const copyCodeBtn = document.getElementById("copy-code-btn");
+const hostStatusText = document.getElementById("host-status-text");
+const createRoomBtn = document.getElementById("create-room-btn");
+const joinCodeInput = document.getElementById("join-code-input");
+const joinRoomBtn = document.getElementById("join-room-btn");
+const joinStatusText = document.getElementById("join-status-text");
+
 const speedDisplay = document.getElementById("speed-display");
 const distDisplay = document.getElementById("dist-display");
-const nearmissDisplay = document.getElementById("nearmiss-display");
 const stateBadge = document.getElementById("state-badge");
 const trickFeed = document.getElementById("trick-feed");
 const crosshair = document.getElementById("crosshair");
@@ -846,50 +870,326 @@ function buildArena() {
 buildArena();
 
 // ==========================================
-// 鬼（AIボット）の作成
+// 対戦相手（友達 / ソロ練習BOT）の3Dモデル
 // ==========================================
-const oniGroup = new THREE.Group();
-const oniBody = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.65, 1.15, 8, 16),
+const rivalGroup = new THREE.Group();
+const rivalBody = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.55, 1.0, 8, 16),
   new THREE.MeshStandardMaterial({
     color: 0xef4444,
     emissive: 0x991b1b,
-    emissiveIntensity: 0.65,
+    emissiveIntensity: 0.55,
+    roughness: 0.35,
   })
 );
-oniBody.position.y = 1.2;
-oniBody.castShadow = true;
-oniGroup.add(oniBody);
+rivalBody.position.y = 1.05;
+rivalBody.castShadow = true;
+rivalGroup.add(rivalBody);
 
-const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), eyeMat);
-leftEye.position.set(-0.23, 1.6, 0.56);
-const rightEye = leftEye.clone();
-rightEye.position.x = 0.23;
-oniGroup.add(leftEye, rightEye);
+// バイザー（向いている方向がわかるように）
+const visorMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(0.62, 0.22, 0.24),
+  new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+);
+visorMesh.position.set(0, 1.48, 0.45);
+rivalGroup.add(visorMesh);
 
-// 射撃・オートエイム用の当たり判定（少し余裕を持たせて当てやすく）
-const oniHitMesh = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.95, 1.35, 6, 10),
+// 相手が持っている銃モデル
+const rivalGun = new THREE.Mesh(
+  new THREE.BoxGeometry(0.14, 0.14, 0.62),
+  new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.3 })
+);
+rivalGun.position.set(0.38, 1.15, 0.42);
+rivalGroup.add(rivalGun);
+
+// 射撃・オートエイム用の当たり判定
+const rivalHitMesh = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.85, 1.25, 6, 10),
   new THREE.MeshBasicMaterial({ visible: false })
 );
-oniHitMesh.position.y = 1.25;
-oniGroup.add(oniHitMesh);
+rivalHitMesh.position.y = 1.1;
+rivalGroup.add(rivalHitMesh);
 
-scene.add(oniGroup);
+scene.add(rivalGroup);
 
-const oni = {
-  pos: new THREE.Vector3(0, 1, -50),
+const SPAWN_POINTS = [
+  new THREE.Vector3(0, 2, 52),
+  new THREE.Vector3(0, 2, -52),
+  new THREE.Vector3(52, 2, 0),
+  new THREE.Vector3(-52, 2, 0),
+  new THREE.Vector3(44, 6, 44),
+  new THREE.Vector3(-44, 6, -44),
+];
+
+const rival = {
+  pos: new THREE.Vector3(0, 2, -52),
+  targetPos: new THREE.Vector3(0, 2, -52),
   vel: new THREE.Vector3(),
-  onGround: false,
-  baseSpeed: 10.0,
-  jumpCooldown: 0,
-  stunGauge: 0,
-  stunTimer: 0,
-  slowTimer: 0,
+  yaw: Math.PI,
+  hp: 100,
+  maxHp: 100,
+  dead: false,
+  respawnTimer: 0,
   hitFlashTimer: 0,
-  knockbackVel: new THREE.Vector3(),
+  onGround: false,
+  jumpCooldown: 0,
+  botFireCooldown: 0.8,
+  botStrafeDir: 1,
+  botStrafeTimer: 1.5,
+  weaponKey: "rifle",
 };
+
+// ==========================================
+// オンライン対戦（PeerJS ルームコード接続）
+// ==========================================
+const ROOM_PREFIX = "parkourfps-v7-";
+const net = {
+  mode: "solo", // "solo" | "host" | "client"
+  peer: null,
+  conn: null,
+  connected: false,
+  roomCode: "",
+  lastSyncSent: 0,
+};
+
+function setMpTab(tab) {
+  mpTabHost.classList.toggle("active", tab === "host");
+  mpTabJoin.classList.toggle("active", tab === "join");
+  mpTabSolo.classList.toggle("active", tab === "solo");
+
+  mpHostPanel.classList.toggle("hidden", tab !== "host");
+  mpJoinPanel.classList.toggle("hidden", tab !== "join");
+  mpSoloPanel.classList.toggle("hidden", tab !== "solo");
+
+  if (!net.connected) {
+    net.mode = tab === "solo" ? "solo" : tab;
+    updateStartButtonLabel();
+  }
+}
+
+function updateStartButtonLabel() {
+  if (game.over) return;
+  if (net.connected) {
+    startBtn.textContent = game.elapsed > 0 ? "対戦に戻る" : "友達と対戦スタート！";
+  } else if (net.mode === "solo") {
+    startBtn.textContent = game.elapsed > 0 ? "再開する" : "対戦スタート（ソロ練習）";
+  } else {
+    startBtn.textContent = "接続待機中（ソロ練習も可）";
+  }
+}
+
+function updateScoreAndHpUI() {
+  myKillsDisplay.textContent = String(game.myKills);
+  enemyKillsDisplay.textContent = String(game.enemyKills);
+  targetKillsDisplay.textContent = String(game.targetKills);
+
+  const myHpClamped = Math.max(0, Math.ceil(player.hp));
+  myHpDisplay.textContent = String(myHpClamped);
+  myHpFill.style.width = `${(myHpClamped / player.maxHp) * 100}%`;
+  myHpFill.classList.toggle("low", myHpClamped <= 30);
+
+  const enHpClamped = Math.max(0, Math.ceil(rival.hp));
+  enemyHpDisplay.textContent = rival.dead ? "KO" : String(enHpClamped);
+  if (enemyHpHudFill) {
+    enemyHpHudFill.style.width = `${rival.dead ? 0 : (enHpClamped / rival.maxHp) * 100}%`;
+  }
+
+  if (net.connected) {
+    enemyTagLabel.textContent = "FRIEND";
+    netStatusPill.textContent = `ONLINE #${net.roomCode}`;
+    netStatusPill.className = "net-pill online";
+  } else {
+    enemyTagLabel.textContent = "BOT";
+    netStatusPill.textContent = "SOLO練習";
+    netStatusPill.className = "net-pill solo";
+  }
+}
+
+function sendNet(payload) {
+  if (net.connected && net.conn && net.conn.open) {
+    try {
+      net.conn.send(payload);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function cleanupPeer() {
+  if (net.conn) {
+    try { net.conn.close(); } catch {}
+    net.conn = null;
+  }
+  if (net.peer) {
+    try { net.peer.destroy(); } catch {}
+    net.peer = null;
+  }
+  net.connected = false;
+  updateScoreAndHpUI();
+}
+
+function setupConnection(conn, isHost) {
+  net.conn = conn;
+  conn.on("open", () => {
+    net.connected = true;
+    net.mode = isHost ? "host" : "client";
+    updateScoreAndHpUI();
+    updateStartButtonLabel();
+
+    if (isHost) {
+      hostStatusText.textContent = "友達が接続しました！対戦を開始します！";
+      hostStatusText.className = "mp-status ok";
+      const goal = Number(goalKillsSelect.value) || 5;
+      game.targetKills = goal;
+      sendNet({ type: "start_match", targetKills: goal });
+      resetMatch(true);
+      startOrResumeGame();
+    } else {
+      joinStatusText.textContent = "接続成功！対戦を開始します！";
+      joinStatusText.className = "mp-status ok";
+    }
+  });
+
+  conn.on("data", (data) => {
+    if (!data || typeof data !== "object") return;
+
+    if (data.type === "start_match") {
+      game.targetKills = Number(data.targetKills) || 5;
+      goalKillsSelect.value = String(game.targetKills);
+      resetMatch(false);
+      startOrResumeGame();
+    } else if (data.type === "state") {
+      rival.targetPos.set(data.x, data.y, data.z);
+      rival.yaw = data.yaw || 0;
+      rival.hp = typeof data.hp === "number" ? data.hp : rival.hp;
+      rival.dead = Boolean(data.dead);
+      rival.weaponKey = data.w || "rifle";
+      rivalGroup.visible = !rival.dead;
+      updateScoreAndHpUI();
+    } else if (data.type === "shot") {
+      const s = new THREE.Vector3(data.sx, data.sy, data.sz);
+      const e = new THREE.Vector3(data.ex, data.ey, data.ez);
+      spawnTracer(s, e, data.color || 0xef4444);
+    } else if (data.type === "hit") {
+      applyDamageToSelf(Number(data.dmg) || 10, data.weaponName || "WEAPON");
+    } else if (data.type === "killed") {
+      // 相手を撃破した通知を受信
+      game.myKills += 1;
+      rival.dead = true;
+      rival.hp = 0;
+      rivalGroup.visible = false;
+      playSfx("stun");
+      showTrick(`KILL!! (${game.myKills} / ${game.targetKills})`);
+      updateScoreAndHpUI();
+      if (game.myKills >= game.targetKills) {
+        triggerMatchEnd(true);
+      }
+    } else if (data.type === "respawned") {
+      rival.dead = false;
+      rival.hp = 100;
+      rival.pos.set(data.x, data.y, data.z);
+      rival.targetPos.copy(rival.pos);
+      rivalGroup.visible = true;
+      updateScoreAndHpUI();
+    } else if (data.type === "rematch") {
+      game.targetKills = Number(data.targetKills) || game.targetKills;
+      resetMatch(false);
+      startOrResumeGame();
+    }
+  });
+
+  conn.on("close", () => {
+    net.connected = false;
+    updateScoreAndHpUI();
+    updateStartButtonLabel();
+    showTrick("相手の接続が切れました");
+  });
+}
+
+mpTabHost.addEventListener("click", () => setMpTab("host"));
+mpTabJoin.addEventListener("click", () => setMpTab("join"));
+mpTabSolo.addEventListener("click", () => {
+  cleanupPeer();
+  setMpTab("solo");
+});
+
+goalKillsSelect.addEventListener("change", () => {
+  game.targetKills = Number(goalKillsSelect.value) || 5;
+  updateScoreAndHpUI();
+});
+
+createRoomBtn.addEventListener("click", () => {
+  if (typeof Peer === "undefined") {
+    hostStatusText.textContent = "通信ライブラリの読み込みに失敗しました";
+    hostStatusText.className = "mp-status err";
+    return;
+  }
+  cleanupPeer();
+  const code = String(Math.floor(1000 + Math.random() * 9000));
+  net.roomCode = code;
+  net.mode = "host";
+  hostRoomCodeEl.textContent = code;
+  hostStatusText.textContent = "ルームを作成中...";
+  hostStatusText.className = "mp-status";
+
+  const peer = new Peer(ROOM_PREFIX + code);
+  net.peer = peer;
+
+  peer.on("open", () => {
+    hostStatusText.textContent = `待機中... 友達に「${code}」を教えてください`;
+    hostStatusText.className = "mp-status ok";
+  });
+
+  peer.on("connection", (conn) => {
+    setupConnection(conn, true);
+  });
+
+  peer.on("error", (err) => {
+    hostStatusText.textContent = `エラー: ${err.type}（もう一度お試しください）`;
+    hostStatusText.className = "mp-status err";
+  });
+});
+
+copyCodeBtn.addEventListener("click", () => {
+  if (!net.roomCode || net.roomCode === "----") return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(net.roomCode).catch(() => {});
+  }
+  copyCodeBtn.textContent = "済!";
+  setTimeout(() => { copyCodeBtn.textContent = "コピー"; }, 1200);
+});
+
+joinRoomBtn.addEventListener("click", () => {
+  const code = (joinCodeInput.value || "").trim();
+  if (!/^\d{4}$/.test(code)) {
+    joinStatusText.textContent = "4桁の数字を入力してください";
+    joinStatusText.className = "mp-status err";
+    return;
+  }
+  if (typeof Peer === "undefined") {
+    joinStatusText.textContent = "通信ライブラリの読み込みに失敗しました";
+    joinStatusText.className = "mp-status err";
+    return;
+  }
+  cleanupPeer();
+  net.roomCode = code;
+  net.mode = "client";
+  joinStatusText.textContent = `部屋 ${code} に接続中...`;
+  joinStatusText.className = "mp-status";
+
+  const peer = new Peer();
+  net.peer = peer;
+
+  peer.on("open", () => {
+    const conn = peer.connect(ROOM_PREFIX + code, { reliable: true });
+    setupConnection(conn, false);
+  });
+
+  peer.on("error", (err) => {
+    joinStatusText.textContent = `接続失敗 (${err.type})。コードを確認してください`;
+    joinStatusText.className = "mp-status err";
+  });
+});
 
 // ==========================================
 // プレイヤー状態＆入力
@@ -932,17 +1232,24 @@ const player = {
 
   // ブースト床クールタイム
   boostPadCooldown: 0,
+
+  // 対戦FPSステータス
+  hp: 100,
+  maxHp: 100,
+  dead: false,
+  respawnTimer: 0,
+  damageFlash: 0,
 };
 
 const game = {
   active: false,
   over: false,
   elapsed: 0,
-  best: Number(localStorage.getItem("parkour_tag_best") || 0),
-  nearMissCount: 0,
-  nearMissCooldown: 0,
+  myKills: 0,
+  enemyKills: 0,
+  targetKills: 5,
 };
-bestDisplay.textContent = game.best.toFixed(1);
+updateScoreAndHpUI();
 
 
 // ==========================================
@@ -957,12 +1264,10 @@ const WEAPONS = {
     maxAmmo: 18,
     fireRate: 0.13,
     reloadTime: 1.25,
-    range: 115,
+    range: 125,
     pellets: 1,
     spread: 0.008,
-    stunGain: 22,
-    slowDuration: 0.75,
-    knockback: 5.5,
+    damage: 14,
     color: 0x38bdf8,
     recoilZ: 0.055,
     recoilPitch: 0.045,
@@ -973,14 +1278,12 @@ const WEAPONS = {
     name: "SCATTER SHOTGUN",
     shortName: "SHOTGUN",
     maxAmmo: 6,
-    fireRate: 0.66,
+    fireRate: 0.68,
     reloadTime: 1.5,
     range: 46,
     pellets: 7,
-    spread: 0.062,
-    stunGain: 12,
-    slowDuration: 1.15,
-    knockback: 3.4,
+    spread: 0.064,
+    damage: 13,
     color: 0xf97316,
     recoilZ: 0.13,
     recoilPitch: 0.13,
@@ -991,14 +1294,12 @@ const WEAPONS = {
     name: "RAIL SNIPER",
     shortName: "SNIPER",
     maxAmmo: 4,
-    fireRate: 0.92,
+    fireRate: 0.95,
     reloadTime: 1.65,
-    range: 175,
+    range: 180,
     pellets: 1,
     spread: 0.001,
-    stunGain: 55,
-    slowDuration: 1.45,
-    knockback: 16.5,
+    damage: 65,
     color: 0xe879f9,
     recoilZ: 0.15,
     recoilPitch: 0.15,
@@ -1193,15 +1494,17 @@ function startReload() {
   updateWeaponUI();
 }
 
-function checkAimOnOni(maxRange) {
+function checkAimOnRival(maxRange) {
+  if (rival.dead) return false;
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
   raycaster.far = maxRange;
-  const targets = [...worldMeshes, oniHitMesh];
+  const targets = [...worldMeshes, rivalHitMesh];
   const hits = raycaster.intersectObjects(targets, false);
-  return hits.length > 0 && hits[0].object === oniHitMesh;
+  return hits.length > 0 && hits[0].object === rivalHitMesh;
 }
 
 function fireWeapon() {
+  if (player.dead) return;
   const w = WEAPONS[weaponState.currentKey];
   if (weaponState.reloading || weaponState.fireCooldown > 0) return;
   if (weaponState.ammo[w.key] <= 0) {
@@ -1219,9 +1522,8 @@ function fireWeapon() {
   const muzzleWorld = new THREE.Vector3();
   muzzlePoint.getWorldPosition(muzzleWorld);
 
-  const targets = [...worldMeshes, oniHitMesh];
+  const targets = rival.dead ? worldMeshes : [...worldMeshes, rivalHitMesh];
   let hitCount = 0;
-  let totalKbDir = new THREE.Vector3();
 
   for (let p = 0; p < w.pellets; p++) {
     const spreadX = (Math.random() - 0.5) * 2 * w.spread;
@@ -1233,43 +1535,56 @@ function fireWeapon() {
     let endPos;
     if (hits.length > 0) {
       endPos = hits[0].point.clone();
-      if (hits[0].object === oniHitMesh) {
+      if (!rival.dead && hits[0].object === rivalHitMesh) {
         hitCount += 1;
-        totalKbDir.add(raycaster.ray.direction);
       }
     } else {
       endPos = raycaster.ray.origin.clone().addScaledVector(raycaster.ray.direction, w.range);
     }
     spawnTracer(muzzleWorld, endPos, w.color);
+
+    if (net.connected) {
+      sendNet({
+        type: "shot",
+        sx: muzzleWorld.x,
+        sy: muzzleWorld.y,
+        sz: muzzleWorld.z,
+        ex: endPos.x,
+        ey: endPos.y,
+        ez: endPos.z,
+        color: w.color,
+      });
+    }
   }
 
   if (hitCount > 0) {
+    const totalDmg = w.damage * hitCount;
     weaponState.hitmarkerTimer = 0.14;
     hitmarker.classList.remove("hidden");
-    oni.hitFlashTimer = 0.12;
-    oni.slowTimer = Math.max(oni.slowTimer, w.slowDuration);
+    rival.hitFlashTimer = 0.12;
+    playSfx("hit");
 
-    totalKbDir.y = 0;
-    if (totalKbDir.lengthSq() > 0.001) {
-      totalKbDir.normalize();
-      oni.knockbackVel.addScaledVector(totalKbDir, w.knockback * hitCount);
-      if (oni.knockbackVel.length() > 24) {
-        oni.knockbackVel.setLength(24);
-      }
-    }
-
-    if (oni.stunTimer <= 0) {
-      oni.stunGauge = Math.min(100, oni.stunGauge + w.stunGain * hitCount);
-      if (oni.stunGauge >= 100) {
-        oni.stunTimer = 2.5;
-        oni.stunGauge = 100;
-        playSfx("stun");
-        showTrick("ONI STUNNED!! (2.5s)");
-      } else {
-        playSfx("hit");
-      }
+    if (net.connected) {
+      // オンライン時は相手にダメージ通知を送信
+      rival.hp = Math.max(1, rival.hp - totalDmg);
+      updateScoreAndHpUI();
+      sendNet({ type: "hit", dmg: totalDmg, weaponName: w.shortName });
     } else {
-      playSfx("hit");
+      // ソロ練習BOTへのダメージ＆撃破処理
+      rival.hp = Math.max(0, rival.hp - totalDmg);
+      updateScoreAndHpUI();
+      if (rival.hp <= 0 && !rival.dead) {
+        rival.dead = true;
+        rival.respawnTimer = 2.6;
+        rivalGroup.visible = false;
+        game.myKills += 1;
+        playSfx("stun");
+        showTrick(`BOT K.O.!! (${game.myKills} / ${game.targetKills})`);
+        updateScoreAndHpUI();
+        if (game.myKills >= game.targetKills) {
+          triggerMatchEnd(true);
+        }
+      }
     }
   }
 
@@ -1330,13 +1645,13 @@ function updateWeapon(dt) {
     }
   }
 
-  // 照準が鬼に合っているか判定（オート射撃＆ロックオン表示）
-  const aimingOni = checkAimOnOni(w.range);
-  weaponState.isAimingOni = aimingOni;
-  crosshair.classList.toggle("lock-on", aimingOni);
+  // 照準が相手に合っているか判定（オート射撃＆ロックオン表示）
+  const aimingRival = checkAimOnRival(w.range);
+  weaponState.isAimingOni = aimingRival;
+  crosshair.classList.toggle("lock-on", aimingRival);
 
-  if (game.active && !game.over) {
-    if ((autoFireEnabled && aimingOni) || weaponState.manualFireHeld) {
+  if (game.active && !game.over && !player.dead) {
+    if ((autoFireEnabled && aimingRival) || weaponState.manualFireHeld) {
       fireWeapon();
     }
   }
@@ -1365,12 +1680,7 @@ function updateWeapon(dt) {
   );
   weaponRoot.rotation.set(weaponState.recoilRot + reloadTilt, 0, weaponState.reloading ? 0.25 : 0);
 
-  // 鬼スタンゲージHUD更新
-  if (oniStunFill) {
-    const pct = oni.stunTimer > 0 ? (oni.stunTimer / 2.5) * 100 : oni.stunGauge;
-    oniStunFill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
-    oniStunFill.classList.toggle("stunned", oni.stunTimer > 0);
-  }
+
 }
 
 // 初期武器モデル構築＆設定イベント
@@ -1842,7 +2152,7 @@ function pauseGame() {
 function startOrResumeGame() {
   ensureAudio();
   if (game.over) {
-    resetMatch();
+    resetMatch(true);
   }
   applyLoadoutUI();
   applyAllButtonPositions();
@@ -1870,7 +2180,7 @@ startBtn.addEventListener("click", startOrResumeGame);
 hudRetryBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   ensureAudio();
-  resetMatch();
+  resetMatch(true);
   if (controlMode === "pc" && document.body.requestPointerLock) {
     try {
       document.body.requestPointerLock();
@@ -1910,11 +2220,93 @@ document.addEventListener("mousemove", (e) => {
   player.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, player.pitch));
 });
 
-function resetMatch() {
-  player.pos.set(0, 2, 50);
+function getSpawnPoint(preferFarFromEnemy = false) {
+  if (!preferFarFromEnemy) {
+    return SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)].clone();
+  }
+  let bestSp = SPAWN_POINTS[0];
+  let bestDist = -1;
+  for (const sp of SPAWN_POINTS) {
+    const d = sp.distanceTo(rival.pos);
+    if (d > bestDist) {
+      bestDist = d;
+      bestSp = sp;
+    }
+  }
+  return bestSp.clone();
+}
+
+function respawnSelf() {
+  const sp = getSpawnPoint(true);
+  player.pos.copy(sp);
   player.vel.set(0, 0, 0);
-  player.yaw = 0;
+  player.hp = player.maxHp;
+  player.dead = false;
+  player.respawnTimer = 0;
+  player.isSliding = false;
+  player.isWallRunning = false;
+  player.isGrappling = false;
+  player.isZiplining = false;
+  wireLine.visible = false;
+  respawnBanner.classList.add("hidden");
+
+  for (const k of WEAPON_ORDER) {
+    weaponState.ammo[k] = WEAPONS[k].maxAmmo;
+  }
+  weaponState.reloading = false;
+  weaponState.reloadTimer = 0;
+  updateWeaponUI();
+  updateScoreAndHpUI();
+
+  if (net.connected) {
+    sendNet({ type: "respawned", x: player.pos.x, y: player.pos.y, z: player.pos.z });
+  }
+}
+
+function applyDamageToSelf(dmg, weaponName = "WEAPON") {
+  if (player.dead || game.over) return;
+  player.hp = Math.max(0, player.hp - dmg);
+  player.damageFlash = 0.35;
+  playSfx("hit");
+  updateScoreAndHpUI();
+
+  if (player.hp <= 0) {
+    player.dead = true;
+    player.respawnTimer = 3.0;
+    player.vel.set(0, 0, 0);
+    player.isGrappling = false;
+    player.isZiplining = false;
+    wireLine.visible = false;
+    weaponState.manualFireHeld = false;
+    game.enemyKills += 1;
+    playSfx("caught");
+    respawnBanner.classList.remove("hidden");
+    respawnTimerDisplay.textContent = "3.0";
+    updateScoreAndHpUI();
+
+    if (net.connected) {
+      sendNet({ type: "killed" });
+    }
+
+    if (game.enemyKills >= game.targetKills) {
+      triggerMatchEnd(false);
+    }
+  }
+}
+
+function resetMatch(broadcast = false) {
+  const isClient = net.connected && net.mode === "client";
+  const myStart = isClient ? SPAWN_POINTS[1].clone() : SPAWN_POINTS[0].clone();
+  const enemyStart = isClient ? SPAWN_POINTS[0].clone() : SPAWN_POINTS[1].clone();
+
+  player.pos.copy(myStart);
+  player.vel.set(0, 0, 0);
+  player.yaw = isClient ? Math.PI : 0;
   player.pitch = 0;
+  player.hp = player.maxHp;
+  player.dead = false;
+  player.respawnTimer = 0;
+  player.damageFlash = 0;
   player.isSliding = false;
   player.slideTimer = 0;
   player.slideCooldown = 0;
@@ -1928,20 +2320,23 @@ function resetMatch() {
   player.zipCooldown = 0;
   player.boostPadCooldown = 0;
   wireLine.visible = false;
+  respawnBanner.classList.add("hidden");
 
   resetJoystickVisual();
   touchInput.slideHeld = false;
   touchInput.lookTouchId = null;
   weaponState.manualFireHeld = false;
 
-  oni.pos.set(0, 1, -50);
-  oni.vel.set(0, 0, 0);
-  oni.jumpCooldown = 0;
-  oni.stunGauge = 0;
-  oni.stunTimer = 0;
-  oni.slowTimer = 0;
-  oni.hitFlashTimer = 0;
-  oni.knockbackVel.set(0, 0, 0);
+  rival.pos.copy(enemyStart);
+  rival.targetPos.copy(enemyStart);
+  rival.vel.set(0, 0, 0);
+  rival.hp = rival.maxHp;
+  rival.dead = false;
+  rival.respawnTimer = 0;
+  rival.hitFlashTimer = 0;
+  rival.botFireCooldown = 1.0;
+  rivalGroup.visible = true;
+  rivalGroup.position.copy(enemyStart);
 
   for (const k of WEAPON_ORDER) {
     weaponState.ammo[k] = WEAPONS[k].maxAmmo;
@@ -1953,9 +2348,13 @@ function resetMatch() {
 
   game.elapsed = 0;
   game.over = false;
-  game.nearMissCount = 0;
-  game.nearMissCooldown = 0;
-  nearmissDisplay.textContent = "0";
+  game.myKills = 0;
+  game.enemyKills = 0;
+  updateScoreAndHpUI();
+
+  if (broadcast && net.connected) {
+    sendNet({ type: "rematch", targetKills: game.targetKills });
+  }
 }
 
 // ==========================================
@@ -2396,105 +2795,115 @@ function updatePlayer(dt) {
 }
 
 // ==========================================
-// 鬼（AI）の追跡更新
+// 対戦相手（オンライン同期 / ソロ練習BOT）の更新
 // ==========================================
-function updateOni(dt) {
-  let currentOniSpeed = oni.baseSpeed + Math.min(6.0, game.elapsed * 0.085);
-
-  // スタン・スロー・ヒットフラッシュ更新
-  if (oni.hitFlashTimer > 0) oni.hitFlashTimer = Math.max(0, oni.hitFlashTimer - dt);
-  if (oni.slowTimer > 0) oni.slowTimer = Math.max(0, oni.slowTimer - dt);
-
-  if (oni.stunTimer > 0) {
-    oni.stunTimer = Math.max(0, oni.stunTimer - dt);
-    if (oni.stunTimer <= 0) {
-      oni.stunGauge = 0;
-    }
-    currentOniSpeed = 0;
-    const blink = Math.floor(performance.now() / 80) % 2 === 0;
-    oniBody.material.color.setHex(blink ? 0xfacc15 : 0x38bdf8);
-    oniBody.material.emissive.setHex(blink ? 0xca8a04 : 0x0284c7);
+function updateRival(dt) {
+  if (rival.hitFlashTimer > 0) {
+    rival.hitFlashTimer = Math.max(0, rival.hitFlashTimer - dt);
+    rivalBody.material.color.setHex(0xffffff);
+    rivalBody.material.emissive.setHex(0xf59e0b);
   } else {
-    if (oni.stunGauge > 0) {
-      oni.stunGauge = Math.max(0, oni.stunGauge - 6.0 * dt);
-    }
-    if (oni.slowTimer > 0) {
-      currentOniSpeed *= 0.55;
-    }
-    if (oni.hitFlashTimer > 0) {
-      oniBody.material.color.setHex(0xffffff);
-      oniBody.material.emissive.setHex(0xf97316);
+    rivalBody.material.color.setHex(net.connected ? 0xf97316 : 0xef4444);
+    rivalBody.material.emissive.setHex(0x991b1b);
+  }
+
+  if (net.connected) {
+    // オンライン対戦：滑らかに相手の位置・向きを補間
+    rival.pos.lerp(rival.targetPos, Math.min(1, dt * 18));
+    rivalGroup.position.copy(rival.pos);
+    rivalGroup.rotation.y = rival.yaw + Math.PI;
+    rivalGroup.visible = !rival.dead;
+  } else {
+    // ソロ練習BOT：移動＆一定間隔で射撃してくる
+    if (rival.dead) {
+      rival.respawnTimer -= dt;
+      if (rival.respawnTimer <= 0) {
+        const sp = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
+        rival.pos.copy(sp);
+        rival.vel.set(0, 0, 0);
+        rival.hp = rival.maxHp;
+        rival.dead = false;
+        rivalGroup.visible = true;
+        updateScoreAndHpUI();
+      }
     } else {
-      oniBody.material.color.setHex(0xef4444);
-      oniBody.material.emissive.setHex(0x991b1b);
+      const toPlayer = new THREE.Vector3(player.pos.x - rival.pos.x, 0, player.pos.z - rival.pos.z);
+      const distHoriz = toPlayer.length();
+      if (distHoriz > 0.01) toPlayer.divideScalar(distHoriz);
+
+      rival.botStrafeTimer -= dt;
+      if (rival.botStrafeTimer <= 0) {
+        rival.botStrafeDir *= -1;
+        rival.botStrafeTimer = 1.2 + Math.random() * 1.4;
+      }
+
+      const strafe = new THREE.Vector3(-toPlayer.z * rival.botStrafeDir, 0, toPlayer.x * rival.botStrafeDir);
+      const approach = distHoriz > 24 ? 1 : distHoriz < 12 ? -0.6 : 0.15;
+      const botSpeed = 9.2;
+
+      rival.vel.x = (toPlayer.x * approach + strafe.x * 0.85) * botSpeed;
+      rival.vel.z = (toPlayer.z * approach + strafe.z * 0.85) * botSpeed;
+      rival.vel.y -= CONFIG.gravity * dt;
+
+      if (rival.jumpCooldown > 0) rival.jumpCooldown -= dt;
+      const prevX = rival.pos.x;
+      const prevZ = rival.pos.z;
+
+      rival.pos.x += rival.vel.x * dt;
+      rival.pos.y += rival.vel.y * dt;
+      rival.pos.z += rival.vel.z * dt;
+
+      const col = resolveCollisions(rival.pos, rival.vel, 0.6, 1.9, dt);
+      rival.onGround = col.onGround;
+
+      for (const pad of jumpPads) {
+        const dx = rival.pos.x - pad.x;
+        const dz = rival.pos.z - pad.z;
+        if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(rival.pos.y - pad.y) < 1.2) {
+          rival.vel.y = pad.force * 0.9;
+          rival.onGround = false;
+        }
+      }
+
+      const moved = Math.hypot(rival.pos.x - prevX, rival.pos.z - prevZ);
+      if (rival.onGround && rival.jumpCooldown <= 0 && (moved < botSpeed * dt * 0.35 || Math.random() < 0.012)) {
+        rival.vel.y = 11.4;
+        rival.jumpCooldown = 0.9;
+      }
+
+      rivalGroup.position.copy(rival.pos);
+      rivalGroup.lookAt(player.pos.x, rival.pos.y, player.pos.z);
+
+      // BOTの射撃（遮蔽物チェック付き）
+      if (!player.dead && distHoriz < 55) {
+        rival.botFireCooldown -= dt;
+        if (rival.botFireCooldown <= 0) {
+          rival.botFireCooldown = 0.72 + Math.random() * 0.45;
+          const botEye = rival.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
+          const playerTarget = player.pos.clone().add(new THREE.Vector3(0, 1.1, 0));
+          const dir = playerTarget.clone().sub(botEye);
+          const d = dir.length();
+          dir.normalize();
+          raycaster.set(botEye, dir);
+          raycaster.far = d;
+          const wallHits = raycaster.intersectObjects(worldMeshes, false);
+          if (wallHits.length === 0) {
+            const hitPlayer = Math.random() < 0.42;
+            const endPt = hitPlayer
+              ? playerTarget
+              : playerTarget.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 3));
+            spawnTracer(botEye, endPt, 0xef4444);
+            if (hitPlayer) {
+              applyDamageToSelf(11, "BOT RIFLE");
+            }
+          }
+        }
+      }
     }
   }
 
-  const toPlayer = new THREE.Vector3(
-    player.pos.x - oni.pos.x,
-    0,
-    player.pos.z - oni.pos.z
-  );
-  const distHoriz = toPlayer.length();
-  if (distHoriz > 0.01) toPlayer.divideScalar(distHoriz);
-
-  // ノックバック減衰
-  oni.knockbackVel.multiplyScalar(Math.max(0, 1 - dt * 6.5));
-
-  oni.vel.x = toPlayer.x * currentOniSpeed + oni.knockbackVel.x;
-  oni.vel.z = toPlayer.z * currentOniSpeed + oni.knockbackVel.z;
-  oni.vel.y -= CONFIG.gravity * dt;
-
-  if (oni.jumpCooldown > 0) oni.jumpCooldown -= dt;
-
-  const prevX = oni.pos.x;
-  const prevZ = oni.pos.z;
-
-  oni.pos.x += oni.vel.x * dt;
-  oni.pos.y += oni.vel.y * dt;
-  oni.pos.z += oni.vel.z * dt;
-
-  const col = resolveCollisions(oni.pos, oni.vel, 0.7, 2.0, dt);
-  oni.onGround = col.onGround;
-
-  // 鬼もジャンプパッドを使える
-  for (const pad of jumpPads) {
-    const dx = oni.pos.x - pad.x;
-    const dz = oni.pos.z - pad.z;
-    if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(oni.pos.y - pad.y) < 1.2) {
-      oni.vel.y = pad.force * 0.95;
-      oni.onGround = false;
-    }
-  }
-
-  const moved = Math.hypot(oni.pos.x - prevX, oni.pos.z - prevZ);
-  if (
-    oni.stunTimer <= 0 &&
-    oni.onGround &&
-    oni.jumpCooldown <= 0 &&
-    (moved < currentOniSpeed * dt * 0.45 || player.pos.y > oni.pos.y + 1.5)
-  ) {
-    oni.vel.y = player.pos.y > oni.pos.y + 4.0 ? 15.5 : 12.8;
-    oni.jumpCooldown = 0.6;
-  }
-
-  oniGroup.position.copy(oni.pos);
-  oniGroup.lookAt(player.pos.x, oni.pos.y, player.pos.z);
-
-  const totalDist = oni.pos.distanceTo(player.pos);
-  distDisplay.textContent = totalDist.toFixed(1);
-
-  if (game.nearMissCooldown > 0) game.nearMissCooldown -= dt;
-  if (totalDist < 3.6 && totalDist > 1.6 && game.nearMissCooldown <= 0) {
-    game.nearMissCount += 1;
-    game.nearMissCooldown = 1.8;
-    nearmissDisplay.textContent = String(game.nearMissCount);
-    showTrick("NEAR MISS!! +1");
-  }
-
-  if (oni.stunTimer <= 0 && totalDist < 1.5) {
-    triggerGameOver();
-  }
+  const totalDist = rival.pos.distanceTo(player.pos);
+  distDisplay.textContent = rival.dead ? "--" : totalDist.toFixed(1);
 }
 
 // ==========================================
@@ -2576,8 +2985,8 @@ function drawMinimap(now) {
   ctx.fill();
 
   // 鬼（赤＋脈打つリング）
-  const ox = toMapX(oni.pos.x);
-  const oy = toMapY(oni.pos.z);
+  const ox = toMapX(rival.pos.x);
+  const oy = toMapY(rival.pos.z);
   const pulse = 4.5 + Math.sin(now * 0.01) * 2.2;
   ctx.strokeStyle = "rgba(239, 68, 68, 0.75)";
   ctx.lineWidth = 1.4;
@@ -2600,31 +3009,26 @@ function drawMinimap(now) {
   ctx.stroke();
 }
 
-function triggerGameOver() {
+function triggerMatchEnd(isWin) {
   game.over = true;
   game.active = false;
   wireLine.visible = false;
+  respawnBanner.classList.add("hidden");
   resetJoystickVisual();
   touchInput.slideHeld = false;
   touchInput.lookTouchId = null;
   weaponState.manualFireHeld = false;
-  playSfx("caught");
-
-  if (game.elapsed > game.best) {
-    game.best = game.elapsed;
-    localStorage.setItem("parkour_tag_best", game.best.toFixed(2));
-    bestDisplay.textContent = game.best.toFixed(1);
-  }
+  playSfx(isWin ? "stun" : "caught");
 
   if (document.pointerLockElement) {
     document.exitPointerLock();
   }
 
-  modalTitle.textContent = "鬼に捕まった！";
+  modalTitle.textContent = isWin ? "VICTORY!! 勝利！" : "DEFEAT... 敗北";
   modalDesc.innerHTML =
-    `生存時間: <strong>${game.elapsed.toFixed(1)} 秒</strong>（ベスト: ${game.best.toFixed(1)} 秒）<br />` +
-    `ニアミス回数: <strong>${game.nearMissCount} 回</strong>`;
-  startBtn.textContent = "もう一回逃げる";
+    `最終スコア: <strong>YOU ${game.myKills} - ${game.enemyKills} ${net.connected ? "FRIEND" : "BOT"}</strong><br />` +
+    `「もう一度対戦する」を押すとリマッチします！`;
+  startBtn.textContent = "もう一度対戦する";
   overlay.classList.remove("hidden");
 }
 
@@ -2642,12 +3046,41 @@ function animate(now) {
     if (trickTimer <= 0) trickFeed.classList.remove("show");
   }
 
+  if (player.damageFlash > 0) {
+    player.damageFlash = Math.max(0, player.damageFlash - dt);
+    damageVignette.style.opacity = String((player.damageFlash / 0.35) * 0.9);
+  } else {
+    damageVignette.style.opacity = "0";
+  }
+
   if (game.active && !game.over) {
     game.elapsed += dt;
-    timeDisplay.textContent = game.elapsed.toFixed(1);
-    updatePlayer(dt);
-    updateOni(dt);
+    if (player.dead) {
+      player.respawnTimer -= dt;
+      respawnTimerDisplay.textContent = Math.max(0, player.respawnTimer).toFixed(1);
+      if (player.respawnTimer <= 0) {
+        respawnSelf();
+      }
+    } else {
+      updatePlayer(dt);
+    }
+    updateRival(dt);
     updateWeapon(dt);
+
+    // オンライン対戦中は自分の座標・向き・HPを約30fpsで送信
+    if (net.connected && now - net.lastSyncSent > 33) {
+      net.lastSyncSent = now;
+      sendNet({
+        type: "state",
+        x: player.pos.x,
+        y: player.pos.y,
+        z: player.pos.z,
+        yaw: player.yaw,
+        hp: player.hp,
+        dead: player.dead,
+        w: weaponState.currentKey,
+      });
+    }
   }
 
   drawMinimap(now);

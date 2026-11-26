@@ -1024,3 +1024,297 @@ body.touch-mode #weapon-hud {
     font-size: 1.2rem;
   }
 }
+
+
+/* ==========================================
+   v7: 1v1 対戦FPS HUD・ロビー・被弾演出
+   ========================================== */
+.score-panel {
+  min-width: 146px;
+}
+
+.score-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.05rem;
+}
+
+.me-tag {
+  font-size: 0.66rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
+.en-tag {
+  font-size: 0.66rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+.vs-sep {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.goal-line {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.net-pill {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.net-pill.solo {
+  background: #334155;
+  color: #cbd5e1;
+}
+
+.net-pill.online {
+  background: rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.5);
+}
+
+.my-hp-wrap {
+  margin-top: 4px;
+  width: 120px;
+}
+
+.my-hp-wrap span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #86efac;
+  margin-bottom: 2px;
+}
+
+.my-hp-bar {
+  width: 100%;
+  height: 7px;
+  background: rgba(30, 41, 59, 0.95);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+#my-hp-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+  transition: width 0.1s ease-out, background 0.15s;
+}
+
+#my-hp-fill.low {
+  background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+#enemy-hp-hud-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  transition: width 0.1s ease-out;
+}
+
+#damage-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle, transparent 52%, rgba(239, 68, 68, 0.62) 100%);
+  transition: opacity 0.12s ease-out;
+  z-index: 6;
+}
+
+#respawn-banner {
+  position: fixed;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 23, 42, 0.9);
+  border: 2px solid #ef4444;
+  border-radius: 14px;
+  padding: 16px 28px;
+  text-align: center;
+  z-index: 15;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+}
+
+.respawn-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #fca5a5;
+  margin-bottom: 4px;
+}
+
+.respawn-sub {
+  font-size: 0.9rem;
+  color: #e2e8f0;
+}
+
+/* ロビーUI */
+.multiplayer-section {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.mp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mp-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #38bdf8;
+}
+
+.mp-goal-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+}
+
+#goal-kills-select {
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.mp-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mp-tab-btn {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: #cbd5e1;
+  padding: 6px 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mp-tab-btn.active {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.mp-panel {
+  background: rgba(2, 6, 23, 0.45);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.room-code-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+}
+
+#host-room-code {
+  font-size: 1.45rem;
+  letter-spacing: 0.16em;
+  color: #fde047;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-action-btn {
+  background: #334155;
+  color: #f8fafc;
+  border: 1px solid #64748b;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.join-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+#join-code-input {
+  flex: 1;
+  background: #0f172a;
+  color: #fde047;
+  border: 1.5px solid #38bdf8;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+.mp-action-btn {
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  width: 100%;
+}
+
+.join-input-row .mp-action-btn {
+  width: auto;
+  white-space: nowrap;
+}
+
+.mp-status {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.mp-status.ok {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.mp-status.err {
+  color: #f87171;
+  font-weight: 700;
+}
