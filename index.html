@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコン鬼ごっこ - スマホ＆PC両対応版</title>
+  <title>3D キャラコン鬼ごっこ - スマホ＆PC両対応版 v3</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -31,6 +31,15 @@
       </div>
     </div>
 
+    <!-- ミニマップ -->
+    <div id="minimap-wrap">
+      <canvas id="minimap" width="140" height="140"></canvas>
+      <div class="minimap-legend">
+        <span class="leg-p">●自分</span>
+        <span class="leg-o">●鬼</span>
+      </div>
+    </div>
+
     <div id="crosshair"></div>
     <div id="trick-feed"></div>
 
@@ -53,9 +62,16 @@
       </div>
     </div>
 
-    <div id="touch-buttons">
-      <button id="btn-slide" class="action-btn slide-btn" type="button">SLIDE</button>
-      <button id="btn-jump" class="action-btn jump-btn" type="button">JUMP</button>
+    <button id="btn-slide" class="action-btn slide-btn" type="button">SLIDE</button>
+    <button id="btn-jump" class="action-btn jump-btn" type="button">JUMP</button>
+  </div>
+
+  <!-- ボタン配置編集モード用バー -->
+  <div id="layout-editor-bar" class="hidden">
+    <div class="editor-msg">JUMP / SLIDE / スティックをドラッグして好きな位置へ移動</div>
+    <div class="editor-actions">
+      <button id="layout-reset-btn" class="secondary-btn" type="button">初期位置に戻す</button>
+      <button id="layout-save-btn" class="primary-small-btn" type="button">保存して戻る</button>
     </div>
   </div>
 
@@ -68,12 +84,13 @@
         PC（マウス＋キーボード）とスマホ・iPad（タッチ操作）の両方に対応しています。
       </p>
       <div class="controls-box">
-        <div><strong>【スマホ・iPad】</strong>左スティック：移動 ／ 右画面スワイプ：視点 ／ 右下：JUMP・SLIDE</div>
+        <div><strong>【スマホ・iPad】</strong>左画面：移動スティック ／ 右画面スワイプ：視点 ／ JUMP・SLIDE</div>
         <div><strong>【PC】</strong>WASD：移動 ／ マウス：視点 ／ Space：ジャンプ ／ Shift・C：スライディング</div>
         <div><strong>【コツ】</strong>空中で紫の壁に向かって前進するとウォールラン → JUMPで壁キック！</div>
       </div>
       <div class="modal-buttons">
         <button id="start-btn" type="button">プレイ開始</button>
+        <button id="layout-btn" class="secondary-btn" type="button">ボタン配置を変更</button>
         <button id="mode-toggle-btn" class="secondary-btn" type="button">操作モード: 読み込み中...</button>
       </div>
     </div>

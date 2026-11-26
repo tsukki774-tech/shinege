@@ -7,6 +7,7 @@ const overlay = document.getElementById("overlay");
 const modalTitle = document.getElementById("modal-title");
 const modalDesc = document.getElementById("modal-desc");
 const startBtn = document.getElementById("start-btn");
+const layoutBtn = document.getElementById("layout-btn");
 const modeToggleBtn = document.getElementById("mode-toggle-btn");
 
 const timeDisplay = document.getElementById("time-display");
@@ -19,6 +20,9 @@ const trickFeed = document.getElementById("trick-feed");
 const hudRetryBtn = document.getElementById("hud-retry-btn");
 const hudPauseBtn = document.getElementById("hud-pause-btn");
 
+const minimapCanvas = document.getElementById("minimap");
+const minimapCtx = minimapCanvas.getContext("2d");
+
 const touchLayer = document.getElementById("touch-layer");
 const lookZone = document.getElementById("look-zone");
 const joystickZone = document.getElementById("joystick-zone");
@@ -26,6 +30,10 @@ const joystickBase = document.getElementById("joystick-base");
 const joystickKnob = document.getElementById("joystick-knob");
 const btnJump = document.getElementById("btn-jump");
 const btnSlide = document.getElementById("btn-slide");
+
+const layoutEditorBar = document.getElementById("layout-editor-bar");
+const layoutResetBtn = document.getElementById("layout-reset-btn");
+const layoutSaveBtn = document.getElementById("layout-save-btn");
 
 // ==========================================
 // キャラコン調整パラメータ（ここをいじると操作感が激変します！）
@@ -63,6 +71,7 @@ const isCoarsePointer =
   navigator.maxTouchPoints > 0;
 
 let controlMode = isCoarsePointer ? "touch" : "pc"; // "touch" | "pc"
+let isEditingLayout = false;
 
 function applyControlMode() {
   if (controlMode === "touch") {
@@ -80,6 +89,154 @@ applyControlMode();
 modeToggleBtn.addEventListener("click", () => {
   controlMode = controlMode === "touch" ? "pc" : "touch";
   applyControlMode();
+});
+
+// ==========================================
+// ボタン配置カスタマイズ（localStorage保存対応）
+// ==========================================
+const LAYOUT_STORAGE_KEY = "parkour_tag_layout_v1";
+const DEFAULT_LAYOUT = {
+  jump: { xPct: 0.88, yPct: 0.82 },
+  slide: { xPct: 0.88, yPct: 0.64 },
+  stick: { xPct: 0.14, yPct: 0.80 },
+};
+
+function loadLayout() {
+  try {
+    const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (!raw) return structuredClone(DEFAULT_LAYOUT);
+    const parsed = JSON.parse(raw);
+    return {
+      jump: parsed.jump || { ...DEFAULT_LAYOUT.jump },
+      slide: parsed.slide || { ...DEFAULT_LAYOUT.slide },
+      stick: parsed.stick || { ...DEFAULT_LAYOUT.stick },
+    };
+  } catch {
+    return {
+      jump: { ...DEFAULT_LAYOUT.jump },
+      slide: { ...DEFAULT_LAYOUT.slide },
+      stick: { ...DEFAULT_LAYOUT.stick },
+    };
+  }
+}
+
+let buttonLayout = loadLayout();
+
+function saveLayout() {
+  try {
+    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(buttonLayout));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function positionElementByPct(el, xPct, yPct, maxRightRatio = 1.0) {
+  const w = el.offsetWidth || 80;
+  const h = el.offsetHeight || 80;
+  const minX = 8;
+  const maxX = Math.max(minX, window.innerWidth * maxRightRatio - w - 8);
+  const minY = 8;
+  const maxY = Math.max(minY, window.innerHeight - h - 8);
+
+  const left = Math.max(minX, Math.min(maxX, xPct * window.innerWidth - w / 2));
+  const top = Math.max(minY, Math.min(maxY, yPct * window.innerHeight - h / 2));
+
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+}
+
+function applyStickHomePosition() {
+  positionElementByPct(joystickBase, buttonLayout.stick.xPct, buttonLayout.stick.yPct, 0.5);
+}
+
+function applyAllButtonPositions() {
+  positionElementByPct(btnJump, buttonLayout.jump.xPct, buttonLayout.jump.yPct, 1.0);
+  positionElementByPct(btnSlide, buttonLayout.slide.xPct, buttonLayout.slide.yPct, 1.0);
+  applyStickHomePosition();
+}
+
+// 初期化時に位置を反映
+requestAnimationFrame(applyAllButtonPositions);
+
+function attachDraggable(el, key, maxRightRatio = 1.0) {
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  el.addEventListener("pointerdown", (e) => {
+    if (!isEditingLayout) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragging = true;
+    const rect = el.getBoundingClientRect();
+    offsetX = e.clientX - (rect.left + rect.width / 2);
+    offsetY = e.clientY - (rect.top + rect.height / 2);
+    el.setPointerCapture(e.pointerId);
+  });
+
+  el.addEventListener("pointermove", (e) => {
+    if (!dragging || !isEditingLayout) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const w = el.offsetWidth || 80;
+    const h = el.offsetHeight || 80;
+    const cx = e.clientX - offsetX;
+    const cy = e.clientY - offsetY;
+
+    const minCenterX = w / 2 + 8;
+    const maxCenterX = Math.max(minCenterX, window.innerWidth * maxRightRatio - w / 2 - 8);
+    const minCenterY = h / 2 + 8;
+    const maxCenterY = Math.max(minCenterY, window.innerHeight - h / 2 - 8);
+
+    const clampedX = Math.max(minCenterX, Math.min(maxCenterX, cx));
+    const clampedY = Math.max(minCenterY, Math.min(maxCenterY, cy));
+
+    buttonLayout[key].xPct = clampedX / window.innerWidth;
+    buttonLayout[key].yPct = clampedY / window.innerHeight;
+    positionElementByPct(el, buttonLayout[key].xPct, buttonLayout[key].yPct, maxRightRatio);
+  });
+
+  function stopDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    if (el.hasPointerCapture && el.hasPointerCapture(e.pointerId)) {
+      el.releasePointerCapture(e.pointerId);
+    }
+  }
+  el.addEventListener("pointerup", stopDrag);
+  el.addEventListener("pointercancel", stopDrag);
+}
+
+attachDraggable(btnJump, "jump", 1.0);
+attachDraggable(btnSlide, "slide", 1.0);
+attachDraggable(joystickBase, "stick", 0.5);
+
+function enterLayoutEditor() {
+  isEditingLayout = true;
+  document.body.classList.add("layout-editing");
+  overlay.classList.add("hidden");
+  layoutEditorBar.classList.remove("hidden");
+  requestAnimationFrame(applyAllButtonPositions);
+}
+
+function exitLayoutEditor() {
+  isEditingLayout = false;
+  saveLayout();
+  document.body.classList.remove("layout-editing");
+  layoutEditorBar.classList.add("hidden");
+  applyControlMode();
+  overlay.classList.remove("hidden");
+}
+
+layoutBtn.addEventListener("click", enterLayoutEditor);
+layoutSaveBtn.addEventListener("click", exitLayoutEditor);
+layoutResetBtn.addEventListener("click", () => {
+  buttonLayout = {
+    jump: { ...DEFAULT_LAYOUT.jump },
+    slide: { ...DEFAULT_LAYOUT.slide },
+    stick: { ...DEFAULT_LAYOUT.stick },
+  };
+  applyAllButtonPositions();
 });
 
 // ==========================================
@@ -167,7 +324,7 @@ const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerH
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = !isCoarsePointer; // スマホ・iPadでは影を軽くして60fps維持
+renderer.shadowMap.enabled = !isCoarsePointer;
 document.body.appendChild(renderer.domElement);
 
 // ライト
@@ -190,6 +347,7 @@ scene.add(dirLight);
 // ==========================================
 // マップ構築（AABBコライダー付き）
 // ==========================================
+const ARENA_HALF = 45;
 const colliders = [];
 const jumpPads = [];
 
@@ -213,6 +371,11 @@ function addBox(x, y, z, w, h, d, color, options = {}) {
     maxY: y + h / 2,
     minZ: z - d / 2,
     maxZ: z + d / 2,
+    w,
+    d,
+    color,
+    isFloor: Boolean(options.isFloor),
+    isOuterWall: Boolean(options.isOuterWall),
     isWallRun: Boolean(options.wallRun),
   });
   return mesh;
@@ -233,16 +396,16 @@ function addJumpPad(x, y, z) {
 
 function buildArena() {
   // 床（グリッド付き）
-  addBox(0, -0.5, 0, 90, 1, 90, 0x1e293b, { noCast: true, roughness: 0.85 });
+  addBox(0, -0.5, 0, 90, 1, 90, 0x1e293b, { noCast: true, roughness: 0.85, isFloor: true });
   const grid = new THREE.GridHelper(90, 45, 0x38bdf8, 0x334155);
   grid.position.y = 0.02;
   scene.add(grid);
 
   // 外周の壁
-  addBox(0, 6, -45, 90, 12, 1, 0x334155, { wallRun: true });
-  addBox(0, 6, 45, 90, 12, 1, 0x334155, { wallRun: true });
-  addBox(-45, 6, 0, 1, 12, 90, 0x334155, { wallRun: true });
-  addBox(45, 6, 0, 1, 12, 90, 0x334155, { wallRun: true });
+  addBox(0, 6, -45, 90, 12, 1, 0x334155, { wallRun: true, isOuterWall: true });
+  addBox(0, 6, 45, 90, 12, 1, 0x334155, { wallRun: true, isOuterWall: true });
+  addBox(-45, 6, 0, 1, 12, 90, 0x334155, { wallRun: true, isOuterWall: true });
+  addBox(45, 6, 0, 1, 12, 90, 0x334155, { wallRun: true, isOuterWall: true });
 
   // 中央タワー＆周囲の高台
   addBox(0, 2.5, 0, 8, 5, 8, 0x475569, { wallRun: true });
@@ -390,19 +553,23 @@ function resetJoystickVisual() {
   touchInput.moveY = 0;
   touchInput.joyTouchId = null;
   joystickKnob.style.transform = "translate(0px, 0px)";
+  applyStickHomePosition();
 }
 
 joystickZone.addEventListener(
   "touchstart",
   (e) => {
-    if (!game.active) return;
+    if (!game.active || isEditingLayout) return;
     e.preventDefault();
     for (const t of e.changedTouches) {
-      if (touchInput.joyTouchId === null) {
+      // 画面左側（中央より左）のタッチのみスティックとして受け付ける
+      if (touchInput.joyTouchId === null && t.clientX <= window.innerWidth * 0.5) {
         touchInput.joyTouchId = t.identifier;
-        const rect = joystickBase.getBoundingClientRect();
-        touchInput.joyCenterX = rect.left + rect.width / 2;
-        touchInput.joyCenterY = rect.top + rect.height / 2;
+        touchInput.joyCenterX = t.clientX;
+        touchInput.joyCenterY = t.clientY;
+        const half = joystickBase.offsetWidth / 2;
+        joystickBase.style.left = `${t.clientX - half}px`;
+        joystickBase.style.top = `${t.clientY - half}px`;
         updateJoystickFromPoint(t.clientX, t.clientY);
         break;
       }
@@ -414,7 +581,7 @@ joystickZone.addEventListener(
 joystickZone.addEventListener(
   "touchmove",
   (e) => {
-    if (!game.active) return;
+    if (!game.active || isEditingLayout) return;
     e.preventDefault();
     for (const t of e.changedTouches) {
       if (t.identifier === touchInput.joyTouchId) {
@@ -455,7 +622,7 @@ function updateJoystickFromPoint(clientX, clientY) {
 lookZone.addEventListener(
   "touchstart",
   (e) => {
-    if (!game.active) return;
+    if (!game.active || isEditingLayout) return;
     e.preventDefault();
     for (const t of e.changedTouches) {
       if (touchInput.lookTouchId === null) {
@@ -472,7 +639,7 @@ lookZone.addEventListener(
 lookZone.addEventListener(
   "touchmove",
   (e) => {
-    if (!game.active) return;
+    if (!game.active || isEditingLayout) return;
     e.preventDefault();
     for (const t of e.changedTouches) {
       if (t.identifier === touchInput.lookTouchId) {
@@ -506,6 +673,7 @@ lookZone.addEventListener("touchcancel", handleLookEnd);
 btnJump.addEventListener(
   "touchstart",
   (e) => {
+    if (isEditingLayout) return;
     e.preventDefault();
     e.stopPropagation();
     if (!game.active) return;
@@ -520,6 +688,7 @@ btnJump.addEventListener("touchcancel", () => btnJump.classList.remove("pressed"
 btnSlide.addEventListener(
   "touchstart",
   (e) => {
+    if (isEditingLayout) return;
     e.preventDefault();
     e.stopPropagation();
     if (!game.active) return;
@@ -543,9 +712,9 @@ function pauseGame() {
   resetJoystickVisual();
   touchInput.slideHeld = false;
   touchInput.lookTouchId = null;
-  if (!game.over) {
+  if (!game.over && !isEditingLayout) {
     modalTitle.textContent = "一時停止";
-    modalDesc.innerHTML = "「再開する」を押すと戻ります。<br />操作モードの切り替えもできます。";
+    modalDesc.innerHTML = "「再開する」を押すと戻ります。<br />ボタン配置や操作モードの変更もできます。";
     startBtn.textContent = "再開する";
     overlay.classList.remove("hidden");
   }
@@ -556,6 +725,7 @@ function startOrResumeGame() {
   if (game.over) {
     resetMatch();
   }
+  applyAllButtonPositions();
   if (controlMode === "pc" && document.body.requestPointerLock) {
     try {
       const res = document.body.requestPointerLock();
@@ -979,6 +1149,92 @@ function updateOni(dt) {
   }
 }
 
+// ==========================================
+// ミニマップ描画
+// ==========================================
+function drawMinimap(now) {
+  const ctx = minimapCtx;
+  const size = minimapCanvas.width;
+  const scale = size / (ARENA_HALF * 2);
+
+  const toMapX = (wx) => (wx + ARENA_HALF) * scale;
+  const toMapY = (wz) => (wz + ARENA_HALF) * scale;
+
+  // 背景
+  ctx.fillStyle = "#0b1220";
+  ctx.fillRect(0, 0, size, size);
+
+  // 薄いグリッド
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.12)";
+  ctx.lineWidth = 1;
+  const step = size / 6;
+  for (let i = 1; i < 6; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * step, 0);
+    ctx.lineTo(i * step, size);
+    ctx.moveTo(0, i * step);
+    ctx.lineTo(size, i * step);
+    ctx.stroke();
+  }
+
+  // 障害物・足場
+  for (const c of colliders) {
+    if (c.isFloor || c.isOuterWall) continue;
+    const x = toMapX(c.minX);
+    const y = toMapY(c.minZ);
+    const w = Math.max(2, (c.maxX - c.minX) * scale);
+    const h = Math.max(2, (c.maxZ - c.minZ) * scale);
+    ctx.fillStyle = `#${c.color.toString(16).padStart(6, "0")}`;
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(x, y, w, h);
+  }
+  ctx.globalAlpha = 1;
+
+  // ジャンプパッド（緑）
+  ctx.fillStyle = "#22c55e";
+  for (const pad of jumpPads) {
+    ctx.beginPath();
+    ctx.arc(toMapX(pad.x), toMapY(pad.z), 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // プレイヤーの視野コーン＆位置
+  const px = toMapX(player.pos.x);
+  const py = toMapY(player.pos.z);
+  const lookAngle = Math.atan2(-Math.cos(player.yaw), -Math.sin(player.yaw));
+
+  ctx.fillStyle = "rgba(56, 189, 248, 0.28)";
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.arc(px, py, 20, lookAngle - 0.52, lookAngle + 0.52);
+  ctx.closePath();
+  ctx.fill();
+
+  // 鬼（赤＋脈打つリング）
+  const ox = toMapX(oni.pos.x);
+  const oy = toMapY(oni.pos.z);
+  const pulse = 5 + Math.sin(now * 0.01) * 2.5;
+  ctx.strokeStyle = "rgba(239, 68, 68, 0.7)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(ox, oy, pulse, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "#ef4444";
+  ctx.beginPath();
+  ctx.arc(ox, oy, 4.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // プレイヤーマーカー（水色＋白枠）
+  ctx.fillStyle = "#38bdf8";
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(px, py, 4.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
+
 function triggerGameOver() {
   game.over = true;
   game.active = false;
@@ -1026,6 +1282,7 @@ function animate(now) {
     updateOni(dt);
   }
 
+  drawMinimap(now);
   renderer.render(scene, camera);
 }
 
@@ -1033,6 +1290,7 @@ window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  applyAllButtonPositions();
 });
 
 animate(performance.now());
