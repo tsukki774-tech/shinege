@@ -4,10 +4,6 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 // DOM要素
 // ==========================================
 const overlay = document.getElementById("overlay");
-const mainModal = document.getElementById("main-modal");
-const victoryBanner = document.getElementById("victory-banner");
-const victoryCanvas = document.getElementById("victory-canvas");
-const victoryCtx = victoryCanvas ? victoryCanvas.getContext("2d") : null;
 const modalTitle = document.getElementById("modal-title");
 const modalDesc = document.getElementById("modal-desc");
 const startBtn = document.getElementById("start-btn");
@@ -106,6 +102,7 @@ const btnFire = document.getElementById("btn-fire");
 const btnFireSub = document.getElementById("btn-fire-sub");
 const btnWeapon = document.getElementById("btn-weapon");
 const btnWeaponLabel = document.getElementById("btn-weapon-label");
+const btnInspect = document.getElementById("btn-inspect");
 
 const layoutEditorBar = document.getElementById("layout-editor-bar");
 const layoutResetBtn = document.getElementById("layout-reset-btn");
@@ -130,12 +127,12 @@ const CONFIG = {
   wallRunSpeed: 14.2,
   wallJumpUp: 11.8,
   wallJumpPush: 13.5,
-  jumpPadForce: 25.5,
+  jumpPadForce: 22.0,
   boostPadSpeed: 24.0,
   dashSpeed: 24.5,
   dashDuration: 0.22,
   dashCooldown: 2.6,
-  grappleRange: 76,
+  grappleRange: 64,
   grapplePullSpeed: 29.0,
   grappleMaxTime: 1.25,
   grappleCooldown: 3.5,
@@ -279,6 +276,7 @@ const DEFAULT_LAYOUT = {
   zip: { xPct: 0.66, yPct: 0.80 },
   fire: { xPct: 0.89, yPct: 0.46 },
   weapon: { xPct: 0.66, yPct: 0.63 },
+  inspect: { xPct: 0.56, yPct: 0.77 },
   stick: { xPct: 0.14, yPct: 0.80 },
 };
 
@@ -344,6 +342,7 @@ function applyAllButtonPositions() {
   positionElementByPct(btnZip, buttonLayout.zip.xPct, buttonLayout.zip.yPct, 1.0);
   positionElementByPct(btnFire, buttonLayout.fire.xPct, buttonLayout.fire.yPct, 1.0);
   positionElementByPct(btnWeapon, buttonLayout.weapon.xPct, buttonLayout.weapon.yPct, 1.0);
+  if (btnInspect) positionElementByPct(btnInspect, buttonLayout.inspect.xPct, buttonLayout.inspect.yPct, 1.0);
   applyStickHomePosition();
 }
 
@@ -405,6 +404,7 @@ attachDraggable(btnGrapple, "grapple", 1.0);
 attachDraggable(btnZip, "zip", 1.0);
 attachDraggable(btnFire, "fire", 1.0);
 attachDraggable(btnWeapon, "weapon", 1.0);
+if (btnInspect) attachDraggable(btnInspect, "inspect", 1.0);
 attachDraggable(joystickBase, "stick", 0.5);
 
 function enterLayoutEditor() {
@@ -434,10 +434,6 @@ layoutSaveBtn.addEventListener("click", exitLayoutEditor);
 layoutResetBtn.addEventListener("click", () => {
   buttonLayout = cloneDefaultLayout();
   applyAllButtonPositions();
-  if (victoryCanvas && !victoryCanvas.classList.contains("hidden")) {
-    victoryCanvas.width = window.innerWidth;
-    victoryCanvas.height = window.innerHeight;
-  }
 });
 
 // ==========================================
@@ -584,24 +580,6 @@ function playSfx(type) {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
     osc.start(t);
     osc.stop(t + 0.15);
-  } else if (type === "victory") {
-    // 華やかな4音ファンファーレ和音
-    const notes = [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((freq, idx) => {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = "triangle";
-      const start = t + idx * 0.09;
-      o.frequency.setValueAtTime(freq, start);
-      g.gain.setValueAtTime(0.001, start);
-      g.gain.linearRampToValueAtTime(0.14, start + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, start + 0.55);
-      o.connect(g);
-      g.connect(audioCtx.destination);
-      o.start(start);
-      o.stop(start + 0.58);
-    });
-    return;
   } else if (type === "reload") {
     osc.type = "triangle";
     osc.frequency.setValueAtTime(300, t);
@@ -632,22 +610,25 @@ function showTrick(text) {
 // Three.js シーン構築
 // ==========================================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b1220);
-scene.fog = new THREE.Fog(0x0b1220, 105, 360);
+// 昼間の爽やかなスカイブルー背景＋遠方まで見渡せるライトヘイズ
+scene.background = new THREE.Color(0x7dd3fc);
+scene.fog = new THREE.Fog(0xbae6fd, 130, 390);
 
-const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerHeight, 0.1, 480);
+const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerHeight, 0.1, 460);
 scene.add(camera);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
 renderer.shadowMap.enabled = !isCoarsePointer;
 document.body.appendChild(renderer.domElement);
 
-const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.98);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.35);
 scene.add(hemiLight);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
-dirLight.position.set(75, 110, 65);
+const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.45);
+dirLight.position.set(85, 130, 70);
 if (!isCoarsePointer) {
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
@@ -656,7 +637,7 @@ if (!isCoarsePointer) {
   dirLight.shadow.camera.right = 145;
   dirLight.shadow.camera.top = 145;
   dirLight.shadow.camera.bottom = -145;
-  dirLight.shadow.camera.far = 320;
+  dirLight.shadow.camera.far = 340;
 }
 scene.add(dirLight);
 
@@ -695,6 +676,15 @@ function addBox(x, y, z, w, h, d, color, options = {}) {
   mesh.position.set(x, y, z);
   mesh.receiveShadow = true;
   mesh.castShadow = !options.noCast;
+  if (!options.isFloor) {
+    const edges = new THREE.EdgesGeometry(geo);
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: options.isOuterWall ? 0.16 : 0.28,
+    });
+    mesh.add(new THREE.LineSegments(edges, edgeMat));
+  }
   scene.add(mesh);
 
   worldMeshes.push(mesh);
@@ -788,175 +778,125 @@ function addZipline(ax, ay, az, bx, by, bz) {
 }
 
 function buildArena() {
-  // 超広大な床（260 x 260）
-  addBox(0, -0.5, 0, 260, 1, 260, 0x1e293b, { noCast: true, roughness: 0.85, isFloor: true });
-  const grid = new THREE.GridHelper(260, 65, 0x38bdf8, 0x334155);
+  // 明るく敵や弾道がくっきり映えるライトスレート床（260 x 260）
+  addBox(0, -0.5, 0, 260, 1, 260, 0xcbd5e1, { noCast: true, roughness: 0.78, isFloor: true });
+  const grid = new THREE.GridHelper(260, 65, 0x64748b, 0x94a3b8);
   grid.position.y = 0.02;
   scene.add(grid);
 
-  // 外周の壁（±130 / 高さ36mに拡張）
-  addBox(0, 18, -130, 260, 36, 2.0, 0x334155, { wallRun: true, isOuterWall: true });
-  addBox(0, 18, 130, 260, 36, 2.0, 0x334155, { wallRun: true, isOuterWall: true });
-  addBox(-130, 18, 0, 2.0, 36, 260, 0x334155, { wallRun: true, isOuterWall: true });
-  addBox(130, 18, 0, 2.0, 36, 260, 0x334155, { wallRun: true, isOuterWall: true });
+  // 外周の壁（明るいオフホワイト＋上部アクセントライン）
+  addBox(0, 11, -130, 260, 22, 2.0, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+  addBox(0, 11, 130, 260, 22, 2.0, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+  addBox(-130, 11, 0, 2.0, 22, 260, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+  addBox(130, 11, 0, 2.0, 22, 260, 0xe2e8f0, { wallRun: true, isOuterWall: true });
 
   // ======================================
-  // 1. 中央超高層メガシタデル（6段構造・頂上高さ34m）
+  // 1. 中央メガシタデル（4段構造・クリーンホワイト＆ティール）
   // ======================================
-  addBox(0, 3.0, 0, 18, 6.0, 18, 0x475569, { wallRun: true });
-  addBox(0, 8.5, 0, 13, 5.0, 13, 0x64748b, { wallRun: true });
-  addBox(0, 14.0, 0, 9.5, 6.0, 9.5, 0x94a3b8, { wallRun: true });
-  addBox(0, 20.0, 0, 7.0, 6.0, 7.0, 0x38bdf8, { wallRun: true });
-  addBox(0, 26.0, 0, 5.5, 6.0, 5.5, 0x818cf8, { wallRun: true });
-  addBox(0, 31.5, 0, 7.5, 5.0, 7.5, 0xf8fafc, { wallRun: true }); // 最上階スカイ展望デッキ
-  addJumpPad(0, 34.0, 0, 24.0); // 頂上ジャンプパッド
+  addBox(0, 2.5, 0, 16, 5, 16, 0xf8fafc, { wallRun: true });
+  addBox(0, 7.0, 0, 11, 4.0, 11, 0xe2e8f0, { wallRun: true });
+  addBox(0, 11.2, 0, 7, 4.4, 7, 0x38bdf8, { wallRun: true });
+  addBox(0, 15.2, 0, 4.5, 3.6, 4.5, 0x0284c7, { wallRun: true });
+  addJumpPad(0, 17.0, 0, 22.0); // 頂上ジャンプパッド
 
-  // 中層リングデッキ（Y=17m 空中回廊リング）
-  const midSkyRing = [
-    [0, 17.0, -24, 28, 1.2, 6, 0x0ea5e9],
-    [0, 17.0, 24, 28, 1.2, 6, 0x0ea5e9],
-    [-24, 17.0, 0, 6, 1.2, 28, 0x0ea5e9],
-    [24, 17.0, 0, 6, 1.2, 28, 0x0ea5e9],
-  ];
-
-  // 中央周辺の階段＆遮蔽物（撃ち合い用カバー）
+  // 中央周辺の階段＆戦術遮蔽ブロック
   const centerSteps = [
-    [-17, 1.6, 0, 7, 3.2, 7, 0x0284c7],
-    [17, 1.6, 0, 7, 3.2, 7, 0x0284c7],
-    [0, 1.6, -17, 7, 3.2, 7, 0x0284c7],
-    [0, 1.6, 17, 7, 3.2, 7, 0x0284c7],
-    // 中央周囲の戦術遮蔽ブロック
-    [-26, 1.8, -26, 5, 3.6, 2.2, 0x475569],
-    [26, 1.8, 26, 5, 3.6, 2.2, 0x475569],
-    [26, 1.8, -26, 2.2, 3.6, 5, 0x475569],
-    [-26, 1.8, 26, 2.2, 3.6, 5, 0x475569],
+    [-16, 1.4, 0, 7, 2.8, 7, 0x0ea5e9],
+    [16, 1.4, 0, 7, 2.8, 7, 0x0ea5e9],
+    [0, 1.4, -16, 7, 2.8, 7, 0x0ea5e9],
+    [0, 1.4, 16, 7, 2.8, 7, 0x0ea5e9],
+    // 遮蔽ブロック（視認性の高いスレートブルー）
+    [-25, 1.6, -25, 5, 3.2, 2.2, 0x475569],
+    [25, 1.6, 25, 5, 3.2, 2.2, 0x475569],
+    [25, 1.6, -25, 2.2, 3.2, 5, 0x475569],
+    [-25, 1.6, 25, 2.2, 3.2, 5, 0x475569],
   ];
 
   // ======================================
-  // 2. 4隅の超高層スカイ要塞（高さ24m・2層デッキ構造）
+  // 2. 4隅の巨大スカイ要塞（ロイヤルブルー＆スカイホワイト）
   // ======================================
   const cornerTowers = [
-    // 下層要塞（Y=0〜12m）
-    [-86, 6.0, -86, 18, 12, 18, 0x2563eb],
-    [86, 6.0, 86, 18, 12, 18, 0x2563eb],
-    [86, 6.0, -86, 18, 12, 18, 0x2563eb],
-    [-86, 6.0, 86, 18, 12, 18, 0x2563eb],
-    // 上層スカイタワー（Y=12〜24m）
-    [-86, 18.0, -86, 11, 12, 11, 0x3b82f6],
-    [86, 18.0, 86, 11, 12, 11, 0x3b82f6],
-    [86, 18.0, -86, 11, 12, 11, 0x3b82f6],
-    [-86, 18.0, 86, 11, 12, 11, 0x3b82f6],
-    // 各要塞の登り階段デッキ
-    [-71, 3.2, -86, 8, 6.4, 10, 0x3b82f6],
-    [71, 3.2, 86, 8, 6.4, 10, 0x3b82f6],
-    [86, 3.2, -71, 10, 6.4, 8, 0x3b82f6],
-    [-86, 3.2, 71, 10, 6.4, 8, 0x3b82f6],
-    // 要塞24m屋上のスナイパー用胸壁（遮蔽）
-    [-86, 25.0, -80.5, 9, 2.0, 1.4, 0x1d4ed8],
-    [86, 25.0, 80.5, 9, 2.0, 1.4, 0x1d4ed8],
-    [80.5, 25.0, -86, 1.4, 2.0, 9, 0x1d4ed8],
-    [-80.5, 25.0, 86, 1.4, 2.0, 9, 0x1d4ed8],
+    [-86, 6.0, -86, 16, 12, 16, 0x3b82f6],
+    [86, 6.0, 86, 16, 12, 16, 0x3b82f6],
+    [86, 6.0, -86, 16, 12, 16, 0x3b82f6],
+    [-86, 6.0, 86, 16, 12, 16, 0x3b82f6],
+    // 2段目ステップ
+    [-72, 3.0, -86, 8, 6, 10, 0x60a5fa],
+    [72, 3.0, 86, 8, 6, 10, 0x60a5fa],
+    [86, 3.0, -72, 10, 6, 8, 0x60a5fa],
+    [-86, 3.0, 72, 10, 6, 8, 0x60a5fa],
+    // 要塞屋上のスナイパー胸壁
+    [-86, 13.0, -79, 10, 2.0, 1.4, 0xf8fafc],
+    [86, 13.0, 79, 10, 2.0, 1.4, 0xf8fafc],
+    [79, 13.0, -86, 1.4, 2.0, 10, 0xf8fafc],
+    [-79, 13.0, 86, 1.4, 2.0, 10, 0xf8fafc],
   ];
 
-  // 各要塞の12mテラスに屋上ジャンプパッドを設置（24m頂上へ一気に登れる）
-  addJumpPad(-86, 12.0, -79, 22.0);
-  addJumpPad(86, 12.0, 79, 22.0);
-  addJumpPad(79, 12.0, -86, 22.0);
-  addJumpPad(-79, 12.0, 86, 22.0);
-
   // ======================================
-  // 3. 東西南北の4大前線バンカー（2層構造・高さ14m）
+  // 3. 東西南北の4大前線バンカー（エメラルドティール＆ホワイト）
   // ======================================
   const outpostBunkers = [
-    // 北・南バンカー（下層7m + 上層14m展望台）
-    [0, 3.5, -78, 24, 7, 10, 0x1e40af],
-    [0, 3.5, 78, 24, 7, 10, 0x1e40af],
-    [0, 10.5, -78, 12, 7, 7, 0x2563eb],
-    [0, 10.5, 78, 12, 7, 7, 0x2563eb],
-    [-16, 2.0, -78, 6, 4.0, 8, 0x0284c7],
-    [16, 2.0, 78, 6, 4.0, 8, 0x0284c7],
-    // 東・西バンカー（下層7m + 上層14m展望台）
-    [-78, 3.5, 0, 10, 7, 24, 0x1e40af],
-    [78, 3.5, 0, 10, 7, 24, 0x1e40af],
-    [-78, 10.5, 0, 7, 7, 12, 0x2563eb],
-    [78, 10.5, 0, 7, 7, 12, 0x2563eb],
-    [-78, 2.0, 16, 8, 4.0, 6, 0x0284c7],
-    [78, 2.0, -16, 8, 4.0, 6, 0x0284c7],
+    [0, 3.5, -78, 24, 7, 10, 0x0d9488],
+    [0, 3.5, 78, 24, 7, 10, 0x0d9488],
+    [-16, 1.8, -78, 6, 3.6, 8, 0x2dd4bf],
+    [16, 1.8, 78, 6, 3.6, 8, 0x2dd4bf],
+    [-78, 3.5, 0, 10, 7, 24, 0x0d9488],
+    [78, 3.5, 0, 10, 7, 24, 0x0d9488],
+    [-78, 1.8, 16, 8, 3.6, 6, 0x2dd4bf],
+    [78, 1.8, -16, 8, 3.6, 6, 0x2dd4bf],
   ];
 
   // ======================================
-  // 4. ウォールラン用の紫の大型パネル（地上層＋上空スカイ層）
+  // 4. ウォールラン用のバイオレットウォール（一目で壁走りと分かる色）
   // ======================================
   const wallRunPanels = [
-    // 地上インナーウォールラン（高さ14m）
-    [-34, 7.0, -24, 1.6, 14, 30, 0x7e22ce],
-    [34, 7.0, 24, 1.6, 14, 30, 0x7e22ce],
-    [24, 7.0, -34, 30, 14, 1.6, 0x7e22ce],
-    [-24, 7.0, 34, 30, 14, 1.6, 0x7e22ce],
+    [-34, 5.5, -24, 1.6, 11, 30, 0x8b5cf6],
+    [34, 5.5, 24, 1.6, 11, 30, 0x8b5cf6],
+    [24, 5.5, -34, 30, 11, 1.6, 0x8b5cf6],
+    [-24, 5.5, 34, 30, 11, 1.6, 0x8b5cf6],
 
-    // 上空スカイウォールランパネル（Y=15〜27m の空中壁走り用！）
-    [-46, 21.0, -18, 1.6, 12, 34, 0xc084fc],
-    [46, 21.0, 18, 1.6, 12, 34, 0xc084fc],
-    [18, 21.0, -46, 34, 12, 1.6, 0xc084fc],
-    [-18, 21.0, 46, 34, 12, 1.6, 0xc084fc],
+    [-62, 6.5, -42, 1.6, 13, 36, 0xa855f7],
+    [62, 6.5, 42, 1.6, 13, 36, 0xa855f7],
+    [42, 6.5, -62, 36, 13, 1.6, 0xa855f7],
+    [-42, 6.5, 62, 36, 13, 1.6, 0xa855f7],
 
-    // ミッドウォールラン（高さ16m）
-    [-62, 8.0, -42, 1.6, 16, 36, 0x9333ea],
-    [62, 8.0, 42, 1.6, 16, 36, 0x9333ea],
-    [42, 8.0, -62, 36, 16, 1.6, 0x9333ea],
-    [-42, 8.0, 62, 36, 16, 1.6, 0x9333ea],
-
-    // アウター超ロングウォールラン壁（高さ18m）
-    [-108, 9.0, 0, 1.8, 18, 58, 0xa855f7],
-    [108, 9.0, 0, 1.8, 18, 58, 0xa855f7],
-    [0, 9.0, -108, 58, 18, 1.8, 0xa855f7],
-    [0, 9.0, 108, 58, 18, 1.8, 0xa855f7],
+    [-108, 7.0, 0, 1.8, 14, 58, 0x9333ea],
+    [108, 7.0, 0, 1.8, 14, 58, 0x9333ea],
+    [0, 7.0, -108, 58, 14, 1.8, 0x9333ea],
+    [0, 7.0, 108, 58, 14, 1.8, 0x9333ea],
   ];
 
   // ======================================
-  // 5. 多層スカイブリッジ・浮島・超高層グラップルピラー
+  // 5. 空中ブリッジ・浮島・グラップルピラー・スライディングゲート
   // ======================================
   const platforms = [
-    // 第1層 空中スカイブリッジ（Y=8.5m）
-    [-50, 8.5, 0, 7, 1.0, 32, 0x0ea5e9],
-    [50, 8.5, 0, 7, 1.0, 32, 0x0ea5e9],
-    [0, 8.5, -50, 32, 1.0, 7, 0x0ea5e9],
-    [0, 8.5, 50, 32, 1.0, 7, 0x0ea5e9],
+    // 空中スカイブリッジ（明るいスカイシアン）
+    [-50, 7.0, 0, 7, 1.0, 32, 0x38bdf8],
+    [50, 7.0, 0, 7, 1.0, 32, 0x38bdf8],
+    [0, 7.0, -50, 32, 1.0, 7, 0x38bdf8],
+    [0, 7.0, 50, 32, 1.0, 7, 0x38bdf8],
 
-    // 第2層 ハイ・スカイブリッジ（Y=21.5m 上空回廊）
-    [-54, 21.5, 0, 6, 1.1, 36, 0x38bdf8],
-    [54, 21.5, 0, 6, 1.1, 36, 0x38bdf8],
-    [0, 21.5, -54, 36, 1.1, 6, 0x38bdf8],
-    [0, 21.5, 54, 36, 1.1, 6, 0x38bdf8],
+    // 浮島足場（8箇所）
+    [-44, 10.5, -44, 8, 1.1, 8, 0x7dd3fc],
+    [44, 10.5, 44, 8, 1.1, 8, 0x7dd3fc],
+    [44, 10.5, -44, 8, 1.1, 8, 0x7dd3fc],
+    [-44, 10.5, 44, 8, 1.1, 8, 0x7dd3fc],
+    [-92, 9.5, -36, 7, 1.1, 7, 0x7dd3fc],
+    [92, 9.5, 36, 7, 1.1, 7, 0x7dd3fc],
+    [36, 9.5, -92, 7, 1.1, 7, 0x7dd3fc],
+    [-36, 9.5, 92, 7, 1.1, 7, 0x7dd3fc],
 
-    // 中高度＆超高高度の浮島足場（12箇所）
-    [-44, 12.5, -44, 8, 1.1, 8, 0x38bdf8],
-    [44, 12.5, 44, 8, 1.1, 8, 0x38bdf8],
-    [44, 12.5, -44, 8, 1.1, 8, 0x38bdf8],
-    [-44, 12.5, 44, 8, 1.1, 8, 0x38bdf8],
+    // グラップル用高層ピラー（インディゴ＆ホワイト）
+    [-56, 11.0, -24, 3.0, 22, 3.0, 0x6366f1],
+    [56, 11.0, 24, 3.0, 22, 3.0, 0x6366f1],
+    [24, 11.0, -56, 3.0, 22, 3.0, 0x6366f1],
+    [-24, 11.0, 56, 3.0, 22, 3.0, 0x6366f1],
+    [-95, 11.0, -55, 3.0, 22, 3.0, 0x6366f1],
+    [95, 11.0, 55, 3.0, 22, 3.0, 0x6366f1],
+    [55, 11.0, -95, 3.0, 22, 3.0, 0x6366f1],
+    [-55, 11.0, 95, 3.0, 22, 3.0, 0x6366f1],
 
-    // 超高高度スカイアイランド（Y=25m 狙撃・空中戦足場）
-    [-42, 25.0, -42, 9, 1.2, 9, 0x818cf8],
-    [42, 25.0, 42, 9, 1.2, 9, 0x818cf8],
-    [42, 25.0, -42, 9, 1.2, 9, 0x818cf8],
-    [-42, 25.0, 42, 9, 1.2, 9, 0x818cf8],
-
-    [-92, 14.5, -36, 7, 1.1, 7, 0x38bdf8],
-    [92, 14.5, 36, 7, 1.1, 7, 0x38bdf8],
-    [36, 14.5, -92, 7, 1.1, 7, 0x38bdf8],
-    [-36, 14.5, 92, 7, 1.1, 7, 0x38bdf8],
-
-    // グラップル引っ掛け用の超高層ピラー（高さ34m / 8本）
-    [-56, 17.0, -24, 3.2, 34, 3.2, 0x6366f1],
-    [56, 17.0, 24, 3.2, 34, 3.2, 0x6366f1],
-    [24, 17.0, -56, 3.2, 34, 3.2, 0x6366f1],
-    [-24, 17.0, 56, 3.2, 34, 3.2, 0x6366f1],
-    [-95, 17.0, -55, 3.2, 34, 3.2, 0x6366f1],
-    [95, 17.0, 55, 3.2, 34, 3.2, 0x6366f1],
-    [55, 17.0, -95, 3.2, 34, 3.2, 0x6366f1],
-    [-55, 17.0, 95, 3.2, 34, 3.2, 0x6366f1],
-
-    // スライディングでくぐれるオレンジゲート（各地に配置）
+    // スライディングゲート（鮮やかなアンバーオレンジ）
     [-14, 3.0, -52, 2.0, 3.4, 10, 0xf59e0b],
     [14, 3.0, 52, 2.0, 3.4, 10, 0xf59e0b],
     [-52, 3.0, 14, 10, 3.4, 2.0, 0xf59e0b],
@@ -967,40 +907,34 @@ function buildArena() {
     [0, 3.0, 92, 12, 3.4, 2.0, 0xf59e0b],
   ];
 
-  for (const list of [midSkyRing, centerSteps, cornerTowers, outpostBunkers, wallRunPanels, platforms]) {
+  for (const list of [centerSteps, cornerTowers, outpostBunkers, wallRunPanels, platforms]) {
     for (const [x, y, z, w, h, d, color] of list) {
       addBox(x, y, z, w, h, d, color, { wallRun: true });
     }
   }
 
   // ======================================
-  // 6. ジャンプパッド（地上ハイジャンプ＋空中2段中継パッド）
+  // 6. ジャンプパッド（緑・16箇所）
   // ======================================
-  addJumpPad(-14, 0, -14, 27.0);
-  addJumpPad(14, 0, 14, 27.0);
-  addJumpPad(14, 0, -14, 27.0);
-  addJumpPad(-14, 0, 14, 27.0);
+  addJumpPad(-14, 0, -14);
+  addJumpPad(14, 0, 14);
+  addJumpPad(14, 0, -14);
+  addJumpPad(-14, 0, 14);
 
-  addJumpPad(-64, 0, 0, 27.5);
-  addJumpPad(64, 0, 0, 27.5);
-  addJumpPad(0, 0, -64, 27.5);
-  addJumpPad(0, 0, 64, 27.5);
+  addJumpPad(-64, 0, 0);
+  addJumpPad(64, 0, 0);
+  addJumpPad(0, 0, -64);
+  addJumpPad(0, 0, 64);
 
-  addJumpPad(-64, 0, -64, 29.0);
-  addJumpPad(64, 0, 64, 29.0);
-  addJumpPad(64, 0, -64, 29.0);
-  addJumpPad(-64, 0, 64, 29.0);
+  addJumpPad(-64, 0, -64, 25.5);
+  addJumpPad(64, 0, 64, 25.5);
+  addJumpPad(64, 0, -64, 25.5);
+  addJumpPad(-64, 0, 64, 25.5);
 
-  addJumpPad(-112, 0, -65, 27.5);
-  addJumpPad(112, 0, 65, 27.5);
-  addJumpPad(65, 0, -112, 27.5);
-  addJumpPad(-65, 0, 112, 27.5);
-
-  // 第1層スカイブリッジ（Y=8.5m）から第2層（Y=21.5m）へ打ち上げる中継ジャンプパッド
-  addJumpPad(-50, 9.0, 0, 23.5);
-  addJumpPad(50, 9.0, 0, 23.5);
-  addJumpPad(0, 9.0, -50, 23.5);
-  addJumpPad(0, 9.0, 50, 23.5);
+  addJumpPad(-112, 0, -65, 24.5);
+  addJumpPad(112, 0, 65, 24.5);
+  addJumpPad(65, 0, -112, 24.5);
+  addJumpPad(-65, 0, 112, 24.5);
 
   // ======================================
   // 7. スピードブースト床（シアン・10箇所）
@@ -1017,29 +951,20 @@ function buildArena() {
   addBoostPad(78, 0, 45, 5, 6);
 
   // ======================================
-  // 8. ジップライン（14本：地上・中層・超高層を縦横無尽に結ぶ）
+  // 8. ジップライン（10本）
   // ======================================
-  // 4隅のスカイ要塞24m頂上外周をつなぐ高高度ジップライン（4本）
-  addZipline(-80, 25.4, -80, 80, 25.4, -80);
-  addZipline(80, 25.4, -80, 80, 25.4, 80);
-  addZipline(80, 25.4, 80, -80, 25.4, 80);
-  addZipline(-80, 25.4, 80, -80, 25.4, -80);
+  addZipline(-80, 13.4, -80, 80, 13.4, -80);
+  addZipline(80, 13.4, -80, 80, 13.4, 80);
+  addZipline(80, 13.4, 80, -80, 13.4, 80);
+  addZipline(-80, 13.4, 80, -80, 13.4, -80);
 
-  // 4隅の要塞24m頂上から中央メガシタデル34m頂上へ昇る斜め上昇ジップライン（4本）
-  addZipline(-80, 25.4, -80, 0, 35.4, 0);
-  addZipline(80, 25.4, 80, 0, 35.4, 0);
-  addZipline(80, 25.4, -80, 0, 35.4, 0);
-  addZipline(-80, 25.4, 80, 0, 35.4, 0);
+  addZipline(-80, 13.4, -80, 0, 18.4, 0);
+  addZipline(80, 13.4, 80, 0, 18.4, 0);
+  addZipline(80, 13.4, -80, 0, 18.4, 0);
+  addZipline(-80, 13.4, 80, 0, 18.4, 0);
 
-  // 地上付近から中層14mバンカーへ一気に駆け上がる昇降ジップライン（4本）
-  addZipline(0, 3.0, -112, 0, 15.2, -78);
-  addZipline(0, 3.0, 112, 0, 15.2, 78);
-  addZipline(-112, 3.0, 0, -78, 15.2, 0);
-  addZipline(112, 3.0, 0, 78, 15.2, 0);
-
-  // 南北・東西の上空スカイブリッジ（Y=22m）を横断するジップライン（2本）
-  addZipline(0, 22.8, -54, 0, 22.8, 54);
-  addZipline(-54, 22.8, 0, 54, 22.8, 0);
+  addZipline(0, 8.4, -74, 0, 8.4, 74);
+  addZipline(-74, 8.4, 0, 74, 8.4, 0);
 }
 
 buildArena();
@@ -1089,12 +1014,10 @@ const SPAWN_POINTS = [
   new THREE.Vector3(0, 2, -102),
   new THREE.Vector3(102, 2, 0),
   new THREE.Vector3(-102, 2, 0),
-  new THREE.Vector3(86, 26, 86),
-  new THREE.Vector3(-86, 26, -86),
-  new THREE.Vector3(86, 26, -86),
-  new THREE.Vector3(-86, 26, 86),
-  new THREE.Vector3(0, 16, -78),
-  new THREE.Vector3(0, 16, 78),
+  new THREE.Vector3(86, 14, 86),
+  new THREE.Vector3(-86, 14, -86),
+  new THREE.Vector3(86, 14, -86),
+  new THREE.Vector3(-86, 14, 86),
 ];
 
 const rival = {
@@ -1733,11 +1656,21 @@ const weaponState = {
   recoilOffset: 0,
   recoilRot: 0,
   meleeSwingTimer: 0,
+  inspectTimer: 0,
+  inspectDuration: 2.8,
   bobTime: 0,
   hitmarkerTimer: 0,
   muzzleFlashTimer: 0,
   isAimingOni: false,
 };
+
+function triggerWeaponInspect() {
+  if (!game.active || game.over || player.dead) return;
+  if (weaponState.reloading) return;
+  weaponState.inspectDuration = weaponState.activeSlot === "melee" ? 2.4 : 2.8;
+  weaponState.inspectTimer = weaponState.inspectDuration;
+  playSfx("melee_swing");
+}
 
 function updateEconomyAndLoadoutUI() {
   if (hudCoinsDisplay) hudCoinsDisplay.textContent = String(profile.coins);
@@ -1997,6 +1930,7 @@ function switchWeaponSlot(slot, showNotice = false) {
   weaponState.reloading = false;
   weaponState.reloadTimer = 0;
   weaponState.fireCooldown = 0.12;
+  weaponState.inspectTimer = 0;
   buildActiveViewModel();
   updateWeaponUI();
 
@@ -2014,6 +1948,7 @@ function startReload() {
   if (weaponState.activeSlot !== "gun") return;
   const g = GUNS[profile.equippedGun];
   if (weaponState.reloading || weaponState.ammo >= g.maxAmmo) return;
+  weaponState.inspectTimer = 0;
   weaponState.reloading = true;
   weaponState.reloadTimer = g.reloadTime;
   playSfx("reload");
@@ -2079,6 +2014,7 @@ function performMeleeAttack() {
 
 function fireWeapon() {
   if (player.dead) return;
+  weaponState.inspectTimer = 0;
   if (weaponState.reloading || weaponState.fireCooldown > 0) return;
 
   if (weaponState.activeSlot === "melee") {
@@ -2229,7 +2165,47 @@ function updateWeapon(dt) {
   weaponState.recoilOffset += (0 - weaponState.recoilOffset) * Math.min(1, dt * 14);
   weaponState.recoilRot += (0 - weaponState.recoilRot) * Math.min(1, dt * 14);
 
-  if (isGun) {
+  if (weaponState.inspectTimer > 0) {
+    weaponState.inspectTimer = Math.max(0, weaponState.inspectTimer - dt);
+  }
+
+  if (weaponState.inspectTimer > 0 && !weaponState.reloading && weaponState.meleeSwingTimer <= 0) {
+    // 武器・近接武器の「眺める（インスペクト）」アニメーション
+    const progress = 1 - weaponState.inspectTimer / weaponState.inspectDuration;
+    // 最初と最後を滑らかに補間するエンベロープ
+    const env = Math.min(1, progress * 5) * Math.min(1, (1 - progress) * 5);
+
+    if (isGun) {
+      // 銃を画面中央寄りに持ち上げ、側面とスキンをじっくり見せる動き
+      const tiltWave = Math.sin(progress * Math.PI * 2);
+      weaponRoot.position.set(
+        weaponBasePos.x - 0.11 * env + bobX * 0.5,
+        weaponBasePos.y + 0.07 * env - bobY * 0.5,
+        weaponBasePos.z + 0.07 * env
+      );
+      weaponRoot.rotation.set(
+        0.22 * env + tiltWave * 0.14 * env,
+        0.82 * env + tiltWave * 0.28 * env,
+        -0.46 * env
+      );
+    } else {
+      // 近接武器（カラムビットは指リングでクルッと1回転スピン！）
+      const isKarambit = profile.equippedMelee === "karambit";
+      const spinAngle = isKarambit
+        ? Math.min(1, progress * 1.45) * Math.PI * 2
+        : Math.sin(progress * Math.PI * 2) * 0.45;
+      weaponRoot.position.set(
+        weaponBasePos.x - 0.12 * env + bobX * 0.5,
+        weaponBasePos.y + 0.08 * env - bobY * 0.5,
+        weaponBasePos.z + 0.06 * env
+      );
+      weaponRoot.rotation.set(
+        (isKarambit ? spinAngle : 0.25 * env),
+        0.78 * env,
+        -0.38 * env + (isKarambit ? 0 : spinAngle * 0.4)
+      );
+    }
+  } else if (isGun) {
     const reloadDrop = weaponState.reloading ? -0.14 : 0;
     const reloadTilt = weaponState.reloading ? -0.55 : 0;
     weaponRoot.position.set(
@@ -2677,6 +2653,9 @@ window.addEventListener("keydown", (e) => {
   }
   if (e.code === "Digit1") switchWeaponSlot("gun", true);
   if (e.code === "Digit2") switchWeaponSlot("melee", true);
+  if (e.code === "KeyV" || e.code === "KeyT") {
+    triggerWeaponInspect();
+  }
   if (e.code === "KeyR") {
     if (game.active && !game.over) {
       startReload();
@@ -2965,6 +2944,23 @@ btnWeapon.addEventListener(
 btnWeapon.addEventListener("touchend", () => btnWeapon.classList.remove("pressed"));
 btnWeapon.addEventListener("touchcancel", () => btnWeapon.classList.remove("pressed"));
 
+if (btnInspect) {
+  btnInspect.addEventListener(
+    "touchstart",
+    (e) => {
+      if (isEditingLayout) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!game.active) return;
+      triggerWeaponInspect();
+      btnInspect.classList.add("pressed");
+    },
+    { passive: false }
+  );
+  btnInspect.addEventListener("touchend", () => btnInspect.classList.remove("pressed"));
+  btnInspect.addEventListener("touchcancel", () => btnInspect.classList.remove("pressed"));
+}
+
 // ==========================================
 // 開始・停止・リトライ管理
 // ==========================================
@@ -2984,7 +2980,6 @@ function pauseGame() {
 
 function startOrResumeGame() {
   ensureAudio();
-  stopVictoryCelebration();
   if (game.over) {
     resetMatch(true);
   }
@@ -3127,7 +3122,6 @@ function applyDamageToSelf(dmg, weaponName = "WEAPON") {
 }
 
 function resetMatch(broadcast = false) {
-  stopVictoryCelebration();
   const isClient = net.connected && net.mode === "client";
   const myStart = isClient ? SPAWN_POINTS[1].clone() : SPAWN_POINTS[0].clone();
   const enemyStart = isClient ? SPAWN_POINTS[0].clone() : SPAWN_POINTS[1].clone();
@@ -3840,78 +3834,6 @@ function drawMinimap(now) {
   ctx.stroke();
 }
 
-const confettiParticles = [];
-let victoryEffectActive = false;
-
-function startVictoryCelebration() {
-  if (!victoryCanvas || !victoryCtx) return;
-  victoryCanvas.width = window.innerWidth;
-  victoryCanvas.height = window.innerHeight;
-  victoryCanvas.classList.remove("hidden");
-  victoryEffectActive = true;
-  confettiParticles.length = 0;
-
-  const palette = ["#fde047", "#38bdf8", "#f43f5e", "#4ade80", "#c084fc", "#ffffff"];
-  for (let i = 0; i < 150; i++) {
-    const fromLeft = i % 2 === 0;
-    confettiParticles.push({
-      x: fromLeft ? window.innerWidth * 0.15 : window.innerWidth * 0.85,
-      y: window.innerHeight * 0.65,
-      vx: (fromLeft ? 1 : -1) * (2 + Math.random() * 7) + (Math.random() - 0.5) * 5,
-      vy: -(7 + Math.random() * 11),
-      size: 6 + Math.random() * 7,
-      color: palette[i % palette.length],
-      rot: Math.random() * Math.PI * 2,
-      vrot: (Math.random() - 0.5) * 0.25,
-      shape: i % 3 === 0 ? "circle" : "rect",
-    });
-  }
-}
-
-function stopVictoryCelebration() {
-  victoryEffectActive = false;
-  confettiParticles.length = 0;
-  if (victoryCanvas) victoryCanvas.classList.add("hidden");
-  if (mainModal) mainModal.classList.remove("victory-mode");
-  if (victoryBanner) victoryBanner.classList.add("hidden");
-  if (modalTitle) modalTitle.classList.remove("victory-title-glow");
-}
-
-function updateVictoryConfetti(dt) {
-  if (!victoryEffectActive || !victoryCtx || !victoryCanvas) return;
-  victoryCtx.clearRect(0, 0, victoryCanvas.width, victoryCanvas.height);
-
-  for (let i = confettiParticles.length - 1; i >= 0; i--) {
-    const p = confettiParticles[i];
-    p.vy += 14.5 * dt;
-    p.vx *= 0.992;
-    p.x += p.vx;
-    p.y += p.vy;
-    p.rot += p.vrot;
-
-    victoryCtx.save();
-    victoryCtx.translate(p.x, p.y);
-    victoryCtx.rotate(p.rot);
-    victoryCtx.fillStyle = p.color;
-    if (p.shape === "circle") {
-      victoryCtx.beginPath();
-      victoryCtx.arc(0, 0, p.size * 0.45, 0, Math.PI * 2);
-      victoryCtx.fill();
-    } else {
-      victoryCtx.fillRect(-p.size / 2, -p.size * 0.3, p.size, p.size * 0.6);
-    }
-    victoryCtx.restore();
-
-    if (p.y > victoryCanvas.height + 30) {
-      // 画面上部から再降下させて華やかさを維持
-      p.y = -15;
-      p.x = Math.random() * victoryCanvas.width;
-      p.vy = 1.5 + Math.random() * 3.5;
-      p.vx = (Math.random() - 0.5) * 2.5;
-    }
-  }
-}
-
 function triggerMatchEnd(isWin) {
   game.over = true;
   game.active = false;
@@ -3921,6 +3843,7 @@ function triggerMatchEnd(isWin) {
   touchInput.slideHeld = false;
   touchInput.lookTouchId = null;
   weaponState.manualFireHeld = false;
+  playSfx(isWin ? "stun" : "caught");
 
   if (document.pointerLockElement) {
     document.exitPointerLock();
@@ -3929,19 +3852,7 @@ function triggerMatchEnd(isWin) {
   const rewardCr = isWin ? (net.connected ? 100 : 40) : (net.connected ? 20 : 10);
   addCoins(rewardCr);
 
-  if (isWin) {
-    playSfx("victory");
-    startVictoryCelebration();
-    if (mainModal) mainModal.classList.add("victory-mode");
-    if (victoryBanner) victoryBanner.classList.remove("hidden");
-    modalTitle.textContent = "VICTORY!! 勝利！";
-    modalTitle.classList.add("victory-title-glow");
-  } else {
-    playSfx("caught");
-    stopVictoryCelebration();
-    modalTitle.textContent = "DEFEAT... 敗北";
-  }
-
+  modalTitle.textContent = isWin ? "VICTORY!! 勝利！" : "DEFEAT... 敗北";
   modalDesc.innerHTML =
     `最終スコア: <strong>YOU ${game.myKills} - ${game.enemyKills} ${net.connected ? "FRIEND" : "BOT"}</strong><br />` +
     `バトル報酬: <strong style="color:#fde047;">+${rewardCr} CR</strong> 獲得！（ショップやガチャで使えます）`;
@@ -4002,7 +3913,6 @@ function animate(now) {
 
   drawMinimap(now);
   renderer.render(scene, camera);
-  updateVictoryConfetti(dt);
 }
 
 window.addEventListener("resize", () => {
