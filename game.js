@@ -46,10 +46,13 @@ const netStatusPill = document.getElementById("net-status-pill");
 const ffaScoreboard = document.getElementById("ffa-scoreboard");
 const myHpDisplay = document.getElementById("my-hp-display");
 const myHpFill = document.getElementById("my-hp-fill");
+const enemyHpHudLabel = document.getElementById("enemy-hp-hud-label");
+const enemyHpHudFill = document.getElementById("enemy-hp-hud-fill");
 const altDisplay = document.getElementById("alt-display");
 const damageVignette = document.getElementById("damage-vignette");
 const respawnBanner = document.getElementById("respawn-banner");
 const respawnTimerDisplay = document.getElementById("respawn-timer-display");
+const forceRespawnBtn = document.getElementById("force-respawn-btn");
 const matchFinishBanner = document.getElementById("match-finish-banner");
 const confettiLayer = document.getElementById("confetti-layer");
 const finishKicker = document.getElementById("finish-kicker");
@@ -1168,8 +1171,22 @@ function createRivalRig(index, preset) {
   gunMesh.position.set(0.38, 1.15, 0.44);
   group.add(gunMesh);
 
+  // 頭上3D HPバー（CPU・対戦相手の残り体力をリアルタイム表示）
+  const hpBarGroup = new THREE.Group();
+  hpBarGroup.position.set(0, 2.28, 0);
+  const hpBg = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.18, 0.16),
+    new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.82, side: THREE.DoubleSide })
+  );
+  const hpFillGeo = new THREE.PlaneGeometry(1.10, 0.10);
+  const hpFillMat = new THREE.MeshBasicMaterial({ color: 0x22c55e, side: THREE.DoubleSide });
+  const hpFillMesh = new THREE.Mesh(hpFillGeo, hpFillMat);
+  hpFillMesh.position.z = 0.005;
+  hpBarGroup.add(hpBg, hpFillMesh);
+  group.add(hpBarGroup);
+
   const hitMesh = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.88, 1.30, 6, 10),
+    new THREE.CapsuleGeometry(0.92, 1.35, 6, 10),
     new THREE.MeshBasicMaterial({ visible: false })
   );
   hitMesh.position.y = 1.1;
@@ -1196,12 +1213,18 @@ function createRivalRig(index, preset) {
     maxHp: ch.maxHp,
     dead: false,
     respawnTimer: 0,
+    respawnAtMs: 0,
     hitFlashTimer: 0,
     onGround: false,
     jumpCooldown: 0,
-    botFireCooldown: 0.9 + index * 0.35,
+    botDashCooldown: 2.2 + index * 0.7,
+    botSkillCooldown: 6.0 + index * 1.5,
+    botStuckTimer: 0,
+    botAvoidDir: new THREE.Vector3(),
+    botAvoidTimer: 0,
+    botFireCooldown: 0.85 + index * 0.3,
     botStrafeDir: index % 2 === 0 ? 1 : -1,
-    botStrafeTimer: 1.3 + index * 0.4,
+    botStrafeTimer: 1.2 + index * 0.35,
     weaponKey: preset.gunKey,
     charKey: ch.id,
     shieldActive: false,
@@ -1210,6 +1233,8 @@ function createRivalRig(index, preset) {
     body,
     visor,
     hitMesh,
+    hpBarGroup,
+    hpFillMesh,
   };
 }
 
@@ -1621,6 +1646,106 @@ function setupClientToHostConnection(conn) {
     updateStartButtonLabel();
     showTrick("ホストとの接続が切れました");
   });
+}
+
+// ロビーUI・部屋作成/参加・勝利条件・ギミック選択イベント
+if (mpTabHost) mpTabHost.addEventListener("click", () => setMpTab("host"));
+if (mpTabJoin) mpTabJoin.addEventListener("click", () => setMpTab("join"));
+if (mpTabSolo) mpTabSolo.addEventListener("click", () => setMpTab("solo"));
+
+if (goalKillsSelect) {
+  goalKillsSelect.addEventListener("change", () => {
+    game.targetKills = Number(goalKillsSelect.value) || 5;
+    updateScoreAndHpUI();
+    if (net.connected && net.mode === "host") {
+      syncRemoteRosterFromHost();
+    }
+  });
+}
+
+if (createRoomBtn) {
+  createRoomBtn.addEventListener("click", () => {
+    if (typeof Peer === "undefined") {
+      hostStatusText.textContent = "PeerJSの読み込みに失敗しました。ネット接続を確認してください。";
+      hostStatusText.className = "mp-status err";
+      return;
+    }
+    cleanupPeer();
+    net.mode = "host";
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+    net.roomCode = code;
+    hostRoomCodeEl.textContent = code;
+    hostStatusText.textContent = "ルームを作成中...";
+    hostStatusText.className = "mp-status";
+
+    const peer = new Peer(ROOM_PREFIX + code);
+    net.peer = peer;
+    peer.on("open", (id) => {
+      net.myPeerId = id;
+      hostStatusText.textContent = `待機中！コード「${code}」を友達に共有してください（最大${matchPlayerCount}人）`;
+      hostStatusText.className = "mp-status ok";
+    });
+    peer.on("connection", (conn) => setupHostClientConnection(conn));
+    peer.on("error", (err) => {
+      hostStatusText.textContent = `通信エラー: ${err.type || err.message}`;
+      hostStatusText.className = "mp-status err";
+    });
+  });
+}
+
+if (copyCodeBtn) {
+  copyCodeBtn.addEventListener("click", () => {
+    const code = hostRoomCodeEl ? hostRoomCodeEl.textContent.trim() : "";
+    if (!code || code === "----") return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(() => {
+        copyCodeBtn.textContent = "コピー済!";
+        setTimeout(() => { copyCodeBtn.textContent = "コピー"; }, 1400);
+      }).catch(() => {});
+    }
+  });
+}
+
+if (joinRoomBtn) {
+  joinRoomBtn.addEventListener("click", () => {
+    if (typeof Peer === "undefined") {
+      joinStatusText.textContent = "PeerJSの読み込みに失敗しました。";
+      joinStatusText.className = "mp-status err";
+      return;
+    }
+    const rawCode = (joinCodeInput ? joinCodeInput.value : "").replace(/\D/g, "").slice(0, 4);
+    if (rawCode.length !== 4) {
+      joinStatusText.textContent = "4桁の数字コードを入力してください";
+      joinStatusText.className = "mp-status err";
+      return;
+    }
+    cleanupPeer();
+    net.mode = "client";
+    net.roomCode = rawCode;
+    joinStatusText.textContent = `ルーム #${rawCode} に接続中...`;
+    joinStatusText.className = "mp-status";
+
+    const peer = new Peer();
+    net.peer = peer;
+    peer.on("open", (id) => {
+      net.myPeerId = id;
+      const conn = peer.connect(ROOM_PREFIX + rawCode, { reliable: true });
+      setupClientToHostConnection(conn);
+    });
+    peer.on("error", (err) => {
+      joinStatusText.textContent = `接続失敗 (${err.type || "部屋が見つかりません"})`;
+      joinStatusText.className = "mp-status err";
+    });
+  });
+}
+
+if (loadoutBtns && loadoutBtns.length > 0) {
+  loadoutBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      loadoutBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
 }// ==========================================
 // プレイヤー状態＆入力
 // ==========================================
@@ -1668,6 +1793,7 @@ const player = {
   maxHp: 100,
   dead: false,
   respawnTimer: 0,
+  respawnAtMs: 0,
   damageFlash: 0,
 };
 
@@ -2567,7 +2693,8 @@ function dealDamageToRival(targetRival, totalDmg, weaponShortName) {
     updateScoreAndHpUI();
     if (targetRival.hp <= 0 && !targetRival.dead) {
       targetRival.dead = true;
-      targetRival.respawnTimer = 2.6;
+      targetRival.respawnTimer = 2.5;
+      targetRival.respawnAtMs = performance.now() + 2500;
       targetRival.group.visible = false;
       game.myKills += 1;
       playSfx("stun");
@@ -3464,6 +3591,10 @@ const keys = {};
 window.addEventListener("keydown", (e) => {
   keys[e.code] = true;
   if (e.code === "Space") {
+    if (player.dead && !game.over) {
+      respawnSelf();
+      return;
+    }
     player.jumpBuffer = 0.14;
   }
   if (e.code === "KeyQ") {
@@ -3481,7 +3612,9 @@ window.addEventListener("keydown", (e) => {
     triggerWeaponInspect();
   }
   if (e.code === "KeyR") {
-    if (game.active && !game.over) {
+    if (player.dead && !game.over) {
+      respawnSelf();
+    } else if (game.active && !game.over) {
       startReload();
     } else if (game.over) {
       resetMatch();
@@ -3827,56 +3960,62 @@ function pauseGame() {
   }
 }
 
+function tryRequestPointerLockSafe() {
+  if (controlMode !== "pc" || !document.body.requestPointerLock) return;
+  try {
+    const res = document.body.requestPointerLock();
+    if (res && typeof res.catch === "function") {
+      res.catch(() => {});
+    }
+  } catch {
+    // fallback without pointer lock
+  }
+}
+
 function startOrResumeGame() {
   ensureAudio();
   if (game.over) {
     resetMatch(true);
   }
+  if (player.dead && !game.over) {
+    respawnSelf();
+  }
   applyLoadoutUI();
   applyAllButtonPositions();
-  if (controlMode === "pc" && document.body.requestPointerLock) {
-    try {
-      const res = document.body.requestPointerLock();
-      if (res && typeof res.catch === "function") {
-        res.catch(() => {
-          overlay.classList.add("hidden");
-          game.active = true;
-        });
-      }
-    } catch {
-      overlay.classList.add("hidden");
-      game.active = true;
-    }
-  } else {
-    overlay.classList.add("hidden");
-    game.active = true;
-  }
+  overlay.classList.add("hidden");
+  game.active = true;
+  tryRequestPointerLockSafe();
 }
 
 startBtn.addEventListener("click", startOrResumeGame);
+
+if (forceRespawnBtn) {
+  forceRespawnBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (player.dead && !game.over) {
+      respawnSelf();
+      overlay.classList.add("hidden");
+      game.active = true;
+      tryRequestPointerLockSafe();
+    }
+  });
+}
 
 hudRetryBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   ensureAudio();
   resetMatch(true);
-  if (controlMode === "pc" && document.body.requestPointerLock) {
-    try {
-      document.body.requestPointerLock();
-    } catch {
-      // fallback
-    }
-  }
   overlay.classList.add("hidden");
   game.active = true;
+  tryRequestPointerLockSafe();
 });
 
 hudPauseBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   if (document.pointerLockElement) {
     document.exitPointerLock();
-  } else {
-    pauseGame();
   }
+  pauseGame();
 });
 
 document.addEventListener("pointerlockchange", () => {
@@ -3885,8 +4024,16 @@ document.addEventListener("pointerlockchange", () => {
   if (locked) {
     overlay.classList.add("hidden");
     game.active = true;
-  } else {
+  } else if (!player.dead && !game.over) {
+    // 死亡リスポーン待機中にロックが外れても試合は一時停止しない
     pauseGame();
+  }
+});
+
+document.addEventListener("pointerlockerror", () => {
+  if (controlMode === "pc" && !game.over) {
+    overlay.classList.add("hidden");
+    game.active = true;
   }
 });
 
@@ -3932,18 +4079,24 @@ function respawnSelf() {
   player.hp = player.maxHp;
   player.dead = false;
   player.respawnTimer = 0;
+  player.respawnAtMs = 0;
   player.isSliding = false;
   player.isWallRunning = false;
   player.isGrappling = false;
   player.isZiplining = false;
   wireLine.visible = false;
   respawnBanner.classList.add("hidden");
+  if (!game.over) {
+    overlay.classList.add("hidden");
+    game.active = true;
+  }
 
   weaponState.ammo = GUNS[profile.equippedGun].maxAmmo;
   weaponState.reloading = false;
   weaponState.reloadTimer = 0;
   updateWeaponUI();
   updateScoreAndHpUI();
+  showTrick("RESPAWN!");
 
   if (net.connected) {
     sendNet({ type: "respawned", x: player.pos.x, y: player.pos.y, z: player.pos.z });
@@ -3961,6 +4114,7 @@ function applyDamageToSelf(dmg, weaponName = "WEAPON", attackerId = null) {
   if (player.hp <= 0) {
     player.dead = true;
     player.respawnTimer = 3.0;
+    player.respawnAtMs = performance.now() + 3000;
     player.vel.set(0, 0, 0);
     player.isGrappling = false;
     player.isZiplining = false;
@@ -4187,6 +4341,7 @@ function resetMatch(broadcast = false) {
     r.botFireCooldown = 1.0 + idx * 0.35;
     r.group.visible = r.active;
     r.group.position.copy(sp);
+    updateRivalHpBarVisual(r);
   });
 
   weaponState.ammo = GUNS[profile.equippedGun].maxAmmo;
@@ -4673,6 +4828,35 @@ function updatePlayer(dt) {
 // ==========================================
 // 対戦相手（オンライン同期 / ソロ練習BOT）の更新
 // ==========================================
+function updateRivalHpBarVisual(r) {
+  if (!r.hpBarGroup || !r.hpFillMesh) return;
+  const ratio = Math.max(0, Math.min(1, r.hp / Math.max(1, r.maxHp)));
+  r.hpFillMesh.scale.x = Math.max(0.001, ratio);
+  r.hpFillMesh.position.x = -(1 - ratio) * 0.55;
+  r.hpFillMesh.material.color.setHex(
+    ratio > 0.5 ? 0x22c55e : ratio > 0.25 ? 0xfacc15 : 0xef4444
+  );
+  r.hpBarGroup.lookAt(camera.position);
+}
+
+function getBotSafeSpawnPoint(selfRival) {
+  let bestSp = SPAWN_POINTS[0];
+  let bestMinDist = -1;
+  for (const sp of SPAWN_POINTS) {
+    let minDist = player.dead ? 999 : sp.distanceTo(player.pos);
+    for (const other of getActiveRivals()) {
+      if (other === selfRival || other.dead) continue;
+      const d = sp.distanceTo(other.pos);
+      if (d < minDist) minDist = d;
+    }
+    if (minDist > bestMinDist) {
+      bestMinDist = minDist;
+      bestSp = sp;
+    }
+  }
+  return bestSp.clone();
+}
+
 function updateSingleRival(r, dt) {
   if (!r.active) {
     r.group.visible = false;
@@ -4696,18 +4880,32 @@ function updateSingleRival(r, dt) {
     r.group.position.copy(r.pos);
     r.group.rotation.y = r.yaw + Math.PI;
     r.group.visible = !r.dead;
+    if (!r.dead) updateRivalHpBarVisual(r);
     return;
   }
 
   if (r.dead) {
+    r.group.visible = false;
     r.respawnTimer -= dt;
-    if (r.respawnTimer <= 0) {
-      const sp = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
+    const nowMs = performance.now();
+    if (r.respawnTimer <= 0 || (r.respawnAtMs > 0 && nowMs >= r.respawnAtMs)) {
+      const sp = getBotSafeSpawnPoint(r);
       r.pos.copy(sp);
+      r.targetPos.copy(sp);
       r.vel.set(0, 0, 0);
       r.hp = r.maxHp;
       r.dead = false;
+      r.respawnTimer = 0;
+      r.respawnAtMs = 0;
+      r.hitFlashTimer = 0;
+      r.shieldActive = false;
+      r.stealthActive = false;
+      r.botStuckTimer = 0;
+      r.botAvoidTimer = 0;
+      r.botFireCooldown = 0.85;
+      r.group.position.copy(r.pos);
       r.group.visible = true;
+      updateRivalHpBarVisual(r);
       updateScoreAndHpUI();
     }
     return;
@@ -4737,16 +4935,58 @@ function updateSingleRival(r, dt) {
   r.botStrafeTimer -= dt;
   if (r.botStrafeTimer <= 0) {
     r.botStrafeDir *= -1;
-    r.botStrafeTimer = 1.1 + Math.random() * 1.4;
+    r.botStrafeTimer = 1.0 + Math.random() * 1.3;
   }
 
-  const strafe = new THREE.Vector3(-toTarget.z * r.botStrafeDir, 0, toTarget.x * r.botStrafeDir);
-  const approach = distHoriz > 32 ? 1 : distHoriz < 14 ? -0.55 : 0.2;
   const rCh = CHARACTERS[r.charKey] || CHARACTERS.vanguard;
-  const botSpeed = 11.4 * rCh.speedMult;
+  const botGun = GUNS[r.weaponKey] || GUNS.rifle;
+  const preferredDist = botGun.key === "shotgun" ? 13 : botGun.key === "smg" ? 20 : 28;
+  const strafe = new THREE.Vector3(-toTarget.z * r.botStrafeDir, 0, toTarget.x * r.botStrafeDir);
+  const approach = distHoriz > preferredDist + 8 ? 1.0 : distHoriz < preferredDist - 6 ? -0.55 : 0.18;
 
-  r.vel.x = (toTarget.x * approach + strafe.x * 0.85) * botSpeed;
-  r.vel.z = (toTarget.z * approach + strafe.z * 0.85) * botSpeed;
+  // CPU パルクール・空中ダッシュ＆スキル活用
+  if (r.botDashCooldown > 0) r.botDashCooldown -= dt;
+  if (r.botSkillCooldown > 0) r.botSkillCooldown -= dt;
+  if (r.botAvoidTimer > 0) r.botAvoidTimer -= dt;
+
+  let moveDirX = toTarget.x * approach + strafe.x * 0.88;
+  let moveDirZ = toTarget.z * approach + strafe.z * 0.88;
+  if (r.botAvoidTimer > 0) {
+    moveDirX = r.botAvoidDir.x;
+    moveDirZ = r.botAvoidDir.z;
+  }
+  const moveLen = Math.hypot(moveDirX, moveDirZ);
+  if (moveLen > 0.01) {
+    moveDirX /= moveLen;
+    moveDirZ /= moveLen;
+  }
+
+  const botSpeed = 12.2 * rCh.speedMult;
+  r.vel.x = moveDirX * botSpeed;
+  r.vel.z = moveDirZ * botSpeed;
+
+  // 相手が高い場所にいる場合は近くのジャンプパッドへ誘導
+  if (focusPos.y > r.pos.y + 6.0 && r.onGround) {
+    for (const pad of jumpPads) {
+      const pd = Math.hypot(pad.x - r.pos.x, pad.z - r.pos.z);
+      if (pd < 24 && Math.abs(pad.y - r.pos.y) < 3.0) {
+        const toPadX = (pad.x - r.pos.x) / Math.max(0.1, pd);
+        const toPadZ = (pad.z - r.pos.z) / Math.max(0.1, pd);
+        r.vel.x = toPadX * botSpeed * 1.1;
+        r.vel.z = toPadZ * botSpeed * 1.1;
+        break;
+      }
+    }
+  }
+
+  // 空中ダッシュで高速接近・回避
+  if (r.botDashCooldown <= 0 && distHoriz > 24 && distHoriz < 95 && r.botAvoidTimer <= 0) {
+    r.botDashCooldown = 3.2 + Math.random() * 1.6;
+    r.vel.x = moveDirX * 22.0;
+    r.vel.z = moveDirZ * 22.0;
+    r.vel.y = Math.max(r.vel.y, 7.5);
+  }
+
   r.vel.y -= CONFIG.gravity * dt;
 
   if (r.jumpCooldown > 0) r.jumpCooldown -= dt;
@@ -4763,25 +5003,62 @@ function updateSingleRival(r, dt) {
   for (const pad of jumpPads) {
     const dx = r.pos.x - pad.x;
     const dz = r.pos.z - pad.z;
-    if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(r.pos.y - pad.y) < 1.3) {
-      r.vel.y = pad.force * 0.92;
+    if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(r.pos.y - pad.y) < 1.4) {
+      r.vel.y = pad.force * 0.95;
       r.onGround = false;
     }
   }
 
+  for (const b of boostPads) {
+    if (
+      r.pos.x >= b.minX &&
+      r.pos.x <= b.maxX &&
+      r.pos.z >= b.minZ &&
+      r.pos.z <= b.maxZ &&
+      Math.abs(r.pos.y - b.y) < 1.2
+    ) {
+      r.vel.x = moveDirX * 24.0;
+      r.vel.z = moveDirZ * 24.0;
+    }
+  }
+
+  // 壁衝突時の賢い回避（ジャンプ乗り越え＋壁沿いスライド旋回）
   const moved = Math.hypot(r.pos.x - prevX, r.pos.z - prevZ);
-  if (r.onGround && r.jumpCooldown <= 0 && (moved < botSpeed * dt * 0.35 || Math.random() < 0.016)) {
-    r.vel.y = 12.2;
-    r.jumpCooldown = 0.85;
+  if (col.hitWallNormal || moved < botSpeed * dt * 0.35) {
+    r.botStuckTimer += dt;
+    if (r.onGround && r.jumpCooldown <= 0) {
+      r.vel.y = 13.0;
+      r.jumpCooldown = 0.65;
+    }
+    if (r.botStuckTimer > 0.28) {
+      r.botStuckTimer = 0;
+      r.botStrafeDir *= -1;
+      const n = col.hitWallNormal || new THREE.Vector3(-moveDirX, 0, -moveDirZ);
+      const tangent = new THREE.Vector3(-n.z * r.botStrafeDir, 0, n.x * r.botStrafeDir).normalize();
+      r.botAvoidDir.copy(tangent.addScaledVector(n, 0.35)).normalize();
+      r.botAvoidTimer = 0.75;
+    }
+  } else {
+    r.botStuckTimer = Math.max(0, r.botStuckTimer - dt);
+    if (r.onGround && r.jumpCooldown <= 0 && Math.random() < 0.022) {
+      r.vel.y = 11.8;
+      r.jumpCooldown = 0.85;
+    }
   }
 
   r.group.position.copy(r.pos);
   r.group.lookAt(focusPos.x, r.pos.y, focusPos.z);
+  r.group.visible = true;
+  updateRivalHpBarVisual(r);
 
-  if (targetPos && bestDist < 125) {
+  if (targetPos && bestDist < botGun.range + 15) {
     r.botFireCooldown -= dt;
     if (r.botFireCooldown <= 0) {
-      r.botFireCooldown = 0.78 + Math.random() * 0.5;
+      r.botFireCooldown =
+        botGun.key === "smg" ? 0.52 + Math.random() * 0.32 :
+        botGun.key === "shotgun" ? 0.95 + Math.random() * 0.45 :
+        0.72 + Math.random() * 0.42;
+
       const botEye = r.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
       const aimPt = targetPos.clone().add(new THREE.Vector3(0, 1.1, 0));
       const dir = aimPt.clone().sub(botEye);
@@ -4791,25 +5068,34 @@ function updateSingleRival(r, dt) {
       raycaster.far = d;
       const wallHits = raycaster.intersectObjects(worldMeshes, false);
       if (wallHits.length === 0) {
-        const hitProb = targetType === "player" && skillState.stealthTimer > 0 ? 0.08 : 0.38;
-        const isHit = Math.random() < hitProb;
+        const stealthPenalty = targetType === "player" && skillState.stealthTimer > 0 ? 0.08 : 1.0;
+        const baseHitProb = (botGun.key === "shotgun" ? 0.46 : 0.38) * stealthPenalty;
+        const isHit = Math.random() < baseHitProb;
         const endPt = isHit
           ? aimPt
-          : aimPt.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3.2, (Math.random() - 0.5) * 2.2, (Math.random() - 0.5) * 3.2));
-        spawnTracer(botEye, endPt, rCh.bodyColor);
+          : aimPt.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3.0, (Math.random() - 0.5) * 2.0, (Math.random() - 0.5) * 3.0));
+        spawnTracer(botEye, endPt, botGun.defaultColor || rCh.bodyColor);
+
+        const dmgPerShot =
+          botGun.key === "shotgun" ? 18 :
+          botGun.key === "smg" ? 8 : 12;
+
         if (isHit) {
           if (targetType === "player") {
-            applyDamageToSelf(10, `${r.name}`, r.id);
+            applyDamageToSelf(dmgPerShot, `${r.name} (${botGun.shortName})`, r.id);
           } else if (targetBot && !targetBot.dead) {
             targetBot.hitFlashTimer = 0.12;
-            targetBot.hp = Math.max(0, targetBot.hp - 14);
+            targetBot.hp = Math.max(0, targetBot.hp - (dmgPerShot + 4));
+            updateRivalHpBarVisual(targetBot);
             if (targetBot.hp <= 0) {
               targetBot.dead = true;
-              targetBot.respawnTimer = 2.6;
+              targetBot.respawnTimer = 2.5;
+              targetBot.respawnAtMs = performance.now() + 2500;
               targetBot.group.visible = false;
               r.kills += 1;
               if (matchPlayerCount === 4) {
                 r.hp = Math.min(r.maxHp, r.hp + 45);
+                updateRivalHpBarVisual(r);
               }
               updateScoreAndHpUI();
               if (r.kills >= game.targetKills) {
@@ -4825,16 +5111,33 @@ function updateSingleRival(r, dt) {
 
 function updateRival(dt) {
   let nearestDist = Infinity;
+  let nearestAlive = null;
   for (const r of rivals) {
     updateSingleRival(r, dt);
     if (r.active && !r.dead) {
       const d = r.pos.distanceTo(player.pos);
-      if (d < nearestDist) nearestDist = d;
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestAlive = r;
+      }
     }
   }
   distDisplay.textContent = Number.isFinite(nearestDist) ? nearestDist.toFixed(1) : "--";
   if (altDisplay) {
     altDisplay.textContent = Math.max(0, Math.round(player.pos.y));
+  }
+
+  // HUD右下の ENEMY HP バーを「照準中の相手」または「最も近い生存中の敵」とリアルタイム連動
+  const trackedRival = weaponState.isAimingOni || nearestAlive;
+  if (enemyHpHudFill && enemyHpHudLabel) {
+    if (trackedRival && !trackedRival.dead) {
+      const pct = Math.max(0, Math.min(100, (trackedRival.hp / Math.max(1, trackedRival.maxHp)) * 100));
+      enemyHpHudFill.style.width = `${pct}%`;
+      enemyHpHudLabel.textContent = `${trackedRival.name} HP ${Math.ceil(trackedRival.hp)}`;
+    } else {
+      enemyHpHudFill.style.width = "0%";
+      enemyHpHudLabel.textContent = "ENEMY KO / RESPAWNING...";
+    }
   }
 }
 
@@ -5048,20 +5351,37 @@ function animate(now) {
     damageVignette.style.opacity = "0";
   }
 
+  // 試合終了前であれば、ポインターロックが外れていてもリスポーンタイマーは絶対に止めない
+  if (!game.over && player.dead) {
+    const remainSec = player.respawnAtMs > 0
+      ? Math.max(0, (player.respawnAtMs - now) / 1000)
+      : Math.max(0, player.respawnTimer - dt);
+    player.respawnTimer = remainSec;
+    if (respawnTimerDisplay) {
+      respawnTimerDisplay.textContent = remainSec.toFixed(1);
+    }
+    if (remainSec <= 0) {
+      respawnSelf();
+    }
+  }
+
   if (game.active && !game.over) {
     game.elapsed += dt;
-    if (player.dead) {
-      player.respawnTimer -= dt;
-      respawnTimerDisplay.textContent = Math.max(0, player.respawnTimer).toFixed(1);
-      if (player.respawnTimer <= 0) {
-        respawnSelf();
-      }
-    } else {
+    if (!player.dead) {
       updatePlayer(dt);
     }
     updateRival(dt);
     updateWeapon(dt);
 
+  } else if (!game.over && player.dead) {
+    for (const r of rivals) {
+      if (r.active && r.dead) {
+        updateSingleRival(r, dt);
+      }
+    }
+  }
+
+  if (game.active && !game.over) {
     // オンライン対戦中は自分の座標・向き・HPを約30fpsで送信
     if (net.connected && now - net.lastSyncSent > 33) {
       net.lastSyncSent = now;
