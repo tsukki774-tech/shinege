@@ -325,8 +325,7 @@ function renderCharacterSelector() {
           localStorage.setItem("parkour_fps_character", selectedCharKey);
         } catch {}
         applyCharacterStatsToPlayer(true);
-        applyCharacterStatsToPlayer(true);
-applyLoadoutUI();
+        applyLoadoutUI();
         renderCharacterSelector();
       });
       characterGrid.appendChild(btn);
@@ -351,9 +350,7 @@ function applyCharacterStatsToPlayer(refillHp = false) {
   const ch = getSelectedChar();
   player.maxHp = ch.maxHp;
   if (refillHp || player.hp > player.maxHp) {
-    clearSkillEffects();
-  applyCharacterStatsToPlayer(true);
-  player.hp = player.maxHp;
+    player.hp = player.maxHp;
   }
   if (hudCharName) {
     hudCharName.textContent = ch.name;
