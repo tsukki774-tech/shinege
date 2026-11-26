@@ -52,6 +52,13 @@ const enemyHpHudFill = document.getElementById("enemy-hp-hud-fill");
 const damageVignette = document.getElementById("damage-vignette");
 const respawnBanner = document.getElementById("respawn-banner");
 const respawnTimerDisplay = document.getElementById("respawn-timer-display");
+const matchFinishBanner = document.getElementById("match-finish-banner");
+const confettiLayer = document.getElementById("confetti-layer");
+const finishKicker = document.getElementById("finish-kicker");
+const finishMainTitle = document.getElementById("finish-main-title");
+const finishScoreLine = document.getElementById("finish-score-line");
+const finishRewardLine = document.getElementById("finish-reward-line");
+const modalBox = overlay ? overlay.querySelector(".modal") : null;
 
 const goalKillsSelect = document.getElementById("goal-kills-select");
 const mpTabHost = document.getElementById("mp-tab-host");
@@ -103,6 +110,8 @@ const btnFireSub = document.getElementById("btn-fire-sub");
 const btnWeapon = document.getElementById("btn-weapon");
 const btnWeaponLabel = document.getElementById("btn-weapon-label");
 const btnInspect = document.getElementById("btn-inspect");
+const btnReload = document.getElementById("btn-reload");
+const hudReloadBtn = document.getElementById("hud-reload-btn");
 
 const layoutEditorBar = document.getElementById("layout-editor-bar");
 const layoutResetBtn = document.getElementById("layout-reset-btn");
@@ -276,7 +285,8 @@ const DEFAULT_LAYOUT = {
   zip: { xPct: 0.66, yPct: 0.80 },
   fire: { xPct: 0.89, yPct: 0.46 },
   weapon: { xPct: 0.66, yPct: 0.63 },
-  inspect: { xPct: 0.56, yPct: 0.77 },
+  inspect: { xPct: 0.55, yPct: 0.84 },
+  reload: { xPct: 0.66, yPct: 0.46 },
   stick: { xPct: 0.14, yPct: 0.80 },
 };
 
@@ -343,6 +353,7 @@ function applyAllButtonPositions() {
   positionElementByPct(btnFire, buttonLayout.fire.xPct, buttonLayout.fire.yPct, 1.0);
   positionElementByPct(btnWeapon, buttonLayout.weapon.xPct, buttonLayout.weapon.yPct, 1.0);
   if (btnInspect) positionElementByPct(btnInspect, buttonLayout.inspect.xPct, buttonLayout.inspect.yPct, 1.0);
+  if (btnReload) positionElementByPct(btnReload, buttonLayout.reload.xPct, buttonLayout.reload.yPct, 1.0);
   applyStickHomePosition();
 }
 
@@ -405,6 +416,7 @@ attachDraggable(btnZip, "zip", 1.0);
 attachDraggable(btnFire, "fire", 1.0);
 attachDraggable(btnWeapon, "weapon", 1.0);
 if (btnInspect) attachDraggable(btnInspect, "inspect", 1.0);
+if (btnReload) attachDraggable(btnReload, "reload", 1.0);
 attachDraggable(joystickBase, "stick", 0.5);
 
 function enterLayoutEditor() {
@@ -580,6 +592,23 @@ function playSfx(type) {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
     osc.start(t);
     osc.stop(t + 0.15);
+  } else if (type === "victory") {
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, idx) => {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "triangle";
+      const st = t + idx * 0.085;
+      o.frequency.setValueAtTime(freq, st);
+      g.gain.setValueAtTime(0.001, st);
+      g.gain.linearRampToValueAtTime(0.16, st + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, st + 0.42);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(st);
+      o.stop(st + 0.44);
+    });
+    return;
   } else if (type === "reload") {
     osc.type = "triangle";
     osc.frequency.setValueAtTime(300, t);
@@ -1899,10 +1928,12 @@ function updateWeaponUI() {
     if (ammoMaxDisplay) ammoMaxDisplay.textContent = `/ ${g.maxAmmo}`;
     if (reloadStatus) reloadStatus.classList.toggle("hidden", !weaponState.reloading);
     if (meleeReadyBadge) meleeReadyBadge.classList.add("hidden");
+    if (hudReloadBtn) hudReloadBtn.classList.remove("hidden");
     if (btnWeaponLabel) btnWeaponLabel.textContent = m.shortName;
   } else {
     if (ammoRow) ammoRow.classList.add("hidden");
     if (reloadStatus) reloadStatus.classList.add("hidden");
+    if (hudReloadBtn) hudReloadBtn.classList.add("hidden");
     if (meleeReadyBadge) meleeReadyBadge.classList.remove("hidden");
     if (btnWeaponLabel) btnWeaponLabel.textContent = g.shortName;
   }
@@ -2993,6 +3024,31 @@ if (btnInspect) {
   btnInspect.addEventListener("touchcancel", () => btnInspect.classList.remove("pressed"));
 }
 
+if (btnReload) {
+  btnReload.addEventListener(
+    "touchstart",
+    (e) => {
+      if (isEditingLayout) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!game.active || game.over) return;
+      startReload();
+      btnReload.classList.add("pressed");
+    },
+    { passive: false }
+  );
+  btnReload.addEventListener("touchend", () => btnReload.classList.remove("pressed"));
+  btnReload.addEventListener("touchcancel", () => btnReload.classList.remove("pressed"));
+}
+
+if (hudReloadBtn) {
+  hudReloadBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!game.active || game.over) return;
+    startReload();
+  });
+}
+
 // ==========================================
 // 開始・停止・リトライ管理
 // ==========================================
@@ -3153,7 +3209,153 @@ function applyDamageToSelf(dmg, weaponName = "WEAPON") {
   }
 }
 
+let matchEndOverlayTimer = null;
+const victoryAnim = {
+  active: false,
+  isWin: false,
+  timer: 0,
+  basePos: new THREE.Vector3(),
+  baseYaw: 0,
+  pillarMesh: null,
+  sparks: [],
+};
+
+function clearVictory3DEffects() {
+  victoryAnim.active = false;
+  victoryAnim.timer = 0;
+  if (victoryAnim.pillarMesh) {
+    scene.remove(victoryAnim.pillarMesh);
+    victoryAnim.pillarMesh.geometry.dispose();
+    victoryAnim.pillarMesh.material.dispose();
+    victoryAnim.pillarMesh = null;
+  }
+  for (const sp of victoryAnim.sparks) {
+    scene.remove(sp.mesh);
+    sp.mesh.geometry.dispose();
+    sp.mesh.material.dispose();
+  }
+  victoryAnim.sparks = [];
+}
+
+function startVictory3DCelebration(isWin) {
+  clearVictory3DEffects();
+  victoryAnim.active = true;
+  victoryAnim.isWin = isWin;
+  victoryAnim.timer = 0;
+  victoryAnim.basePos.copy(player.pos);
+  victoryAnim.baseYaw = player.yaw;
+
+  if (!isWin) return;
+
+  // 1. 勝者の位置から天へ昇る黄金のビクトリーライトピラー（光の柱）
+  const pillarGeo = new THREE.CylinderGeometry(1.6, 2.8, 95, 24, 1, true);
+  const pillarMat = new THREE.MeshBasicMaterial({
+    color: 0xfde047,
+    transparent: true,
+    opacity: 0.34,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+  pillar.position.set(player.pos.x, player.pos.y + 46, player.pos.z);
+  scene.add(pillar);
+  victoryAnim.pillarMesh = pillar;
+
+  // 2. 周囲に打ち上がる3D花火＆光のパーティクル（55個）
+  const sparkColors = [0xfde047, 0x38bdf8, 0xf43f5e, 0x34d399, 0xe879f9];
+  for (let i = 0; i < 55; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.24, 0),
+      new THREE.MeshBasicMaterial({
+        color: sparkColors[i % sparkColors.length],
+        transparent: true,
+        opacity: 0.95,
+      })
+    );
+    const angle = (i / 55) * Math.PI * 2 + Math.random() * 0.4;
+    const radius = 1.5 + Math.random() * 3.5;
+    mesh.position.set(
+      player.pos.x + Math.cos(angle) * radius,
+      player.pos.y + 1.0 + Math.random() * 1.5,
+      player.pos.z + Math.sin(angle) * radius
+    );
+    const speedOut = 4.5 + Math.random() * 8.5;
+    const vel = new THREE.Vector3(
+      Math.cos(angle) * speedOut,
+      8.0 + Math.random() * 11.0,
+      Math.sin(angle) * speedOut
+    );
+    scene.add(mesh);
+    victoryAnim.sparks.push({ mesh, vel, life: 2.4 });
+  }
+}
+
+function updateVictory3DCelebration(dt) {
+  if (!victoryAnim.active) return;
+  victoryAnim.timer += dt;
+  const t = victoryAnim.timer;
+
+  if (victoryAnim.isWin) {
+    // 勝利時のシネマティック・オービットカメラ（ゆっくり上昇しながら旋回してフィールドを見渡す）
+    const orbitYaw = victoryAnim.baseYaw + t * 0.85;
+    const liftY = Math.min(4.2, t * 1.6);
+    const backDist = Math.min(4.5, t * 2.0);
+    camera.position.set(
+      victoryAnim.basePos.x + Math.sin(orbitYaw) * backDist,
+      victoryAnim.basePos.y + player.currentHeight + liftY,
+      victoryAnim.basePos.z + Math.cos(orbitYaw) * backDist
+    );
+    camera.rotation.order = "YXZ";
+    camera.rotation.y = orbitYaw;
+    camera.rotation.x = -0.18;
+    camera.rotation.z = 0;
+
+    // 武器・近接武器を掲げてクルクル祝うビクトリーモーション
+    weaponRoot.position.set(
+      weaponBasePos.x - 0.10,
+      weaponBasePos.y + 0.11 + Math.sin(t * 7) * 0.025,
+      weaponBasePos.z + 0.04
+    );
+    weaponRoot.rotation.set(0.35, t * 5.2, -0.35);
+
+    if (victoryAnim.pillarMesh) {
+      victoryAnim.pillarMesh.rotation.y += dt * 1.8;
+      victoryAnim.pillarMesh.material.opacity = 0.24 + Math.sin(t * 8) * 0.1;
+    }
+
+    for (const sp of victoryAnim.sparks) {
+      sp.vel.y -= 11.5 * dt;
+      sp.mesh.position.addScaledVector(sp.vel, dt);
+      sp.mesh.rotation.x += dt * 6;
+      sp.mesh.rotation.y += dt * 6;
+      sp.life -= dt;
+      sp.mesh.material.opacity = Math.max(0, sp.life / 2.4);
+    }
+  } else {
+    // 敗北時はゆっくり視線が下がる演出
+    camera.rotation.order = "YXZ";
+    camera.rotation.x = Math.max(-0.55, -t * 0.25);
+  }
+}
+
+function hideFinishCelebration() {
+  clearVictory3DEffects();
+  if (matchEndOverlayTimer) {
+    clearTimeout(matchEndOverlayTimer);
+    matchEndOverlayTimer = null;
+  }
+  if (matchFinishBanner) {
+    matchFinishBanner.classList.add("hidden");
+    matchFinishBanner.classList.remove("defeat");
+  }
+  if (confettiLayer) confettiLayer.innerHTML = "";
+  if (modalBox) {
+    modalBox.classList.remove("victory-modal", "defeat-modal");
+  }
+}
+
 function resetMatch(broadcast = false) {
+  hideFinishCelebration();
   const isClient = net.connected && net.mode === "client";
   const myStart = isClient ? SPAWN_POINTS[1].clone() : SPAWN_POINTS[0].clone();
   const enemyStart = isClient ? SPAWN_POINTS[0].clone() : SPAWN_POINTS[1].clone();
@@ -3866,7 +4068,23 @@ function drawMinimap(now) {
   ctx.stroke();
 }
 
+function spawnVictoryConfetti() {
+  if (!confettiLayer) return;
+  confettiLayer.innerHTML = "";
+  const colors = ["#fde047", "#38bdf8", "#f43f5e", "#34d399", "#c084fc", "#fb923c"];
+  for (let i = 0; i < 65; i++) {
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = colors[i % colors.length];
+    piece.style.animationDuration = `${1.4 + Math.random() * 1.6}s`;
+    piece.style.animationDelay = `${Math.random() * 0.45}s`;
+    confettiLayer.appendChild(piece);
+  }
+}
+
 function triggerMatchEnd(isWin) {
+  if (game.over) return;
   game.over = true;
   game.active = false;
   wireLine.visible = false;
@@ -3875,7 +4093,7 @@ function triggerMatchEnd(isWin) {
   touchInput.slideHeld = false;
   touchInput.lookTouchId = null;
   weaponState.manualFireHeld = false;
-  playSfx(isWin ? "stun" : "caught");
+  playSfx(isWin ? "victory" : "caught");
 
   if (document.pointerLockElement) {
     document.exitPointerLock();
@@ -3884,12 +4102,48 @@ function triggerMatchEnd(isWin) {
   const rewardCr = isWin ? (net.connected ? 100 : 40) : (net.connected ? 20 : 10);
   addCoins(rewardCr);
 
-  modalTitle.textContent = isWin ? "VICTORY!! 勝利！" : "DEFEAT... 敗北";
-  modalDesc.innerHTML =
-    `最終スコア: <strong>YOU ${game.myKills} - ${game.enemyKills} ${net.connected ? "FRIEND" : "BOT"}</strong><br />` +
-    `バトル報酬: <strong style="color:#fde047;">+${rewardCr} CR</strong> 獲得！（ショップやガチャで使えます）`;
-  startBtn.textContent = "もう一度対戦する";
-  overlay.classList.remove("hidden");
+  const opponentLabel = net.connected ? "FRIEND" : "BOT";
+  const scoreSummary = `YOU ${game.myKills} - ${game.enemyKills} ${opponentLabel}`;
+
+  if (matchFinishBanner) {
+    matchFinishBanner.classList.remove("hidden", "defeat");
+    if (!isWin) matchFinishBanner.classList.add("defeat");
+    if (finishKicker) {
+      finishKicker.textContent = isWin ? "★ WINNER ★ MATCH VICTORY" : "MATCH FINISHED";
+    }
+    if (finishMainTitle) {
+      finishMainTitle.textContent = isWin ? "VICTORY!!" : "DEFEAT...";
+    }
+    if (finishScoreLine) {
+      finishScoreLine.textContent = scoreSummary;
+    }
+    if (finishRewardLine) {
+      finishRewardLine.textContent = isWin
+        ? `勝利報酬 +${rewardCr} CR GET!`
+        : `参加報酬 +${rewardCr} CR GET`;
+    }
+    if (isWin) {
+      spawnVictoryConfetti();
+    }
+  }
+  startVictory3DCelebration(isWin);
+
+  if (matchEndOverlayTimer) clearTimeout(matchEndOverlayTimer);
+  matchEndOverlayTimer = setTimeout(() => {
+    if (matchFinishBanner) matchFinishBanner.classList.add("hidden");
+    if (modalBox) {
+      modalBox.classList.remove("victory-modal", "defeat-modal");
+      modalBox.classList.add(isWin ? "victory-modal" : "defeat-modal");
+    }
+    modalTitle.innerHTML = isWin
+      ? `<span style="color:#fde047;">★ VICTORY!! あなたの勝利！ ★</span>`
+      : `<span style="color:#f87171;">DEFEAT... 敗北</span>`;
+    modalDesc.innerHTML =
+      `最終スコア: <strong>${scoreSummary}</strong><br />` +
+      `獲得報酬: <strong style="color:#fde047;">+${rewardCr} CR</strong>（現在の所持: <strong>${profile.coins} CR</strong>）`;
+    startBtn.textContent = "もう一度対戦する";
+    overlay.classList.remove("hidden");
+  }, 2400);
 }
 
 // ==========================================
@@ -3941,6 +4195,10 @@ function animate(now) {
         w: weaponState.activeSlot,
       });
     }
+  }
+
+  if (game.over) {
+    updateVictory3DCelebration(dt);
   }
 
   drawMinimap(now);

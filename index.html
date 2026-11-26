@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v11 - ナイフ＆カラムビット回転インスペクト対応</title>
+  <title>3D キャラコンFPS v13 - リロードボタン＆3D勝利カメラ演出対応</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -57,6 +57,7 @@
     <div id="weapon-hud">
       <div class="weapon-hud-top">
         <span id="weapon-name">PULSE RIFLE</span>
+        <button id="hud-reload-btn" class="hud-reload-chip" type="button" title="リロード [R]">R 装填</button>
         <span id="autofire-badge">AUTO</span>
       </div>
       <div class="weapon-ammo-row">
@@ -75,6 +76,17 @@
     <div id="respawn-banner" class="hidden">
       <div class="respawn-title">K.O. - 撃破された！</div>
       <div class="respawn-sub"><strong id="respawn-timer-display">3.0</strong> 秒後にリスポーン...</div>
+    </div>
+
+    <!-- 試合決着時の大型VICTORY / DEFEATカットイン -->
+    <div id="match-finish-banner" class="hidden">
+      <div id="confetti-layer"></div>
+      <div class="finish-card">
+        <div id="finish-kicker" class="finish-kicker">MATCH POINT DECIDED</div>
+        <div id="finish-main-title" class="finish-main-title">VICTORY!!</div>
+        <div id="finish-score-line" class="finish-score-line">YOU 5 - 2 BOT</div>
+        <div id="finish-reward-line" class="finish-reward-line">+100 CR GET!</div>
+      </div>
     </div>
 
     <!-- PC用クールタイム表示 -->
@@ -131,6 +143,10 @@
       <span>LOOK</span>
       <small>眺める</small>
     </button>
+    <button id="btn-reload" class="action-btn reload-btn" type="button">
+      <span>RELOAD</span>
+      <small>装填</small>
+    </button>
   </div>
 
   <!-- ボタン配置編集モード用バー -->
@@ -145,7 +161,7 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v11</h1>
+      <h1 id="modal-title">3D キャラコンFPS v13</h1>
       <p id="modal-desc">
         パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
         ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
@@ -260,7 +276,7 @@
       </div>
 
       <div class="controls-box">
-        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ FIRE・銃↔近接切替・LOOK(眺める)・JUMP・SLIDE・DASH・WIRE・ZIP</div>
+        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ FIRE・RELOAD(装填)・銃↔近接切替・LOOK(眺める)・JUMP・SLIDE・DASH・WIRE・ZIP</div>
         <div><strong>【PC】</strong>WASD移動 ／ 左クリック攻撃 ／ 1・2・ホイールで銃↔近接切替 ／ V・T武器を眺める ／ Rリロード ／ Spaceジャンプ ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップ</div>
         <div><strong>【報酬＆ガチャ】</strong>バトル勝利で <strong>+100 CR</strong>（ソロ練習 +40 CR）獲得！ショップで新武器やカラムビットを買い、ガチャでレアスキンを引こう！</div>
       </div>
