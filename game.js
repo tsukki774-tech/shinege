@@ -41,14 +41,12 @@ const gachaPull1Btn = document.getElementById("gacha-pull-1-btn");
 const gachaPull3Btn = document.getElementById("gacha-pull-3-btn");
 
 const myKillsDisplay = document.getElementById("my-kills-display");
-const enemyKillsDisplay = document.getElementById("enemy-kills-display");
-const enemyTagLabel = document.getElementById("enemy-tag-label");
 const targetKillsDisplay = document.getElementById("target-kills-display");
 const netStatusPill = document.getElementById("net-status-pill");
+const ffaScoreboard = document.getElementById("ffa-scoreboard");
 const myHpDisplay = document.getElementById("my-hp-display");
 const myHpFill = document.getElementById("my-hp-fill");
-const enemyHpDisplay = document.getElementById("enemy-hp-display");
-const enemyHpHudFill = document.getElementById("enemy-hp-hud-fill");
+const altDisplay = document.getElementById("alt-display");
 const damageVignette = document.getElementById("damage-vignette");
 const respawnBanner = document.getElementById("respawn-banner");
 const respawnTimerDisplay = document.getElementById("respawn-timer-display");
@@ -146,16 +144,16 @@ const CONFIG = {
   wallRunSpeed: 14.2,
   wallJumpUp: 11.8,
   wallJumpPush: 13.5,
-  jumpPadForce: 22.0,
-  boostPadSpeed: 24.0,
-  dashSpeed: 24.5,
+  jumpPadForce: 24.5,
+  boostPadSpeed: 25.5,
+  dashSpeed: 25.0,
   dashDuration: 0.22,
-  dashCooldown: 2.6,
-  grappleRange: 64,
-  grapplePullSpeed: 29.0,
-  grappleMaxTime: 1.25,
-  grappleCooldown: 3.5,
-  ziplineSpeed: 26.0,
+  dashCooldown: 2.5,
+  grappleRange: 96,
+  grapplePullSpeed: 33.5,
+  grappleMaxTime: 1.45,
+  grappleCooldown: 2.8,
+  ziplineSpeed: 29.0,
   ziplineGrabDist: 3.8,
   playerRadius: 0.55,
   standHeight: 1.8,
@@ -806,16 +804,16 @@ const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.35);
 scene.add(hemiLight);
 
 const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.45);
-dirLight.position.set(85, 130, 70);
+dirLight.position.set(110, 185, 95);
 if (!isCoarsePointer) {
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
   dirLight.shadow.mapSize.height = 2048;
-  dirLight.shadow.camera.left = -145;
-  dirLight.shadow.camera.right = 145;
-  dirLight.shadow.camera.top = 145;
-  dirLight.shadow.camera.bottom = -145;
-  dirLight.shadow.camera.far = 340;
+  dirLight.shadow.camera.left = -195;
+  dirLight.shadow.camera.right = 195;
+  dirLight.shadow.camera.top = 195;
+  dirLight.shadow.camera.bottom = -195;
+  dirLight.shadow.camera.far = 480;
 }
 scene.add(dirLight);
 
@@ -835,7 +833,7 @@ const raycaster = new THREE.Raycaster();
 // ==========================================
 // 超広大バトルアリーナ構築（260 x 260 / 約3.5倍面積）
 // ==========================================
-const ARENA_HALF = 130;
+const ARENA_HALF = 180;
 const colliders = [];
 const grappleMeshes = [];
 const worldMeshes = [];
@@ -847,8 +845,8 @@ function addBox(x, y, z, w, h, d, color, options = {}) {
   const geo = new THREE.BoxGeometry(w, h, d);
   const mat = new THREE.MeshStandardMaterial({
     color,
-    roughness: options.roughness ?? 0.65,
-    metalness: options.metalness ?? 0.15,
+    roughness: options.roughness ?? 0.62,
+    metalness: options.metalness ?? 0.16,
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x, y, z);
@@ -859,7 +857,7 @@ function addBox(x, y, z, w, h, d, color, options = {}) {
     const edgeMat = new THREE.LineBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: options.isOuterWall ? 0.16 : 0.28,
+      opacity: options.isOuterWall ? 0.18 : 0.30,
     });
     mesh.add(new THREE.LineSegments(edges, edgeMat));
   }
@@ -888,16 +886,16 @@ function addBox(x, y, z, w, h, d, color, options = {}) {
 }
 
 function addJumpPad(x, y, z, force = CONFIG.jumpPadForce) {
-  const geo = new THREE.CylinderGeometry(2.0, 2.2, 0.28, 24);
+  const geo = new THREE.CylinderGeometry(2.2, 2.5, 0.30, 24);
   const mat = new THREE.MeshStandardMaterial({
     color: 0x22c55e,
     emissive: 0x15803d,
-    emissiveIntensity: 0.75,
+    emissiveIntensity: 0.8,
   });
   const pad = new THREE.Mesh(geo, mat);
-  pad.position.set(x, y + 0.14, z);
+  pad.position.set(x, y + 0.15, z);
   scene.add(pad);
-  jumpPads.push({ x, y: y + 0.14, z, radius: 2.15, force });
+  jumpPads.push({ x, y: y + 0.15, z, radius: 2.35, force });
 }
 
 function addBoostPad(x, y, z, w, d) {
@@ -929,7 +927,7 @@ function addZipline(ax, ay, az, bx, by, bz) {
   const diff = new THREE.Vector3().subVectors(end, start);
   const len = diff.length();
 
-  const cableGeo = new THREE.CylinderGeometry(0.10, 0.10, len, 8);
+  const cableGeo = new THREE.CylinderGeometry(0.11, 0.11, len, 8);
   const cableMat = new THREE.MeshStandardMaterial({
     color: 0xfacc15,
     emissive: 0xca8a04,
@@ -943,9 +941,9 @@ function addZipline(ax, ay, az, bx, by, bz) {
   const postMat = new THREE.MeshStandardMaterial({
     color: 0xfde047,
     emissive: 0xa16207,
-    emissiveIntensity: 0.5,
+    emissiveIntensity: 0.55,
   });
-  const anchorGeo = new THREE.SphereGeometry(0.46, 12, 12);
+  const anchorGeo = new THREE.SphereGeometry(0.52, 12, 12);
   const aMesh = new THREE.Mesh(anchorGeo, postMat);
   aMesh.position.copy(start);
   const bMesh = new THREE.Mesh(anchorGeo, postMat);
@@ -956,287 +954,320 @@ function addZipline(ax, ay, az, bx, by, bz) {
 }
 
 function buildArena() {
-  // 明るく敵や弾道がくっきり映えるライトスレート床（260 x 260）
-  addBox(0, -0.5, 0, 260, 1, 260, 0xcbd5e1, { noCast: true, roughness: 0.78, isFloor: true });
-  const grid = new THREE.GridHelper(260, 65, 0x64748b, 0x94a3b8);
+  addBox(0, -0.5, 0, 360, 1, 360, 0xcbd5e1, { noCast: true, roughness: 0.78, isFloor: true });
+  const grid = new THREE.GridHelper(360, 72, 0x64748b, 0x94a3b8);
   grid.position.y = 0.02;
   scene.add(grid);
 
-  // 外周の壁（明るいオフホワイト＋上部アクセントライン）
-  addBox(0, 11, -130, 260, 22, 2.0, 0xe2e8f0, { wallRun: true, isOuterWall: true });
-  addBox(0, 11, 130, 260, 22, 2.0, 0xe2e8f0, { wallRun: true, isOuterWall: true });
-  addBox(-130, 11, 0, 2.0, 22, 260, 0xe2e8f0, { wallRun: true, isOuterWall: true });
-  addBox(130, 11, 0, 2.0, 22, 260, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+  addBox(0, 23, -180, 360, 46, 2.4, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+  addBox(0, 23, 180, 360, 46, 2.4, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+  addBox(-180, 23, 0, 2.4, 46, 360, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+  addBox(180, 23, 0, 2.4, 46, 360, 0xe2e8f0, { wallRun: true, isOuterWall: true });
 
-  // ======================================
-  // 1. 中央メガシタデル（4段構造・クリーンホワイト＆ティール）
-  // ======================================
-  addBox(0, 2.5, 0, 16, 5, 16, 0xf8fafc, { wallRun: true });
-  addBox(0, 7.0, 0, 11, 4.0, 11, 0xe2e8f0, { wallRun: true });
-  addBox(0, 11.2, 0, 7, 4.4, 7, 0x38bdf8, { wallRun: true });
-  addBox(0, 15.2, 0, 4.5, 3.6, 4.5, 0x0284c7, { wallRun: true });
-  addJumpPad(0, 17.0, 0, 22.0); // 頂上ジャンプパッド
+  // 中央スカイシタデル（地上〜高度54mまで貫く7段立体タワー）
+  addBox(0, 3.0, 0, 22, 6, 22, 0xf8fafc, { wallRun: true });
+  addBox(0, 8.5, 0, 16, 5, 16, 0xe2e8f0, { wallRun: true });
+  addBox(0, 14.0, 0, 12, 6, 12, 0x38bdf8, { wallRun: true });
+  addBox(0, 20.0, 0, 8.5, 6, 8.5, 0x0284c7, { wallRun: true });
+  addBox(0, 24.0, -14, 24, 1.4, 7, 0x7dd3fc, { wallRun: true });
+  addBox(0, 24.0, 14, 24, 1.4, 7, 0x7dd3fc, { wallRun: true });
+  addBox(-14, 24.0, 0, 7, 1.4, 24, 0x7dd3fc, { wallRun: true });
+  addBox(14, 24.0, 0, 7, 1.4, 24, 0x7dd3fc, { wallRun: true });
+  addJumpPad(0, 23.0, 0, 33.5);
 
-  // 中央周辺の階段＆戦術遮蔽ブロック
-  const centerSteps = [
-    [-16, 1.4, 0, 7, 2.8, 7, 0x0ea5e9],
-    [16, 1.4, 0, 7, 2.8, 7, 0x0ea5e9],
-    [0, 1.4, -16, 7, 2.8, 7, 0x0ea5e9],
-    [0, 1.4, 16, 7, 2.8, 7, 0x0ea5e9],
-    // 遮蔽ブロック（視認性の高いスレートブルー）
-    [-25, 1.6, -25, 5, 3.2, 2.2, 0x475569],
-    [25, 1.6, 25, 5, 3.2, 2.2, 0x475569],
-    [25, 1.6, -25, 2.2, 3.2, 5, 0x475569],
-    [-25, 1.6, 25, 2.2, 3.2, 5, 0x475569],
+  // 最上層・成層圏スカイサンクチュアリ（Y=46m〜54m）
+  addBox(0, 46.0, 0, 26, 1.6, 26, 0xf8fafc, { wallRun: true });
+  addBox(0, 50.5, 0, 9, 7.5, 9, 0x0ea5e9, { wallRun: true });
+  addBox(0, 47.6, -12.2, 16, 1.8, 1.2, 0x38bdf8);
+  addBox(0, 47.6, 12.2, 16, 1.8, 1.2, 0x38bdf8);
+  addBox(-12.2, 47.6, 0, 1.2, 1.8, 16, 0x38bdf8);
+  addBox(12.2, 47.6, 0, 1.2, 1.8, 16, 0x38bdf8);
+  addJumpPad(0, 54.25, 0, 25.0);
+
+  // 4隅の超高層スカイスクレイパー要塞（高さ38m・多層フロア構造）
+  const cornerCoords = [
+    [-122, -122],
+    [122, 122],
+    [122, -122],
+    [-122, 122],
   ];
+  for (const [cx, cz] of cornerCoords) {
+    addBox(cx, 8.0, cz, 22, 16, 22, 0x3b82f6, { wallRun: true });
+    addBox(cx, 26.0, cz, 13, 20, 13, 0x2563eb, { wallRun: true });
+    addBox(cx, 36.6, cz, 20, 1.4, 20, 0x93c5fd, { wallRun: true });
+    addBox(cx, 38.2, cz + (cz > 0 ? -9.2 : 9.2), 14, 1.8, 1.2, 0xf8fafc);
+    addBox(cx + (cx > 0 ? -9.2 : 9.2), 38.2, cz, 1.2, 1.8, 14, 0xf8fafc);
+    addJumpPad(cx + (cx > 0 ? -15 : 15), 0, cz, 31.0);
+    addJumpPad(cx, 16.0, cz + (cz > 0 ? -8.5 : 8.5), 29.0);
+  }
 
-  // ======================================
-  // 2. 4隅の巨大スカイ要塞（ロイヤルブルー＆スカイホワイト）
-  // ======================================
-  const cornerTowers = [
-    [-86, 6.0, -86, 16, 12, 16, 0x3b82f6],
-    [86, 6.0, 86, 16, 12, 16, 0x3b82f6],
-    [86, 6.0, -86, 16, 12, 16, 0x3b82f6],
-    [-86, 6.0, 86, 16, 12, 16, 0x3b82f6],
-    // 2段目ステップ
-    [-72, 3.0, -86, 8, 6, 10, 0x60a5fa],
-    [72, 3.0, 86, 8, 6, 10, 0x60a5fa],
-    [86, 3.0, -72, 10, 6, 8, 0x60a5fa],
-    [-86, 3.0, 72, 10, 6, 8, 0x60a5fa],
-    // 要塞屋上のスナイパー胸壁
-    [-86, 13.0, -79, 10, 2.0, 1.4, 0xf8fafc],
-    [86, 13.0, 79, 10, 2.0, 1.4, 0xf8fafc],
-    [79, 13.0, -86, 1.4, 2.0, 10, 0xf8fafc],
-    [-79, 13.0, 86, 1.4, 2.0, 10, 0xf8fafc],
-  ];
-
-  // ======================================
-  // 3. 東西南北の4大前線バンカー（エメラルドティール＆ホワイト）
-  // ======================================
+  // 東西南北の4大立体前線バンカー（2層構造・高さ18m）
   const outpostBunkers = [
-    [0, 3.5, -78, 24, 7, 10, 0x0d9488],
-    [0, 3.5, 78, 24, 7, 10, 0x0d9488],
-    [-16, 1.8, -78, 6, 3.6, 8, 0x2dd4bf],
-    [16, 1.8, 78, 6, 3.6, 8, 0x2dd4bf],
-    [-78, 3.5, 0, 10, 7, 24, 0x0d9488],
-    [78, 3.5, 0, 10, 7, 24, 0x0d9488],
-    [-78, 1.8, 16, 8, 3.6, 6, 0x2dd4bf],
-    [78, 1.8, -16, 8, 3.6, 6, 0x2dd4bf],
+    [0, 4.5, -108, 32, 9, 14, 0x0d9488],
+    [0, 14.0, -108, 18, 10, 10, 0x14b8a6],
+    [0, 4.5, 108, 32, 9, 14, 0x0d9488],
+    [0, 14.0, 108, 18, 10, 10, 0x14b8a6],
+    [-108, 4.5, 0, 14, 9, 32, 0x0d9488],
+    [-108, 14.0, 0, 10, 10, 18, 0x14b8a6],
+    [108, 4.5, 0, 14, 9, 32, 0x0d9488],
+    [108, 14.0, 0, 10, 10, 18, 0x14b8a6],
   ];
 
-  // ======================================
-  // 4. ウォールラン用のバイオレットウォール（一目で壁走りと分かる色）
-  // ======================================
+  // 高層垂直ウォールランパネル（高さ24m〜34m）
   const wallRunPanels = [
-    [-34, 5.5, -24, 1.6, 11, 30, 0x8b5cf6],
-    [34, 5.5, 24, 1.6, 11, 30, 0x8b5cf6],
-    [24, 5.5, -34, 30, 11, 1.6, 0x8b5cf6],
-    [-24, 5.5, 34, 30, 11, 1.6, 0x8b5cf6],
+    [-42, 12.0, -30, 1.8, 24, 38, 0x8b5cf6],
+    [42, 12.0, 30, 1.8, 24, 38, 0x8b5cf6],
+    [30, 12.0, -42, 38, 24, 1.8, 0x8b5cf6],
+    [-30, 12.0, 42, 38, 24, 1.8, 0x8b5cf6],
 
-    [-62, 6.5, -42, 1.6, 13, 36, 0xa855f7],
-    [62, 6.5, 42, 1.6, 13, 36, 0xa855f7],
-    [42, 6.5, -62, 36, 13, 1.6, 0xa855f7],
-    [-42, 6.5, 62, 36, 13, 1.6, 0xa855f7],
+    [-78, 15.0, -52, 2.0, 30, 48, 0xa855f7],
+    [78, 15.0, 52, 2.0, 30, 48, 0xa855f7],
+    [52, 15.0, -78, 48, 30, 2.0, 0xa855f7],
+    [-52, 15.0, 78, 48, 30, 2.0, 0xa855f7],
 
-    [-108, 7.0, 0, 1.8, 14, 58, 0x9333ea],
-    [108, 7.0, 0, 1.8, 14, 58, 0x9333ea],
-    [0, 7.0, -108, 58, 14, 1.8, 0x9333ea],
-    [0, 7.0, 108, 58, 14, 1.8, 0x9333ea],
+    [-152, 17.0, 0, 2.2, 34, 84, 0x9333ea],
+    [152, 17.0, 0, 2.2, 34, 84, 0x9333ea],
+    [0, 17.0, -152, 84, 34, 2.2, 0x9333ea],
+    [0, 17.0, 152, 84, 34, 2.2, 0x9333ea],
   ];
 
-  // ======================================
-  // 5. 空中ブリッジ・浮島・グラップルピラー・スライディングゲート
-  // ======================================
-  const platforms = [
-    // 空中スカイブリッジ（明るいスカイシアン）
-    [-50, 7.0, 0, 7, 1.0, 32, 0x38bdf8],
-    [50, 7.0, 0, 7, 1.0, 32, 0x38bdf8],
-    [0, 7.0, -50, 32, 1.0, 7, 0x38bdf8],
-    [0, 7.0, 50, 32, 1.0, 7, 0x38bdf8],
+  // 多層スカイブリッジ・高空浮島・超高層グラップルピラー（高さ48m）
+  const skyPlatforms = [
+    [-64, 10.0, 0, 9, 1.2, 42, 0x38bdf8],
+    [64, 10.0, 0, 9, 1.2, 42, 0x38bdf8],
+    [0, 10.0, -64, 42, 1.2, 9, 0x38bdf8],
+    [0, 10.0, 64, 42, 1.2, 9, 0x38bdf8],
 
-    // 浮島足場（8箇所）
-    [-44, 10.5, -44, 8, 1.1, 8, 0x7dd3fc],
-    [44, 10.5, 44, 8, 1.1, 8, 0x7dd3fc],
-    [44, 10.5, -44, 8, 1.1, 8, 0x7dd3fc],
-    [-44, 10.5, 44, 8, 1.1, 8, 0x7dd3fc],
-    [-92, 9.5, -36, 7, 1.1, 7, 0x7dd3fc],
-    [92, 9.5, 36, 7, 1.1, 7, 0x7dd3fc],
-    [36, 9.5, -92, 7, 1.1, 7, 0x7dd3fc],
-    [-36, 9.5, 92, 7, 1.1, 7, 0x7dd3fc],
+    [-62, 22.0, -62, 13, 1.3, 13, 0x7dd3fc],
+    [62, 22.0, 62, 13, 1.3, 13, 0x7dd3fc],
+    [62, 22.0, -62, 13, 1.3, 13, 0x7dd3fc],
+    [-62, 22.0, 62, 13, 1.3, 13, 0x7dd3fc],
 
-    // グラップル用高層ピラー（インディゴ＆ホワイト）
-    [-56, 11.0, -24, 3.0, 22, 3.0, 0x6366f1],
-    [56, 11.0, 24, 3.0, 22, 3.0, 0x6366f1],
-    [24, 11.0, -56, 3.0, 22, 3.0, 0x6366f1],
-    [-24, 11.0, 56, 3.0, 22, 3.0, 0x6366f1],
-    [-95, 11.0, -55, 3.0, 22, 3.0, 0x6366f1],
-    [95, 11.0, 55, 3.0, 22, 3.0, 0x6366f1],
-    [55, 11.0, -95, 3.0, 22, 3.0, 0x6366f1],
-    [-55, 11.0, 95, 3.0, 22, 3.0, 0x6366f1],
+    [-64, 34.0, 0, 12, 1.4, 12, 0xbae6fd],
+    [64, 34.0, 0, 12, 1.4, 12, 0xbae6fd],
+    [0, 34.0, -64, 12, 1.4, 12, 0xbae6fd],
+    [0, 34.0, 64, 12, 1.4, 12, 0xbae6fd],
 
-    // スライディングゲート（鮮やかなアンバーオレンジ）
-    [-14, 3.0, -52, 2.0, 3.4, 10, 0xf59e0b],
-    [14, 3.0, 52, 2.0, 3.4, 10, 0xf59e0b],
-    [-52, 3.0, 14, 10, 3.4, 2.0, 0xf59e0b],
-    [52, 3.0, -14, 10, 3.4, 2.0, 0xf59e0b],
-    [-92, 3.0, 0, 2.0, 3.4, 12, 0xf59e0b],
-    [92, 3.0, 0, 2.0, 3.4, 12, 0xf59e0b],
-    [0, 3.0, -92, 12, 3.4, 2.0, 0xf59e0b],
-    [0, 3.0, 92, 12, 3.4, 2.0, 0xf59e0b],
+    [-76, 24.0, -32, 3.6, 48, 3.6, 0x6366f1],
+    [76, 24.0, 32, 3.6, 48, 3.6, 0x6366f1],
+    [32, 24.0, -76, 3.6, 48, 3.6, 0x6366f1],
+    [-32, 24.0, 76, 3.6, 48, 3.6, 0x6366f1],
+    [-132, 24.0, -68, 3.6, 48, 3.6, 0x4f46e5],
+    [132, 24.0, 68, 3.6, 48, 3.6, 0x4f46e5],
+    [68, 24.0, -132, 3.6, 48, 3.6, 0x4f46e5],
+    [-68, 24.0, 132, 3.6, 48, 3.6, 0x4f46e5],
+
+    [-18, 3.0, -68, 2.2, 3.4, 12, 0xf59e0b],
+    [18, 3.0, 68, 2.2, 3.4, 12, 0xf59e0b],
+    [-68, 3.0, 18, 12, 3.4, 2.2, 0xf59e0b],
+    [68, 3.0, -18, 12, 3.4, 2.2, 0xf59e0b],
+    [-130, 3.0, 0, 2.2, 3.4, 14, 0xf59e0b],
+    [130, 3.0, 0, 2.2, 3.4, 14, 0xf59e0b],
+    [0, 3.0, -130, 14, 3.4, 2.2, 0xf59e0b],
+    [0, 3.0, 130, 14, 3.4, 2.2, 0xf59e0b],
   ];
 
-  for (const list of [centerSteps, cornerTowers, outpostBunkers, wallRunPanels, platforms]) {
+  for (const list of [outpostBunkers, wallRunPanels, skyPlatforms]) {
     for (const [x, y, z, w, h, d, color] of list) {
       addBox(x, y, z, w, h, d, color, { wallRun: true });
     }
   }
 
-  // ======================================
-  // 6. ジャンプパッド（緑・16箇所）
-  // ======================================
-  addJumpPad(-14, 0, -14);
-  addJumpPad(14, 0, 14);
-  addJumpPad(14, 0, -14);
-  addJumpPad(-14, 0, 14);
+  addJumpPad(-18, 0, -18, 26.5);
+  addJumpPad(18, 0, 18, 26.5);
+  addJumpPad(18, 0, -18, 26.5);
+  addJumpPad(-18, 0, 18, 26.5);
 
-  addJumpPad(-64, 0, 0);
-  addJumpPad(64, 0, 0);
-  addJumpPad(0, 0, -64);
-  addJumpPad(0, 0, 64);
+  addJumpPad(-84, 0, 0, 31.5);
+  addJumpPad(84, 0, 0, 31.5);
+  addJumpPad(0, 0, -84, 31.5);
+  addJumpPad(0, 0, 84, 31.5);
 
-  addJumpPad(-64, 0, -64, 25.5);
-  addJumpPad(64, 0, 64, 25.5);
-  addJumpPad(64, 0, -64, 25.5);
-  addJumpPad(-64, 0, 64, 25.5);
+  addJumpPad(-62, 22.65, -62, 31.0);
+  addJumpPad(62, 22.65, 62, 31.0);
+  addJumpPad(62, 22.65, -62, 31.0);
+  addJumpPad(-62, 22.65, 62, 31.0);
 
-  addJumpPad(-112, 0, -65, 24.5);
-  addJumpPad(112, 0, 65, 24.5);
-  addJumpPad(65, 0, -112, 24.5);
-  addJumpPad(-65, 0, 112, 24.5);
+  addBoostPad(0, 0, 44, 7, 5);
+  addBoostPad(0, 0, -44, 7, 5);
+  addBoostPad(44, 0, 0, 5, 7);
+  addBoostPad(-44, 0, 0, 5, 7);
+  addBoostPad(-160, 0, -36, 6, 10);
+  addBoostPad(160, 0, 36, 6, 10);
+  addBoostPad(-36, 0, -160, 10, 6);
+  addBoostPad(36, 0, 160, 10, 6);
 
-  // ======================================
-  // 7. スピードブースト床（シアン・10箇所）
-  // ======================================
-  addBoostPad(0, 0, 36, 6, 4.5);
-  addBoostPad(0, 0, -36, 6, 4.5);
-  addBoostPad(36, 0, 0, 4.5, 6);
-  addBoostPad(-36, 0, 0, 4.5, 6);
-  addBoostPad(-115, 0, -28, 5, 8);
-  addBoostPad(115, 0, 28, 5, 8);
-  addBoostPad(-28, 0, -115, 8, 5);
-  addBoostPad(28, 0, 115, 8, 5);
-  addBoostPad(-78, 0, -45, 5, 6);
-  addBoostPad(78, 0, 45, 5, 6);
+  addZipline(-114, 38.2, -114, 114, 38.2, -114);
+  addZipline(114, 38.2, -114, 114, 38.2, 114);
+  addZipline(114, 38.2, 114, -114, 38.2, 114);
+  addZipline(-114, 38.2, 114, -114, 38.2, -114);
 
-  // ======================================
-  // 8. ジップライン（10本）
-  // ======================================
-  addZipline(-80, 13.4, -80, 80, 13.4, -80);
-  addZipline(80, 13.4, -80, 80, 13.4, 80);
-  addZipline(80, 13.4, 80, -80, 13.4, 80);
-  addZipline(-80, 13.4, 80, -80, 13.4, -80);
+  addZipline(-114, 38.2, -114, -10, 48.0, -10);
+  addZipline(114, 38.2, 114, 10, 48.0, 10);
+  addZipline(114, 38.2, -114, 10, 48.0, -10);
+  addZipline(-114, 38.2, 114, -10, 48.0, 10);
 
-  addZipline(-80, 13.4, -80, 0, 18.4, 0);
-  addZipline(80, 13.4, 80, 0, 18.4, 0);
-  addZipline(80, 13.4, -80, 0, 18.4, 0);
-  addZipline(-80, 13.4, 80, 0, 18.4, 0);
+  addZipline(0, 20.2, -102, 0, 20.2, 102);
+  addZipline(-102, 20.2, 0, 102, 20.2, 0);
 
-  addZipline(0, 8.4, -74, 0, 8.4, 74);
-  addZipline(-74, 8.4, 0, 74, 8.4, 0);
+  addZipline(-64, 11.2, -64, 64, 11.2, 64);
+  addZipline(64, 11.2, -64, -64, 11.2, 64);
 }
 
 buildArena();
 
 // ==========================================
-// 対戦相手（友達 / ソロ練習BOT）の3Dモデル
+// 4人対戦用 敵プレイヤー / BOT エンティティ管理（最大3体の相手）
 // ==========================================
-const rivalGroup = new THREE.Group();
-const rivalBody = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.55, 1.0, 8, 16),
-  new THREE.MeshStandardMaterial({
-    color: 0xef4444,
-    emissive: 0x991b1b,
-    emissiveIntensity: 0.55,
-    roughness: 0.35,
-  })
-);
-rivalBody.position.y = 1.05;
-rivalBody.castShadow = true;
-rivalGroup.add(rivalBody);
-
-const visorMesh = new THREE.Mesh(
-  new THREE.BoxGeometry(0.62, 0.22, 0.24),
-  new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
-);
-visorMesh.position.set(0, 1.48, 0.45);
-rivalGroup.add(visorMesh);
-
-const rivalGun = new THREE.Mesh(
-  new THREE.BoxGeometry(0.14, 0.14, 0.62),
-  new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.3 })
-);
-rivalGun.position.set(0.38, 1.15, 0.42);
-rivalGroup.add(rivalGun);
-
-const rivalHitMesh = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.85, 1.25, 6, 10),
-  new THREE.MeshBasicMaterial({ visible: false })
-);
-rivalHitMesh.position.y = 1.1;
-rivalGroup.add(rivalHitMesh);
-
-scene.add(rivalGroup);
-
 const SPAWN_POINTS = [
-  new THREE.Vector3(0, 2, 102),
-  new THREE.Vector3(0, 2, -102),
-  new THREE.Vector3(102, 2, 0),
-  new THREE.Vector3(-102, 2, 0),
-  new THREE.Vector3(86, 14, 86),
-  new THREE.Vector3(-86, 14, -86),
-  new THREE.Vector3(86, 14, -86),
-  new THREE.Vector3(-86, 14, 86),
+  new THREE.Vector3(0, 2, 142),
+  new THREE.Vector3(0, 2, -142),
+  new THREE.Vector3(142, 2, 0),
+  new THREE.Vector3(-142, 2, 0),
+  new THREE.Vector3(122, 38.5, 122),
+  new THREE.Vector3(-122, 38.5, -122),
+  new THREE.Vector3(122, 38.5, -122),
+  new THREE.Vector3(-122, 38.5, 122),
+  new THREE.Vector3(62, 24.0, 62),
+  new THREE.Vector3(-62, 24.0, -62),
+  new THREE.Vector3(64, 36.0, 0),
+  new THREE.Vector3(-64, 36.0, 0),
 ];
 
-const rival = {
-  pos: new THREE.Vector3(0, 2, -102),
-  targetPos: new THREE.Vector3(0, 2, -102),
-  vel: new THREE.Vector3(),
-  yaw: Math.PI,
-  hp: 100,
-  maxHp: 100,
-  dead: false,
-  respawnTimer: 0,
-  hitFlashTimer: 0,
-  onGround: false,
-  jumpCooldown: 0,
-  botFireCooldown: 0.8,
-  botStrafeDir: 1,
-  botStrafeTimer: 1.5,
-  weaponKey: "rifle",
-  charKey: "vanguard",
-  shieldActive: false,
-  stealthActive: false,
-};
+const BOT_PRESETS = [
+  { id: "bot_1", name: "BOT-BLITZ", charKey: "blitz", gunKey: "smg" },
+  { id: "bot_2", name: "BOT-VANGUARD", charKey: "vanguard", gunKey: "rifle" },
+  { id: "bot_3", name: "BOT-SPECTRE", charKey: "spectre", gunKey: "shotgun" },
+];
 
-function applyRivalCharacterVisual(charKey) {
-  const ch = CHARACTERS[charKey] || CHARACTERS.vanguard;
-  rival.charKey = ch.id;
-  rival.maxHp = ch.maxHp;
-  visorMesh.material.color.setHex(ch.visorColor);
-  rivalBody.material.transparent = rival.stealthActive;
-  rivalBody.material.opacity = rival.stealthActive ? 0.22 : 1.0;
+function createRivalRig(index, preset) {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.55, 1.0, 8, 16),
+    new THREE.MeshStandardMaterial({
+      color: 0xef4444,
+      emissive: 0x991b1b,
+      emissiveIntensity: 0.55,
+      roughness: 0.35,
+    })
+  );
+  body.position.y = 1.05;
+  body.castShadow = true;
+  group.add(body);
+
+  const visor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.64, 0.22, 0.24),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+  );
+  visor.position.set(0, 1.48, 0.45);
+  group.add(visor);
+
+  const gunMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.16, 0.68),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.75, roughness: 0.25 })
+  );
+  gunMesh.position.set(0.38, 1.15, 0.44);
+  group.add(gunMesh);
+
+  const hitMesh = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.88, 1.30, 6, 10),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  hitMesh.position.y = 1.1;
+  hitMesh.userData.rivalIndex = index;
+  group.add(hitMesh);
+
+  scene.add(group);
+
+  const ch = CHARACTERS[preset.charKey] || CHARACTERS.vanguard;
+  const sp = SPAWN_POINTS[(index + 1) % SPAWN_POINTS.length].clone();
+  return {
+    index,
+    id: preset.id,
+    name: preset.name,
+    active: true,
+    isRemotePlayer: false,
+    peerId: null,
+    kills: 0,
+    pos: sp.clone(),
+    targetPos: sp.clone(),
+    vel: new THREE.Vector3(),
+    yaw: Math.PI,
+    hp: ch.maxHp,
+    maxHp: ch.maxHp,
+    dead: false,
+    respawnTimer: 0,
+    hitFlashTimer: 0,
+    onGround: false,
+    jumpCooldown: 0,
+    botFireCooldown: 0.9 + index * 0.35,
+    botStrafeDir: index % 2 === 0 ? 1 : -1,
+    botStrafeTimer: 1.3 + index * 0.4,
+    weaponKey: preset.gunKey,
+    charKey: ch.id,
+    shieldActive: false,
+    stealthActive: false,
+    group,
+    body,
+    visor,
+    hitMesh,
+  };
 }
-applyRivalCharacterVisual("vanguard");
+
+const rivals = BOT_PRESETS.map((preset, idx) => createRivalRig(idx, preset));
+
+function applyRivalVisual(r, charKey) {
+  const ch = CHARACTERS[charKey] || CHARACTERS.vanguard;
+  r.charKey = ch.id;
+  r.maxHp = ch.maxHp;
+  r.visor.material.color.setHex(ch.visorColor);
+  r.body.material.transparent = Boolean(r.stealthActive);
+  r.body.material.opacity = r.stealthActive ? 0.22 : 1.0;
+}
+
+rivals.forEach((r) => applyRivalVisual(r, r.charKey));
+
+function getActiveRivals() {
+  return rivals.filter((r) => r.active);
+}
+
+function getAllParticipantsScoreList() {
+  const list = [
+    {
+      id: "me",
+      name: `YOU (${getSelectedChar().name})`,
+      kills: game.myKills,
+      hp: player.dead ? 0 : Math.ceil(player.hp),
+      dead: player.dead,
+      isMe: true,
+    },
+  ];
+  for (const r of getActiveRivals()) {
+    const ch = CHARACTERS[r.charKey] || CHARACTERS.vanguard;
+    list.push({
+      id: r.id,
+      name: `${r.name} (${ch.name})`,
+      kills: r.kills,
+      hp: r.dead ? 0 : Math.ceil(r.hp),
+      dead: r.dead,
+      isMe: false,
+    });
+  }
+  list.sort((a, b) => b.kills - a.kills || (a.isMe ? -1 : 1));
+  return list;
+}
 
 // ==========================================
-// オンライン対戦（PeerJS ルームコード接続）
+// オンライン対戦（PeerJS 最大4人同時接続ハブ）
 // ==========================================
-const ROOM_PREFIX = "parkourfps-v7-";
+const ROOM_PREFIX = "parkourfps-v15-";
+const MAX_ROOM_PLAYERS = 4;
 const net = {
-  mode: "solo", // "solo" | "host" | "client"
+  mode: "solo",
   peer: null,
-  conn: null,
+  myPeerId: "",
+  conns: [],
+  hostConn: null,
   connected: false,
   roomCode: "",
   lastSyncSent: 0,
@@ -1260,9 +1291,10 @@ function setMpTab(tab) {
 function updateStartButtonLabel() {
   if (game.over) return;
   if (net.connected) {
-    startBtn.textContent = game.elapsed > 0 ? "対戦に戻る" : "友達と対戦スタート！";
+    const count = getActiveRivals().length + 1;
+    startBtn.textContent = game.elapsed > 0 ? "対戦に戻る" : `${count}人で対戦スタート！`;
   } else if (net.mode === "solo") {
-    startBtn.textContent = game.elapsed > 0 ? "再開する" : "対戦スタート（ソロ練習）";
+    startBtn.textContent = game.elapsed > 0 ? "再開する" : "4人乱戦スタート（ソロ練習）";
   } else {
     startBtn.textContent = "接続待機中（ソロ練習も可）";
   }
@@ -1270,7 +1302,6 @@ function updateStartButtonLabel() {
 
 function updateScoreAndHpUI() {
   myKillsDisplay.textContent = String(game.myKills);
-  enemyKillsDisplay.textContent = String(game.enemyKills);
   targetKillsDisplay.textContent = String(game.targetKills);
 
   const myHpClamped = Math.max(0, Math.ceil(player.hp));
@@ -1278,215 +1309,292 @@ function updateScoreAndHpUI() {
   myHpFill.style.width = `${(myHpClamped / player.maxHp) * 100}%`;
   myHpFill.classList.toggle("low", myHpClamped <= 30);
 
-  const enHpClamped = Math.max(0, Math.ceil(rival.hp));
-  enemyHpDisplay.textContent = rival.dead ? "KO" : String(enHpClamped);
-  if (enemyHpHudFill) {
-    enemyHpHudFill.style.width = `${rival.dead ? 0 : (enHpClamped / rival.maxHp) * 100}%`;
+  if (ffaScoreboard) {
+    const ranking = getAllParticipantsScoreList();
+    ffaScoreboard.innerHTML = ranking
+      .map(
+        (entry, idx) =>
+          `<div class="ffa-row${entry.isMe ? " me" : ""}${entry.dead ? " ko" : ""}">` +
+          `<span>${idx + 1}. ${entry.name}</span>` +
+          `<strong>${entry.kills}K (${entry.dead ? "KO" : entry.hp})</strong>` +
+          `</div>`
+      )
+      .join("");
   }
 
   if (net.connected) {
-    enemyTagLabel.textContent = "FRIEND";
-    netStatusPill.textContent = `ONLINE #${net.roomCode}`;
+    const totalPlayers = getActiveRivals().length + 1;
+    netStatusPill.textContent = `ONLINE ${totalPlayers}人 #${net.roomCode}`;
     netStatusPill.className = "net-pill online";
   } else {
-    enemyTagLabel.textContent = "BOT";
-    netStatusPill.textContent = "SOLO練習";
+    netStatusPill.textContent = "4人乱戦(SOLO)";
     netStatusPill.className = "net-pill solo";
   }
 }
 
 function sendNet(payload) {
-  if (net.connected && net.conn && net.conn.open) {
-    try {
-      net.conn.send(payload);
-    } catch {
-      // ignore
+  if (!net.connected) return;
+  if (net.mode === "host") {
+    for (const c of net.conns) {
+      if (c && c.open) {
+        try { c.send(payload); } catch {}
+      }
     }
+  } else if (net.mode === "client" && net.hostConn && net.hostConn.open) {
+    try { net.hostConn.send(payload); } catch {}
   }
 }
 
+function sendToSpecificPeer(targetPeerId, payload) {
+  if (!net.connected) return;
+  if (net.mode === "host") {
+    const c = net.conns.find((conn) => conn.peer === targetPeerId);
+    if (c && c.open) {
+      try { c.send(payload); } catch {}
+    }
+  } else if (net.mode === "client" && net.hostConn && net.hostConn.open) {
+    try {
+      net.hostConn.send({ ...payload, relayTo: targetPeerId });
+    } catch {}
+  }
+}
+
+function configureSoloBotsMode() {
+  rivals.forEach((r, idx) => {
+    const preset = BOT_PRESETS[idx];
+    r.active = true;
+    r.isRemotePlayer = false;
+    r.peerId = null;
+    r.name = preset.name;
+    r.kills = 0;
+    applyRivalVisual(r, preset.charKey);
+    r.group.visible = true;
+  });
+}
+
+function syncRemoteRosterFromHost() {
+  if (net.mode !== "host") return;
+  const openConns = net.conns.filter((c) => c && c.open);
+  net.connected = openConns.length > 0;
+  if (!net.connected) {
+    configureSoloBotsMode();
+    updateScoreAndHpUI();
+    updateStartButtonLabel();
+    return;
+  }
+
+  rivals.forEach((r, idx) => {
+    const conn = openConns[idx];
+    if (conn) {
+      r.active = true;
+      r.isRemotePlayer = true;
+      r.peerId = conn.peer;
+      r.name = `PLAYER ${idx + 2}`;
+      r.group.visible = !r.dead;
+    } else {
+      r.active = false;
+      r.isRemotePlayer = false;
+      r.peerId = null;
+      r.group.visible = false;
+    }
+  });
+
+  const roster = [
+    { peerId: net.myPeerId, name: "HOST (P1)" },
+    ...openConns.map((c, idx) => ({ peerId: c.peer, name: `PLAYER ${idx + 2}` })),
+  ];
+  sendNet({ type: "roster", roster, targetKills: game.targetKills });
+  updateScoreAndHpUI();
+  updateStartButtonLabel();
+}
+
 function cleanupPeer() {
-  if (net.conn) {
-    try { net.conn.close(); } catch {}
-    net.conn = null;
+  for (const c of net.conns) {
+    try { c.close(); } catch {}
+  }
+  net.conns = [];
+  if (net.hostConn) {
+    try { net.hostConn.close(); } catch {}
+    net.hostConn = null;
   }
   if (net.peer) {
     try { net.peer.destroy(); } catch {}
     net.peer = null;
   }
   net.connected = false;
+  configureSoloBotsMode();
   updateScoreAndHpUI();
 }
 
-function setupConnection(conn, isHost) {
-  net.conn = conn;
-  conn.on("open", () => {
-    net.connected = true;
-    net.mode = isHost ? "host" : "client";
+function handleIncomingNetPacket(senderPeerId, data) {
+  if (!data || typeof data !== "object") return;
+
+  if (net.mode === "host") {
+    if (data.relayTo) {
+      if (data.relayTo === net.myPeerId) {
+        handleIncomingNetPacket(senderPeerId, { ...data, relayTo: undefined });
+      } else {
+        sendToSpecificPeer(data.relayTo, { ...data, fromPeer: senderPeerId, relayTo: undefined });
+      }
+      return;
+    }
+    if (data.type === "state" || data.type === "shot" || data.type === "killed" || data.type === "respawned") {
+      const fwd = { ...data, fromPeer: senderPeerId };
+      for (const c of net.conns) {
+        if (c && c.open && c.peer !== senderPeerId) {
+          try { c.send(fwd); } catch {}
+        }
+      }
+    }
+  }
+
+  const originPeer = data.fromPeer || senderPeerId;
+
+  if (data.type === "roster" && net.mode === "client") {
+    const others = (data.roster || []).filter((p) => p.peerId !== net.myPeerId);
+    rivals.forEach((r, idx) => {
+      const info = others[idx];
+      if (info) {
+        r.active = true;
+        r.isRemotePlayer = true;
+        r.peerId = info.peerId;
+        r.name = info.name;
+        r.group.visible = !r.dead;
+      } else {
+        r.active = false;
+        r.peerId = null;
+        r.group.visible = false;
+      }
+    });
     updateScoreAndHpUI();
     updateStartButtonLabel();
-
-    if (isHost) {
-      hostStatusText.textContent = "友達が接続しました！対戦を開始します！";
-      hostStatusText.className = "mp-status ok";
-      const goal = Number(goalKillsSelect.value) || 5;
-      game.targetKills = goal;
-      sendNet({ type: "start_match", targetKills: goal });
-      resetMatch(true);
-      startOrResumeGame();
-    } else {
-      joinStatusText.textContent = "接続成功！対戦を開始します！";
-      joinStatusText.className = "mp-status ok";
-    }
-  });
-
-  conn.on("data", (data) => {
-    if (!data || typeof data !== "object") return;
-
-    if (data.type === "start_match") {
-      game.targetKills = Number(data.targetKills) || 5;
-      goalKillsSelect.value = String(game.targetKills);
-      resetMatch(false);
-      startOrResumeGame();
-    } else if (data.type === "state") {
-      rival.targetPos.set(data.x, data.y, data.z);
-      rival.yaw = data.yaw || 0;
-      rival.hp = typeof data.hp === "number" ? data.hp : rival.hp;
-      rival.dead = Boolean(data.dead);
-      rival.weaponKey = data.w || "rifle";
-      if (data.ch && CHARACTERS[data.ch] && rival.charKey !== data.ch) {
-        applyRivalCharacterVisual(data.ch);
+  } else if (data.type === "start_match") {
+    game.targetKills = Number(data.targetKills) || 5;
+    goalKillsSelect.value = String(game.targetKills);
+    resetMatch(false);
+    startOrResumeGame();
+  } else if (data.type === "state") {
+    const r = rivals.find((item) => item.active && item.peerId === originPeer);
+    if (r) {
+      r.targetPos.set(data.x, data.y, data.z);
+      r.yaw = data.yaw || 0;
+      r.hp = typeof data.hp === "number" ? data.hp : r.hp;
+      r.dead = Boolean(data.dead);
+      r.kills = typeof data.kills === "number" ? data.kills : r.kills;
+      r.weaponKey = data.w || "rifle";
+      if (data.ch && CHARACTERS[data.ch] && r.charKey !== data.ch) {
+        applyRivalVisual(r, data.ch);
       }
-      rival.shieldActive = Boolean(data.sh);
-      rival.stealthActive = Boolean(data.st);
-      rivalGroup.visible = !rival.dead;
+      r.shieldActive = Boolean(data.sh);
+      r.stealthActive = Boolean(data.st);
+      r.group.visible = !r.dead;
       updateScoreAndHpUI();
-    } else if (data.type === "shot") {
-      const s = new THREE.Vector3(data.sx, data.sy, data.sz);
-      const e = new THREE.Vector3(data.ex, data.ey, data.ez);
-      spawnTracer(s, e, data.color || 0xef4444);
-    } else if (data.type === "hit") {
-      applyDamageToSelf(Number(data.dmg) || 10, data.weaponName || "WEAPON");
-    } else if (data.type === "killed") {
-      // 相手を撃破した通知を受信
+      if (r.kills >= game.targetKills && !game.over) {
+        triggerMatchEnd(false, r.name);
+      }
+    }
+  } else if (data.type === "shot") {
+    const s = new THREE.Vector3(data.sx, data.sy, data.sz);
+    const e = new THREE.Vector3(data.ex, data.ey, data.ez);
+    spawnTracer(s, e, data.color || 0xef4444);
+  } else if (data.type === "hit") {
+    applyDamageToSelf(Number(data.dmg) || 10, data.weaponName || "WEAPON", originPeer);
+  } else if (data.type === "killed") {
+    const victim = rivals.find((item) => item.active && item.peerId === originPeer);
+    if (victim) {
+      victim.dead = true;
+      victim.hp = 0;
+      victim.group.visible = false;
+    }
+    if (data.killerPeer === net.myPeerId) {
       game.myKills += 1;
-      rival.dead = true;
-      rival.hp = 0;
-      rivalGroup.visible = false;
       playSfx("stun");
       showTrick(`KILL!! (${game.myKills} / ${game.targetKills})`);
       updateScoreAndHpUI();
       if (game.myKills >= game.targetKills) {
-        triggerMatchEnd(true);
+        triggerMatchEnd(true, "YOU");
       }
-    } else if (data.type === "respawned") {
-      rival.dead = false;
-      rival.hp = 100;
-      rival.pos.set(data.x, data.y, data.z);
-      rival.targetPos.copy(rival.pos);
-      rivalGroup.visible = true;
+    } else if (data.killerPeer) {
+      const killer = rivals.find((item) => item.active && item.peerId === data.killerPeer);
+      if (killer) {
+        killer.kills += 1;
+        updateScoreAndHpUI();
+        if (killer.kills >= game.targetKills && !game.over) {
+          triggerMatchEnd(false, killer.name);
+        }
+      }
+    }
+  } else if (data.type === "respawned") {
+    const r = rivals.find((item) => item.active && item.peerId === originPeer);
+    if (r) {
+      r.dead = false;
+      r.hp = r.maxHp;
+      r.pos.set(data.x, data.y, data.z);
+      r.targetPos.copy(r.pos);
+      r.group.visible = true;
       updateScoreAndHpUI();
-    } else if (data.type === "rematch") {
-      game.targetKills = Number(data.targetKills) || game.targetKills;
-      resetMatch(false);
+    }
+  } else if (data.type === "rematch") {
+    game.targetKills = Number(data.targetKills) || game.targetKills;
+    resetMatch(false);
+    startOrResumeGame();
+  }
+}
+
+function setupHostClientConnection(conn) {
+  if (net.conns.length >= MAX_ROOM_PLAYERS - 1) {
+    try { conn.close(); } catch {}
+    return;
+  }
+  net.conns.push(conn);
+  conn.on("open", () => {
+    net.connected = true;
+    net.mode = "host";
+    syncRemoteRosterFromHost();
+    const total = getActiveRivals().length + 1;
+    hostStatusText.textContent = `現在 ${total} / 4 人参加中！「対戦スタート」または追加待機できます`;
+    hostStatusText.className = "mp-status ok";
+
+    const goal = Number(goalKillsSelect.value) || 5;
+    game.targetKills = goal;
+    sendNet({ type: "start_match", targetKills: goal });
+    if (!game.active) {
+      resetMatch(true);
       startOrResumeGame();
     }
   });
 
+  conn.on("data", (data) => handleIncomingNetPacket(conn.peer, data));
+
   conn.on("close", () => {
-    net.connected = false;
-    updateScoreAndHpUI();
-    updateStartButtonLabel();
-    showTrick("相手の接続が切れました");
+    net.conns = net.conns.filter((c) => c !== conn);
+    syncRemoteRosterFromHost();
+    showTrick("プレイヤー1名が退出しました");
   });
 }
 
-mpTabHost.addEventListener("click", () => setMpTab("host"));
-mpTabJoin.addEventListener("click", () => setMpTab("join"));
-mpTabSolo.addEventListener("click", () => {
-  cleanupPeer();
-  setMpTab("solo");
-});
-
-goalKillsSelect.addEventListener("change", () => {
-  game.targetKills = Number(goalKillsSelect.value) || 5;
-  updateScoreAndHpUI();
-});
-
-createRoomBtn.addEventListener("click", () => {
-  if (typeof Peer === "undefined") {
-    hostStatusText.textContent = "通信ライブラリの読み込みに失敗しました";
-    hostStatusText.className = "mp-status err";
-    return;
-  }
-  cleanupPeer();
-  const code = String(Math.floor(1000 + Math.random() * 9000));
-  net.roomCode = code;
-  net.mode = "host";
-  hostRoomCodeEl.textContent = code;
-  hostStatusText.textContent = "ルームを作成中...";
-  hostStatusText.className = "mp-status";
-
-  const peer = new Peer(ROOM_PREFIX + code);
-  net.peer = peer;
-
-  peer.on("open", () => {
-    hostStatusText.textContent = `待機中... 友達に「${code}」を教えてください`;
-    hostStatusText.className = "mp-status ok";
+function setupClientToHostConnection(conn) {
+  net.hostConn = conn;
+  conn.on("open", () => {
+    net.connected = true;
+    net.mode = "client";
+    joinStatusText.textContent = "接続成功！4人アリーナへ参加します！";
+    joinStatusText.className = "mp-status ok";
+    updateScoreAndHpUI();
+    updateStartButtonLabel();
   });
 
-  peer.on("connection", (conn) => {
-    setupConnection(conn, true);
+  conn.on("data", (data) => handleIncomingNetPacket(conn.peer, data));
+
+  conn.on("close", () => {
+    net.connected = false;
+    net.hostConn = null;
+    configureSoloBotsMode();
+    updateScoreAndHpUI();
+    updateStartButtonLabel();
+    showTrick("ホストとの接続が切れました");
   });
-
-  peer.on("error", (err) => {
-    hostStatusText.textContent = `エラー: ${err.type}（もう一度お試しください）`;
-    hostStatusText.className = "mp-status err";
-  });
-});
-
-copyCodeBtn.addEventListener("click", () => {
-  if (!net.roomCode || net.roomCode === "----") return;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(net.roomCode).catch(() => {});
-  }
-  copyCodeBtn.textContent = "済!";
-  setTimeout(() => { copyCodeBtn.textContent = "コピー"; }, 1200);
-});
-
-joinRoomBtn.addEventListener("click", () => {
-  const code = (joinCodeInput.value || "").trim();
-  if (!/^\d{4}$/.test(code)) {
-    joinStatusText.textContent = "4桁の数字を入力してください";
-    joinStatusText.className = "mp-status err";
-    return;
-  }
-  if (typeof Peer === "undefined") {
-    joinStatusText.textContent = "通信ライブラリの読み込みに失敗しました";
-    joinStatusText.className = "mp-status err";
-    return;
-  }
-  cleanupPeer();
-  net.roomCode = code;
-  net.mode = "client";
-  joinStatusText.textContent = `部屋 ${code} に接続中...`;
-  joinStatusText.className = "mp-status";
-
-  const peer = new Peer();
-  net.peer = peer;
-
-  peer.on("open", () => {
-    const conn = peer.connect(ROOM_PREFIX + code, { reliable: true });
-    setupConnection(conn, false);
-  });
-
-  peer.on("error", (err) => {
-    joinStatusText.textContent = `接続失敗 (${err.type})。コードを確認してください`;
-    joinStatusText.className = "mp-status err";
-  });
-});
-
-// ==========================================
+}// ==========================================
 // プレイヤー状態＆入力
 // ==========================================
 const player = {
@@ -1911,165 +2019,229 @@ function buildActiveViewModel() {
 
     const bodyMat = new THREE.MeshStandardMaterial({
       color: skin.bodyColor,
-      roughness: 0.32,
-      metalness: skin.metalness,
+      roughness: 0.28,
+      metalness: Math.min(0.95, skin.metalness + 0.08),
+    });
+    const darkTrimMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      roughness: 0.35,
+      metalness: 0.85,
     });
     const accentMat = new THREE.MeshStandardMaterial({
       color: accentHex,
       emissive: accentHex,
-      emissiveIntensity: 0.85,
-      roughness: 0.2,
+      emissiveIntensity: 0.95,
+      roughness: 0.16,
     });
-    const metalMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.3, metalness: 0.8 });
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      roughness: 0.24,
+      metalness: 0.88,
+    });
 
     if (g.key === "rifle") {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.13, 0.52), bodyMat);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.34, 10), metalMat);
+      const upper = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.075, 0.54), bodyMat);
+      upper.position.set(0, 0.025, -0.02);
+      const lower = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.065, 0.38), darkTrimMat);
+      lower.position.set(0, -0.032, 0.03);
+      const shroud = new THREE.Mesh(new THREE.BoxGeometry(0.104, 0.082, 0.26), bodyMat);
+      shroud.position.set(0, 0.022, -0.22);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.024, 0.38, 12), metalMat);
       barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0, 0.025, -0.34);
-      const core = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.035, 0.28), accentMat);
-      core.position.set(0, 0.03, -0.05);
-      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.08), metalMat);
-      mag.position.set(0, -0.11, -0.04);
-      mag.rotation.x = 0.22;
-      const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.09), accentMat);
-      sight.position.set(0, 0.085, 0.02);
-      weaponRoot.add(body, barrel, core, mag, sight);
-      muzzlePoint.position.set(0, 0.025, -0.53);
+      barrel.position.set(0, 0.024, -0.38);
+      const brake = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.056, 0.075), darkTrimMat);
+      brake.position.set(0, 0.024, -0.55);
+      const sideCoreL = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.024, 0.34), accentMat);
+      sideCoreL.position.set(-0.053, 0.026, -0.10);
+      const sideCoreR = sideCoreL.clone();
+      sideCoreR.position.x = 0.053;
+      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.18, 0.078), darkTrimMat);
+      mag.position.set(0, -0.125, -0.05);
+      mag.rotation.x = 0.26;
+      const magStripe = new THREE.Mesh(new THREE.BoxGeometry(0.060, 0.12, 0.022), accentMat);
+      magStripe.position.set(0, -0.125, -0.05);
+      magStripe.rotation.x = 0.26;
+      const sightFrame = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.052, 0.11), darkTrimMat);
+      sightFrame.position.set(0, 0.088, 0.02);
+      const sightGlass = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.034, 0.015), accentMat);
+      sightGlass.position.set(0, 0.092, -0.02);
+      weaponRoot.add(upper, lower, shroud, barrel, brake, sideCoreL, sideCoreR, mag, magStripe, sightFrame, sightGlass);
+      muzzlePoint.position.set(0, 0.024, -0.60);
     } else if (g.key === "smg") {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.13, 0.36), bodyMat);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.022, 0.22, 10), metalMat);
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0, 0.02, -0.24);
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.106, 0.03, 0.24), accentMat);
-      rail.position.set(0, 0.055, -0.02);
-      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.20, 0.065), accentMat);
-      mag.position.set(0, -0.12, -0.05);
-      mag.rotation.x = -0.18;
-      weaponRoot.add(body, barrel, rail, mag);
-      muzzlePoint.position.set(0, 0.02, -0.38);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.092, 0.125, 0.38), bodyMat);
+      const foregrip = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.085, 0.052), darkTrimMat);
+      foregrip.position.set(0, -0.085, -0.15);
+      foregrip.rotation.x = -0.25;
+      const suppressor = new THREE.Mesh(new THREE.CylinderGeometry(0.030, 0.032, 0.25, 14), darkTrimMat);
+      suppressor.rotation.x = Math.PI / 2;
+      suppressor.position.set(0, 0.022, -0.27);
+      const barrelRing = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.025, 14), accentMat);
+      barrelRing.rotation.x = Math.PI / 2;
+      barrelRing.position.set(0, 0.022, -0.36);
+      const topRail = new THREE.Mesh(new THREE.BoxGeometry(0.098, 0.024, 0.30), accentMat);
+      topRail.position.set(0, 0.072, -0.02);
+      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.23, 0.062), darkTrimMat);
+      mag.position.set(0, -0.13, -0.05);
+      mag.rotation.x = -0.22;
+      const magGlow = new THREE.Mesh(new THREE.BoxGeometry(0.050, 0.18, 0.018), accentMat);
+      magGlow.position.set(0, -0.13, -0.05);
+      magGlow.rotation.x = -0.22;
+      weaponRoot.add(body, foregrip, suppressor, barrelRing, topRail, mag, magGlow);
+      muzzlePoint.position.set(0, 0.022, -0.42);
     } else if (g.key === "shotgun") {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.48), bodyMat);
-      const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.034, 0.36, 10), metalMat);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.135, 0.46), bodyMat);
+      const heatShield = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.045, 0.34), darkTrimMat);
+      heatShield.position.set(0, 0.068, -0.22);
+      const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.030, 0.42, 12), metalMat);
       barrelTop.rotation.x = Math.PI / 2;
-      barrelTop.position.set(0, 0.032, -0.30);
-      const barrelBot = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.32, 10), bodyMat);
+      barrelTop.position.set(0, 0.035, -0.34);
+      const barrelBot = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.38, 12), darkTrimMat);
       barrelBot.rotation.x = Math.PI / 2;
-      barrelBot.position.set(0, -0.022, -0.28);
-      const pump = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.07, 0.18), accentMat);
-      pump.position.set(0, -0.02, -0.24);
-      weaponRoot.add(body, barrelTop, barrelBot, pump);
-      muzzlePoint.position.set(0, 0.032, -0.50);
+      barrelBot.position.set(0, -0.020, -0.32);
+      const pump = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.068, 0.19), bodyMat);
+      pump.position.set(0, -0.022, -0.24);
+      const pumpGlowL = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.032, 0.16), accentMat);
+      pumpGlowL.position.set(-0.074, -0.022, -0.24);
+      const pumpGlowR = pumpGlowL.clone();
+      pumpGlowR.position.x = 0.074;
+      weaponRoot.add(body, heatShield, barrelTop, barrelBot, pump, pumpGlowL, pumpGlowR);
+      muzzlePoint.position.set(0, 0.035, -0.56);
     } else if (g.key === "sniper") {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.12, 0.58), bodyMat);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.62, 10), metalMat);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.125, 0.62), bodyMat);
+      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.105, 0.22), darkTrimMat);
+      stock.position.set(0, -0.015, 0.34);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.022, 0.72, 12), metalMat);
       barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0, 0.02, -0.50);
-      const railL = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.022, 0.50), accentMat);
-      railL.position.set(-0.048, 0.02, -0.35);
-      const railR = railL.clone();
-      railR.position.x = 0.048;
-      const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.028, 0.26, 12), metalMat);
+      barrel.position.set(0, 0.022, -0.56);
+      const railTop = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.018, 0.56), accentMat);
+      railTop.position.set(0, 0.052, -0.42);
+      const railBot = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.018, 0.56), accentMat);
+      railBot.position.set(0, -0.008, -0.42);
+      const muzzleTip = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.068, 0.09), darkTrimMat);
+      muzzleTip.position.set(0, 0.022, -0.89);
+      const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.028, 0.30, 14), darkTrimMat);
       scope.rotation.x = Math.PI / 2;
-      scope.position.set(0, 0.105, -0.02);
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.02, 12), accentMat);
+      scope.position.set(0, 0.112, -0.04);
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.022, 14), accentMat);
       lens.rotation.x = Math.PI / 2;
-      lens.position.set(0, 0.105, -0.155);
-      weaponRoot.add(body, barrel, railL, railR, scope, lens);
-      muzzlePoint.position.set(0, 0.02, -0.82);
+      lens.position.set(0, 0.112, -0.195);
+      const bipodL = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 8), metalMat);
+      bipodL.position.set(-0.048, -0.075, -0.44);
+      bipodL.rotation.z = 0.25;
+      const bipodR = bipodL.clone();
+      bipodR.position.x = 0.048;
+      bipodR.rotation.z = -0.25;
+      weaponRoot.add(body, stock, barrel, railTop, railBot, muzzleTip, scope, lens, bipodL, bipodR);
+      muzzlePoint.position.set(0, 0.022, -0.95);
     } else {
-      // lmg
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.56), bodyMat);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.032, 0.42, 10), metalMat);
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0, 0.03, -0.40);
-      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.12, 14), accentMat);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.155, 0.56), bodyMat);
+      const shroud = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.062, 0.32, 12), darkTrimMat);
+      shroud.rotation.x = Math.PI / 2;
+      shroud.position.set(0, 0.028, -0.34);
+      const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.48, 10), metalMat);
+      barrelTop.rotation.x = Math.PI / 2;
+      barrelTop.position.set(0, 0.046, -0.44);
+      const barrelBot = barrelTop.clone();
+      barrelBot.position.y = 0.010;
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.13, 16), darkTrimMat);
       drum.rotation.z = Math.PI / 2;
-      drum.position.set(0, -0.10, -0.06);
-      const topCover = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.03, 0.34), accentMat);
-      topCover.position.set(0, 0.08, -0.04);
-      weaponRoot.add(body, barrel, drum, topCover);
-      muzzlePoint.position.set(0, 0.03, -0.62);
+      drum.position.set(0, -0.105, -0.06);
+      const drumCore = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.138, 16), accentMat);
+      drumCore.rotation.z = Math.PI / 2;
+      drumCore.position.set(0, -0.105, -0.06);
+      const topCover = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.032, 0.36), accentMat);
+      topCover.position.set(0, 0.088, -0.04);
+      weaponRoot.add(body, shroud, barrelTop, barrelBot, drum, drumCore, topCover);
+      muzzlePoint.position.set(0, 0.028, -0.69);
     }
 
     muzzleFlashMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(g.key === "shotgun" ? 0.095 : 0.065, 8, 8),
-      new THREE.MeshBasicMaterial({ color: accentHex, transparent: true, opacity: 0.92 })
+      new THREE.OctahedronGeometry(g.key === "shotgun" ? 0.115 : 0.08, 1),
+      new THREE.MeshBasicMaterial({ color: accentHex, transparent: true, opacity: 0.94 })
     );
     muzzleFlashMesh.position.copy(muzzlePoint.position);
     muzzleFlashMesh.visible = false;
     weaponRoot.add(muzzlePoint, muzzleFlashMesh);
   } else {
-    // 近接武器モデル（ナイフ / カラムビット / サイバーカタナ / プラズマアックス）
     const m = MELEES[profile.equippedMelee];
     const skin = SKINS[profile.equippedMeleeSkin] || SKINS.default;
     const accentHex = getEffectiveAccentColor(m.defaultColor, profile.equippedMeleeSkin);
 
     const gripMat = new THREE.MeshStandardMaterial({
       color: skin.bodyColor,
-      roughness: 0.35,
+      roughness: 0.30,
       metalness: skin.metalness,
+    });
+    const steelMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      roughness: 0.22,
+      metalness: 0.9,
     });
     const bladeMat = new THREE.MeshStandardMaterial({
       color: accentHex,
       emissive: accentHex,
-      emissiveIntensity: 0.78,
-      roughness: 0.18,
-      metalness: 0.85,
+      emissiveIntensity: 0.92,
+      roughness: 0.14,
+      metalness: 0.88,
     });
 
     if (m.key === "knife") {
-      const grip = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.055, 0.16), gripMat);
-      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.085, 0.022), bladeMat);
-      guard.position.set(0, 0, -0.09);
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.045, 0.28), bladeMat);
-      blade.position.set(0, 0.005, -0.24);
-      weaponRoot.add(grip, guard, blade);
+      const pommel = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.03, 12), steelMat);
+      pommel.rotation.x = Math.PI / 2;
+      pommel.position.set(0, 0, 0.09);
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.028, 0.16, 12), gripMat);
+      grip.rotation.x = Math.PI / 2;
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.095, 0.024), steelMat);
+      guard.position.set(0, 0, -0.085);
+      const bladeSpine = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.032, 0.29), steelMat);
+      bladeSpine.position.set(0, 0.012, -0.24);
+      const bladeEdge = new THREE.Mesh(new THREE.BoxGeometry(0.010, 0.024, 0.31), bladeMat);
+      bladeEdge.position.set(0, -0.010, -0.25);
+      weaponRoot.add(pommel, grip, guard, bladeSpine, bladeEdge);
     } else if (m.key === "karambit") {
-      // カラムビット：フィンガーリング + 湾曲クローブレード
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.011, 10, 20), bladeMat);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.011, 12, 24), bladeMat);
       ring.rotation.y = Math.PI / 2;
-      ring.position.set(0, -0.01, 0.08);
-
-      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.048, 0.14), gripMat);
+      ring.position.set(0, -0.012, 0.085);
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.048, 0.15), gripMat);
       handle.rotation.x = 0.24;
       handle.position.set(0, 0.01, -0.01);
-
-      const blade1 = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.044, 0.15), bladeMat);
+      const bolster = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.056, 0.028), steelMat);
+      bolster.position.set(0, 0.005, -0.085);
+      const blade1 = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.044, 0.16), steelMat);
       blade1.rotation.x = -0.35;
-      blade1.position.set(0, -0.015, -0.14);
-
-      const blade2 = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.034, 0.14), bladeMat);
-      blade2.rotation.x = -0.88;
-      blade2.position.set(0, -0.095, -0.23);
-
-      weaponRoot.add(ring, handle, blade1, blade2);
+      blade1.position.set(0, -0.018, -0.15);
+      const blade2 = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.034, 0.16), bladeMat);
+      blade2.rotation.x = -0.92;
+      blade2.position.set(0, -0.105, -0.24);
+      weaponRoot.add(ring, handle, bolster, blade1, blade2);
     } else if (m.key === "katana") {
-      const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.24, 10), gripMat);
+      const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.025, 0.26, 12), gripMat);
       hilt.rotation.x = Math.PI / 2.4;
-      hilt.position.set(0, -0.04, 0.04);
-      const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.016, 14), bladeMat);
+      hilt.position.set(0, -0.04, 0.045);
+      const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.018, 8), steelMat);
       tsuba.rotation.x = Math.PI / 2.4;
-      tsuba.position.set(0, 0.01, -0.07);
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.036, 0.68), bladeMat);
-      blade.rotation.x = -0.22;
-      blade.position.set(0, 0.11, -0.40);
-      weaponRoot.add(hilt, tsuba, blade);
+      tsuba.position.set(0, 0.01, -0.075);
+      const spine = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.022, 0.72), steelMat);
+      spine.rotation.x = -0.22;
+      spine.position.set(0, 0.125, -0.41);
+      const plasmaBlade = new THREE.Mesh(new THREE.BoxGeometry(0.010, 0.026, 0.74), bladeMat);
+      plasmaBlade.rotation.x = -0.22;
+      plasmaBlade.position.set(0, 0.105, -0.42);
+      weaponRoot.add(hilt, tsuba, spine, plasmaBlade);
     } else {
-      // axe
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.54, 10), gripMat);
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.025, 0.58, 12), gripMat);
       shaft.rotation.x = Math.PI / 2.2;
       shaft.position.set(0, -0.02, -0.14);
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.19, 0.16), bladeMat);
-      head.position.set(0, 0.07, -0.34);
-      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.24, 0.07), bladeMat);
-      edge.position.set(0, 0.07, -0.42);
-      weaponRoot.add(shaft, head, edge);
+      const headCore = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.16, 0.15), steelMat);
+      headCore.position.set(0, 0.075, -0.34);
+      const frontEdge = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.27, 0.075), bladeMat);
+      frontEdge.position.set(0, 0.075, -0.43);
+      const backSpike = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.11, 0.08), bladeMat);
+      backSpike.position.set(0, 0.085, -0.25);
+      weaponRoot.add(shaft, headCore, frontEdge, backSpike);
     }
   }
-}
-
-const activeTracers = [];
+}const activeTracers = [];
 function spawnTracer(startPos, endPos, colorHex) {
   const geo = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
   const mat = new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.95 });
@@ -2168,37 +2340,49 @@ function startReload() {
 }
 
 function checkAimOnRival(maxRange) {
-  if (rival.dead) return false;
+  const activeHitMeshes = getActiveRivals()
+    .filter((r) => !r.dead)
+    .map((r) => r.hitMesh);
+  if (activeHitMeshes.length === 0) return null;
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
   raycaster.far = maxRange;
-  const targets = [...worldMeshes, rivalHitMesh];
+  const targets = [...worldMeshes, ...activeHitMeshes];
   const hits = raycaster.intersectObjects(targets, false);
-  return hits.length > 0 && hits[0].object === rivalHitMesh;
+  if (hits.length > 0 && activeHitMeshes.includes(hits[0].object)) {
+    const idx = hits[0].object.userData.rivalIndex;
+    return rivals[idx] || null;
+  }
+  return null;
 }
 
-function dealDamageToRival(totalDmg, weaponShortName) {
+function dealDamageToRival(targetRival, totalDmg, weaponShortName) {
+  if (!targetRival || !targetRival.active || targetRival.dead) return;
   weaponState.hitmarkerTimer = 0.14;
   hitmarker.classList.remove("hidden");
-  rival.hitFlashTimer = 0.12;
+  targetRival.hitFlashTimer = 0.12;
   playSfx(weaponState.activeSlot === "melee" ? "melee_hit" : "hit");
 
-  if (net.connected) {
-    rival.hp = Math.max(1, rival.hp - totalDmg);
+  if (targetRival.isRemotePlayer && net.connected) {
+    targetRival.hp = Math.max(1, targetRival.hp - totalDmg);
     updateScoreAndHpUI();
-    sendNet({ type: "hit", dmg: totalDmg, weaponName: weaponShortName });
+    sendToSpecificPeer(targetRival.peerId, {
+      type: "hit",
+      dmg: totalDmg,
+      weaponName: weaponShortName,
+    });
   } else {
-    rival.hp = Math.max(0, rival.hp - totalDmg);
+    targetRival.hp = Math.max(0, targetRival.hp - totalDmg);
     updateScoreAndHpUI();
-    if (rival.hp <= 0 && !rival.dead) {
-      rival.dead = true;
-      rival.respawnTimer = 2.6;
-      rivalGroup.visible = false;
+    if (targetRival.hp <= 0 && !targetRival.dead) {
+      targetRival.dead = true;
+      targetRival.respawnTimer = 2.6;
+      targetRival.group.visible = false;
       game.myKills += 1;
       playSfx("stun");
-      showTrick(`BOT K.O.!! (${game.myKills} / ${game.targetKills})`);
+      showTrick(`${targetRival.name} K.O.!! (${game.myKills} / ${game.targetKills})`);
       updateScoreAndHpUI();
       if (game.myKills >= game.targetKills) {
-        triggerMatchEnd(true);
+        triggerMatchEnd(true, "YOU");
       }
     }
   }
@@ -2219,9 +2403,10 @@ function performMeleeAttack() {
   const slashEnd = eyePos.clone().addScaledVector(forward, 2.2).add(new THREE.Vector3(-0.22, -0.1, 0));
   spawnTracer(slashStart, slashEnd, accentHex);
 
-  if (checkAimOnRival(MELEE_COMMON_STATS.range)) {
+  const hitTarget = checkAimOnRival(MELEE_COMMON_STATS.range);
+  if (hitTarget) {
     const meleeDmg = MELEE_COMMON_STATS.damage + (getSelectedChar().meleeBonus || 0);
-    dealDamageToRival(meleeDmg, m.shortName);
+    dealDamageToRival(hitTarget, meleeDmg, m.shortName);
   }
 }
 
@@ -2252,8 +2437,11 @@ function fireWeapon() {
   const muzzleWorld = new THREE.Vector3();
   muzzlePoint.getWorldPosition(muzzleWorld);
 
-  const targets = rival.dead ? worldMeshes : [...worldMeshes, rivalHitMesh];
-  let hitCount = 0;
+  const activeEnemyHitMeshes = getActiveRivals()
+    .filter((r) => !r.dead)
+    .map((r) => r.hitMesh);
+  const targets = [...worldMeshes, ...activeEnemyHitMeshes];
+  const hitCountsByIndex = new Map();
 
   for (let p = 0; p < g.pellets; p++) {
     const spreadX = (Math.random() - 0.5) * 2 * g.spread;
@@ -2265,8 +2453,10 @@ function fireWeapon() {
     let endPos;
     if (hits.length > 0) {
       endPos = hits[0].point.clone();
-      if (!rival.dead && hits[0].object === rivalHitMesh) {
-        hitCount += 1;
+      const hitObj = hits[0].object;
+      if (typeof hitObj.userData.rivalIndex === "number") {
+        const rIdx = hitObj.userData.rivalIndex;
+        hitCountsByIndex.set(rIdx, (hitCountsByIndex.get(rIdx) || 0) + 1);
       }
     } else {
       endPos = raycaster.ray.origin.clone().addScaledVector(raycaster.ray.direction, g.range);
@@ -2287,8 +2477,11 @@ function fireWeapon() {
     }
   }
 
-  if (hitCount > 0) {
-    dealDamageToRival(g.damage * hitCount, g.shortName);
+  for (const [rIdx, count] of hitCountsByIndex.entries()) {
+    const targetRival = rivals[rIdx];
+    if (targetRival && count > 0) {
+      dealDamageToRival(targetRival, g.damage * count, g.shortName);
+    }
   }
 
   if (weaponState.ammo <= 0) {
@@ -3425,7 +3618,7 @@ function respawnSelf() {
   }
 }
 
-function applyDamageToSelf(dmg, weaponName = "WEAPON") {
+function applyDamageToSelf(dmg, weaponName = "WEAPON", attackerId = null) {
   if (player.dead || game.over) return;
   const mitigatedDmg = skillState.shieldTimer > 0 ? Math.max(1, Math.round(dmg * 0.25)) : dmg;
   player.hp = Math.max(0, player.hp - mitigatedDmg);
@@ -3441,18 +3634,25 @@ function applyDamageToSelf(dmg, weaponName = "WEAPON") {
     player.isZiplining = false;
     wireLine.visible = false;
     weaponState.manualFireHeld = false;
-    game.enemyKills += 1;
     playSfx("caught");
     respawnBanner.classList.remove("hidden");
     respawnTimerDisplay.textContent = "3.0";
+
+    const killer = attackerId
+      ? rivals.find((r) => r.active && (r.peerId === attackerId || r.id === attackerId))
+      : null;
+    if (killer) {
+      killer.kills += 1;
+      showTrick(`${killer.name} に撃破された！`);
+    }
     updateScoreAndHpUI();
 
     if (net.connected) {
-      sendNet({ type: "killed" });
+      sendNet({ type: "killed", killerPeer: attackerId || "" });
     }
 
-    if (game.enemyKills >= game.targetKills) {
-      triggerMatchEnd(false);
+    if (killer && killer.kills >= game.targetKills) {
+      triggerMatchEnd(false, killer.name);
     }
   }
 }
@@ -3604,14 +3804,20 @@ function hideFinishCelebration() {
 
 function resetMatch(broadcast = false) {
   hideFinishCelebration();
-  const isClient = net.connected && net.mode === "client";
-  const myStart = isClient ? SPAWN_POINTS[1].clone() : SPAWN_POINTS[0].clone();
-  const enemyStart = isClient ? SPAWN_POINTS[0].clone() : SPAWN_POINTS[1].clone();
+  let slotIndex = 0;
+  if (net.connected && net.mode === "client") {
+    const idx = rivals.findIndex((r) => r.active);
+    slotIndex = idx >= 0 ? idx + 1 : 1;
+  }
+  const myStart = SPAWN_POINTS[slotIndex % SPAWN_POINTS.length].clone();
 
   player.pos.copy(myStart);
   player.vel.set(0, 0, 0);
-  player.yaw = isClient ? Math.PI : 0;
+  player.yaw = Math.atan2(-myStart.x, -myStart.z);
   player.pitch = 0;
+  clearSkillEffects();
+  skillState.cooldown = 0;
+  applyCharacterStatsToPlayer(true);
   player.hp = player.maxHp;
   player.dead = false;
   player.respawnTimer = 0;
@@ -3636,16 +3842,20 @@ function resetMatch(broadcast = false) {
   touchInput.lookTouchId = null;
   weaponState.manualFireHeld = false;
 
-  rival.pos.copy(enemyStart);
-  rival.targetPos.copy(enemyStart);
-  rival.vel.set(0, 0, 0);
-  rival.hp = rival.maxHp;
-  rival.dead = false;
-  rival.respawnTimer = 0;
-  rival.hitFlashTimer = 0;
-  rival.botFireCooldown = 1.0;
-  rivalGroup.visible = true;
-  rivalGroup.position.copy(enemyStart);
+  rivals.forEach((r, idx) => {
+    const sp = SPAWN_POINTS[(idx + 1) % SPAWN_POINTS.length].clone();
+    r.pos.copy(sp);
+    r.targetPos.copy(sp);
+    r.vel.set(0, 0, 0);
+    r.hp = r.maxHp;
+    r.dead = false;
+    r.respawnTimer = 0;
+    r.hitFlashTimer = 0;
+    r.kills = 0;
+    r.botFireCooldown = 1.0 + idx * 0.35;
+    r.group.visible = r.active;
+    r.group.position.copy(sp);
+  });
 
   weaponState.ammo = GUNS[profile.equippedGun].maxAmmo;
   weaponState.reloading = false;
@@ -4131,117 +4341,166 @@ function updatePlayer(dt) {
 // ==========================================
 // 対戦相手（オンライン同期 / ソロ練習BOT）の更新
 // ==========================================
-function updateRival(dt) {
-  if (rival.hitFlashTimer > 0) {
-    rival.hitFlashTimer = Math.max(0, rival.hitFlashTimer - dt);
-    rivalBody.material.color.setHex(0xffffff);
-    rivalBody.material.emissive.setHex(0xf59e0b);
-  } else {
-    const rCh = CHARACTERS[rival.charKey] || CHARACTERS.vanguard;
-    rivalBody.material.color.setHex(rCh.bodyColor);
-    rivalBody.material.emissive.setHex(rCh.emissiveColor);
-    rivalBody.material.transparent = Boolean(rival.stealthActive);
-    rivalBody.material.opacity = rival.stealthActive ? 0.22 : 1.0;
+function updateSingleRival(r, dt) {
+  if (!r.active) {
+    r.group.visible = false;
+    return;
   }
 
-  if (net.connected) {
-    // オンライン対戦：滑らかに相手の位置・向きを補間
-    rival.pos.lerp(rival.targetPos, Math.min(1, dt * 18));
-    rivalGroup.position.copy(rival.pos);
-    rivalGroup.rotation.y = rival.yaw + Math.PI;
-    rivalGroup.visible = !rival.dead;
+  if (r.hitFlashTimer > 0) {
+    r.hitFlashTimer = Math.max(0, r.hitFlashTimer - dt);
+    r.body.material.color.setHex(0xffffff);
+    r.body.material.emissive.setHex(0xf59e0b);
   } else {
-    // ソロ練習BOT：移動＆一定間隔で射撃してくる
-    if (rival.dead) {
-      rival.respawnTimer -= dt;
-      if (rival.respawnTimer <= 0) {
-        const sp = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
-        rival.pos.copy(sp);
-        rival.vel.set(0, 0, 0);
-        rival.hp = rival.maxHp;
-        rival.dead = false;
-        rivalGroup.visible = true;
-        updateScoreAndHpUI();
-      }
-    } else {
-      const toPlayer = new THREE.Vector3(player.pos.x - rival.pos.x, 0, player.pos.z - rival.pos.z);
-      const distHoriz = toPlayer.length();
-      if (distHoriz > 0.01) toPlayer.divideScalar(distHoriz);
+    const rCh = CHARACTERS[r.charKey] || CHARACTERS.vanguard;
+    r.body.material.color.setHex(rCh.bodyColor);
+    r.body.material.emissive.setHex(rCh.emissiveColor);
+    r.body.material.transparent = Boolean(r.stealthActive);
+    r.body.material.opacity = r.stealthActive ? 0.22 : 1.0;
+  }
 
-      rival.botStrafeTimer -= dt;
-      if (rival.botStrafeTimer <= 0) {
-        rival.botStrafeDir *= -1;
-        rival.botStrafeTimer = 1.2 + Math.random() * 1.4;
-      }
+  if (r.isRemotePlayer && net.connected) {
+    r.pos.lerp(r.targetPos, Math.min(1, dt * 18));
+    r.group.position.copy(r.pos);
+    r.group.rotation.y = r.yaw + Math.PI;
+    r.group.visible = !r.dead;
+    return;
+  }
 
-      const strafe = new THREE.Vector3(-toPlayer.z * rival.botStrafeDir, 0, toPlayer.x * rival.botStrafeDir);
-      const approach = distHoriz > 24 ? 1 : distHoriz < 12 ? -0.6 : 0.15;
-      const botSpeed = 11.2;
+  if (r.dead) {
+    r.respawnTimer -= dt;
+    if (r.respawnTimer <= 0) {
+      const sp = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
+      r.pos.copy(sp);
+      r.vel.set(0, 0, 0);
+      r.hp = r.maxHp;
+      r.dead = false;
+      r.group.visible = true;
+      updateScoreAndHpUI();
+    }
+    return;
+  }
 
-      rival.vel.x = (toPlayer.x * approach + strafe.x * 0.85) * botSpeed;
-      rival.vel.z = (toPlayer.z * approach + strafe.z * 0.85) * botSpeed;
-      rival.vel.y -= CONFIG.gravity * dt;
+  let targetPos = player.dead ? null : player.pos;
+  let targetType = "player";
+  let targetBot = null;
+  let bestDist = player.dead ? Infinity : r.pos.distanceTo(player.pos);
 
-      if (rival.jumpCooldown > 0) rival.jumpCooldown -= dt;
-      const prevX = rival.pos.x;
-      const prevZ = rival.pos.z;
+  for (const other of getActiveRivals()) {
+    if (other === r || other.dead) continue;
+    const d = r.pos.distanceTo(other.pos);
+    if (d < bestDist * 0.88) {
+      bestDist = d;
+      targetPos = other.pos;
+      targetType = "bot";
+      targetBot = other;
+    }
+  }
 
-      rival.pos.x += rival.vel.x * dt;
-      rival.pos.y += rival.vel.y * dt;
-      rival.pos.z += rival.vel.z * dt;
+  const focusPos = targetPos || new THREE.Vector3(0, 2, 0);
+  const toTarget = new THREE.Vector3(focusPos.x - r.pos.x, 0, focusPos.z - r.pos.z);
+  const distHoriz = toTarget.length();
+  if (distHoriz > 0.01) toTarget.divideScalar(distHoriz);
 
-      const col = resolveCollisions(rival.pos, rival.vel, 0.6, 1.9, dt);
-      rival.onGround = col.onGround;
+  r.botStrafeTimer -= dt;
+  if (r.botStrafeTimer <= 0) {
+    r.botStrafeDir *= -1;
+    r.botStrafeTimer = 1.1 + Math.random() * 1.4;
+  }
 
-      for (const pad of jumpPads) {
-        const dx = rival.pos.x - pad.x;
-        const dz = rival.pos.z - pad.z;
-        if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(rival.pos.y - pad.y) < 1.2) {
-          rival.vel.y = pad.force * 0.9;
-          rival.onGround = false;
-        }
-      }
+  const strafe = new THREE.Vector3(-toTarget.z * r.botStrafeDir, 0, toTarget.x * r.botStrafeDir);
+  const approach = distHoriz > 32 ? 1 : distHoriz < 14 ? -0.55 : 0.2;
+  const rCh = CHARACTERS[r.charKey] || CHARACTERS.vanguard;
+  const botSpeed = 11.4 * rCh.speedMult;
 
-      const moved = Math.hypot(rival.pos.x - prevX, rival.pos.z - prevZ);
-      if (rival.onGround && rival.jumpCooldown <= 0 && (moved < botSpeed * dt * 0.35 || Math.random() < 0.012)) {
-        rival.vel.y = 11.4;
-        rival.jumpCooldown = 0.9;
-      }
+  r.vel.x = (toTarget.x * approach + strafe.x * 0.85) * botSpeed;
+  r.vel.z = (toTarget.z * approach + strafe.z * 0.85) * botSpeed;
+  r.vel.y -= CONFIG.gravity * dt;
 
-      rivalGroup.position.copy(rival.pos);
-      rivalGroup.lookAt(player.pos.x, rival.pos.y, player.pos.z);
+  if (r.jumpCooldown > 0) r.jumpCooldown -= dt;
+  const prevX = r.pos.x;
+  const prevZ = r.pos.z;
 
-      // BOTの射撃（遮蔽物チェック付き）
-      if (!player.dead && distHoriz < 95) {
-        rival.botFireCooldown -= dt;
-        if (rival.botFireCooldown <= 0) {
-          rival.botFireCooldown = 0.72 + Math.random() * 0.45;
-          const botEye = rival.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
-          const playerTarget = player.pos.clone().add(new THREE.Vector3(0, 1.1, 0));
-          const dir = playerTarget.clone().sub(botEye);
-          const d = dir.length();
-          dir.normalize();
-          raycaster.set(botEye, dir);
-          raycaster.far = d;
-          const wallHits = raycaster.intersectObjects(worldMeshes, false);
-          if (wallHits.length === 0) {
-            const hitProb = skillState.stealthTimer > 0 ? 0.08 : 0.42;
-            const hitPlayer = Math.random() < hitProb;
-            const endPt = hitPlayer
-              ? playerTarget
-              : playerTarget.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 3));
-            spawnTracer(botEye, endPt, 0xef4444);
-            if (hitPlayer) {
-              applyDamageToSelf(11, "BOT RIFLE");
+  r.pos.x += r.vel.x * dt;
+  r.pos.y += r.vel.y * dt;
+  r.pos.z += r.vel.z * dt;
+
+  const col = resolveCollisions(r.pos, r.vel, 0.6, 1.9, dt);
+  r.onGround = col.onGround;
+
+  for (const pad of jumpPads) {
+    const dx = r.pos.x - pad.x;
+    const dz = r.pos.z - pad.z;
+    if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(r.pos.y - pad.y) < 1.3) {
+      r.vel.y = pad.force * 0.92;
+      r.onGround = false;
+    }
+  }
+
+  const moved = Math.hypot(r.pos.x - prevX, r.pos.z - prevZ);
+  if (r.onGround && r.jumpCooldown <= 0 && (moved < botSpeed * dt * 0.35 || Math.random() < 0.016)) {
+    r.vel.y = 12.2;
+    r.jumpCooldown = 0.85;
+  }
+
+  r.group.position.copy(r.pos);
+  r.group.lookAt(focusPos.x, r.pos.y, focusPos.z);
+
+  if (targetPos && bestDist < 125) {
+    r.botFireCooldown -= dt;
+    if (r.botFireCooldown <= 0) {
+      r.botFireCooldown = 0.78 + Math.random() * 0.5;
+      const botEye = r.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
+      const aimPt = targetPos.clone().add(new THREE.Vector3(0, 1.1, 0));
+      const dir = aimPt.clone().sub(botEye);
+      const d = dir.length();
+      dir.normalize();
+      raycaster.set(botEye, dir);
+      raycaster.far = d;
+      const wallHits = raycaster.intersectObjects(worldMeshes, false);
+      if (wallHits.length === 0) {
+        const hitProb = targetType === "player" && skillState.stealthTimer > 0 ? 0.08 : 0.38;
+        const isHit = Math.random() < hitProb;
+        const endPt = isHit
+          ? aimPt
+          : aimPt.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3.2, (Math.random() - 0.5) * 2.2, (Math.random() - 0.5) * 3.2));
+        spawnTracer(botEye, endPt, rCh.bodyColor);
+        if (isHit) {
+          if (targetType === "player") {
+            applyDamageToSelf(10, `${r.name}`, r.id);
+          } else if (targetBot && !targetBot.dead) {
+            targetBot.hitFlashTimer = 0.12;
+            targetBot.hp = Math.max(0, targetBot.hp - 14);
+            if (targetBot.hp <= 0) {
+              targetBot.dead = true;
+              targetBot.respawnTimer = 2.6;
+              targetBot.group.visible = false;
+              r.kills += 1;
+              updateScoreAndHpUI();
+              if (r.kills >= game.targetKills) {
+                triggerMatchEnd(false, r.name);
+              }
             }
           }
         }
       }
     }
   }
+}
 
-  const totalDist = rival.pos.distanceTo(player.pos);
-  distDisplay.textContent = rival.dead ? "--" : totalDist.toFixed(1);
+function updateRival(dt) {
+  let nearestDist = Infinity;
+  for (const r of rivals) {
+    updateSingleRival(r, dt);
+    if (r.active && !r.dead) {
+      const d = r.pos.distanceTo(player.pos);
+      if (d < nearestDist) nearestDist = d;
+    }
+  }
+  distDisplay.textContent = Number.isFinite(nearestDist) ? nearestDist.toFixed(1) : "--";
+  if (altDisplay) {
+    altDisplay.textContent = Math.max(0, Math.round(player.pos.y));
+  }
 }
 
 // ==========================================
@@ -4322,20 +4581,24 @@ function drawMinimap(now) {
   ctx.closePath();
   ctx.fill();
 
-  // 鬼（赤＋脈打つリング）
-  const ox = toMapX(rival.pos.x);
-  const oy = toMapY(rival.pos.z);
+  // 対戦相手（最大3体・生存中の敵をマップに表示）
   const pulse = 4.5 + Math.sin(now * 0.01) * 2.2;
-  ctx.strokeStyle = "rgba(239, 68, 68, 0.75)";
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.arc(ox, oy, pulse, 0, Math.PI * 2);
-  ctx.stroke();
+  for (const r of getActiveRivals()) {
+    if (r.dead) continue;
+    const ox = toMapX(r.pos.x);
+    const oy = toMapY(r.pos.z);
+    const rCh = CHARACTERS[r.charKey] || CHARACTERS.vanguard;
+    ctx.strokeStyle = "rgba(239, 68, 68, 0.75)";
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.arc(ox, oy, pulse, 0, Math.PI * 2);
+    ctx.stroke();
 
-  ctx.fillStyle = "#ef4444";
-  ctx.beginPath();
-  ctx.arc(ox, oy, 3.8, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = rCh.cssColor || "#ef4444";
+    ctx.beginPath();
+    ctx.arc(ox, oy, 3.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // プレイヤー
   ctx.fillStyle = "#38bdf8";
@@ -4362,7 +4625,7 @@ function spawnVictoryConfetti() {
   }
 }
 
-function triggerMatchEnd(isWin) {
+function triggerMatchEnd(isWin, winnerName = "") {
   if (game.over) return;
   game.over = true;
   game.active = false;
@@ -4381,8 +4644,12 @@ function triggerMatchEnd(isWin) {
   const rewardCr = isWin ? (net.connected ? 100 : 40) : (net.connected ? 20 : 10);
   addCoins(rewardCr);
 
-  const opponentLabel = net.connected ? "FRIEND" : "BOT";
-  const scoreSummary = `YOU ${game.myKills} - ${game.enemyKills} ${opponentLabel}`;
+  const ranking = getAllParticipantsScoreList();
+  const topRival = ranking.find((p) => !p.isMe);
+  const championLabel = winnerName || (isWin ? "YOU" : topRival ? topRival.name : "RIVAL");
+  const scoreSummary = isWin
+    ? `1位 YOU (${game.myKills}キル) / 目標 ${game.targetKills}キル達成`
+    : `勝者: ${championLabel} / あなた: ${game.myKills}キル`;
 
   if (matchFinishBanner) {
     matchFinishBanner.classList.remove("hidden", "defeat");
@@ -4471,6 +4738,7 @@ function animate(now) {
         yaw: player.yaw,
         hp: player.hp,
         dead: player.dead,
+        kills: game.myKills,
         w: weaponState.activeSlot,
         ch: selectedCharKey,
         sh: skillState.shieldTimer > 0,

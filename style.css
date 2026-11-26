@@ -2076,3 +2076,43 @@ body.touch-mode #weapon-hud {
   background: rgba(126, 34, 206, 0.48);
   border-color: #c084fc;
 }
+
+
+/* ==========================================
+   v15: 最大4人フリーフォーオールHUD＆高度表示
+   ========================================== */
+.goal-inline {
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+.ffa-scoreboard {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.68rem;
+}
+
+.ffa-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+}
+
+.ffa-row.me {
+  background: rgba(2, 132, 199, 0.35);
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.ffa-row.ko {
+  opacity: 0.55;
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v14 - キャラクター4体＆固有スキル（ワイヤー固有化）対応</title>
+  <title>3D キャラコンFPS v15 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -13,10 +13,13 @@
       <div class="panel score-panel">
         <div class="score-line">
           <span class="me-tag">YOU</span> <strong id="my-kills-display">0</strong>
-          <span class="vs-sep">-</span>
-          <strong id="enemy-kills-display">0</strong> <span id="enemy-tag-label" class="en-tag">BOT</span>
+          <span class="vs-sep">/</span>
+          <span class="goal-inline">先取 <strong id="target-kills-display">5</strong></span>
+          <span id="net-status-pill" class="net-pill solo">4人乱戦</span>
         </div>
-        <div class="goal-line">先取: <strong id="target-kills-display">5</strong>キル <span id="net-status-pill" class="net-pill solo">SOLO練習</span></div>
+        <div id="ffa-scoreboard" class="ffa-scoreboard">
+          <div class="ffa-row me"><span>1. YOU</span><strong>0K</strong></div>
+        </div>
       </div>
 
       <div class="panel center-panel">
@@ -33,7 +36,7 @@
 
       <div class="panel right-panel">
         <div>通貨: <strong id="hud-coins-display" class="coin-text">0</strong> CR</div>
-        <div>相手: <strong id="dist-display">--</strong>m / HP:<strong id="enemy-hp-display">100</strong></div>
+        <div>最近敵: <strong id="dist-display">--</strong>m / 高度:<strong id="alt-display">0</strong>m</div>
         <div class="hud-actions">
           <button id="hud-retry-btn" class="mini-btn" type="button">リセット</button>
           <button id="hud-pause-btn" class="mini-btn" type="button">メニュー</button>
@@ -163,7 +166,7 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v14</h1>
+      <h1 id="modal-title">3D キャラコンFPS v15</h1>
       <p id="modal-desc">
         パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
         ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
@@ -211,7 +214,7 @@
       <!-- オンライン対戦ロビー -->
       <div class="multiplayer-section">
         <div class="mp-header">
-          <span class="mp-title">対戦モード（友達と1v1 / ソロ練習）</span>
+          <span class="mp-title">対戦モード（最大4人対戦 / ソロ4人乱戦）</span>
           <div class="mp-goal-wrap">
             <label for="goal-kills-select">勝利条件:</label>
             <select id="goal-kills-select">
@@ -235,7 +238,7 @@
             <strong id="host-room-code">----</strong>
             <button id="copy-code-btn" class="mini-action-btn" type="button">コピー</button>
           </div>
-          <div id="host-status-text" class="mp-status">「部屋を作成」を押して友達に4桁のコードを伝えてください</div>
+          <div id="host-status-text" class="mp-status">「部屋を作成」を押して最大3人の友達に4桁のコードを伝えてください（2〜4人で対戦可能）</div>
           <button id="create-room-btn" class="mp-action-btn" type="button">部屋を作成して待機</button>
         </div>
 
@@ -250,7 +253,7 @@
 
         <!-- ソロ練習パネル -->
         <div id="mp-solo-panel" class="mp-panel">
-          <div class="mp-status">移動・射撃する練習用BOTと1v1で腕試しできます。</div>
+          <div class="mp-status">縦横メガアリーナで3体の個性派BOT（計4人）とハイスピード乱戦練習できます。</div>
         </div>
       </div>
 
