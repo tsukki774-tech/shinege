@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v24 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
+  <title>3D キャラコンFPS v25 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
   <link rel="stylesheet" href="style.css?v=24" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -77,6 +77,13 @@
     <div id="skill-active-banner" class="hidden">OVERDRIVE ACTIVE!</div>
     <div id="zip-prompt" class="hidden">ZIPLINE 乗車可能 [E / ZIP]</div>
     <div id="trick-feed"></div>
+    <div id="val-kill-banner">
+      <div class="val-kill-inner">
+        <div id="val-kill-mark" class="val-kill-mark">✕ ✕</div>
+        <div id="val-kill-title" class="val-kill-title">ELIMINATED</div>
+        <div id="val-kill-sub" class="val-kill-sub">BOT-BLITZ • PULSE RIFLE</div>
+      </div>
+    </div>
     <div id="damage-vignette"></div>
     <div id="respawn-banner" class="hidden">
       <div class="respawn-title">K.O. - 撃破された！</div>
@@ -167,7 +174,7 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v24</h1>
+      <h1 id="modal-title">3D キャラコンFPS v25</h1>
       <p id="modal-desc">
         パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
         ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
@@ -217,6 +224,13 @@
         <div class="mp-header">
           <span class="mp-title">対戦モード（2人 1v1 / 4人乱戦 切替）</span>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div class="mp-goal-wrap">
+              <label for="map-select">マップ:</label>
+              <select id="map-select">
+                <option value="sky_citadel" selected>スカイシタデル</option>
+                <option value="neon_canyon">ネオンキャニオン</option>
+              </select>
+            </div>
             <div class="mp-goal-wrap">
               <label for="player-count-select">人数:</label>
               <select id="player-count-select">

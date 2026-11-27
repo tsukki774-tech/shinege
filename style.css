@@ -2147,3 +2147,69 @@ body.touch-mode #weapon-hud {
   background: rgba(225, 29, 72, 0.48);
   border-color: #fda4af;
 }
+
+/* ==========================================
+   v25: VALORANT風キルバナー演出
+   ========================================== */
+#val-kill-banner {
+  position: fixed;
+  top: 28%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  z-index: 22;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+#val-kill-banner.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.0);
+}
+
+.val-kill-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 26px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(127, 29, 29, 0.88));
+  border: 2px solid #ff4655;
+  box-shadow: 0 0 26px rgba(255, 70, 85, 0.65), inset 0 0 12px rgba(253, 224, 71, 0.25);
+}
+
+.val-kill-mark {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #ff4655;
+  text-shadow: 0 0 12px rgba(255, 70, 85, 0.9);
+  letter-spacing: 0.14em;
+}
+
+.val-kill-title {
+  margin-top: 3px;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+
+.val-kill-sub {
+  margin-top: 2px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #fde047;
+  letter-spacing: 0.06em;
+}
+
+#map-select {
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}

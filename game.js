@@ -82,6 +82,11 @@ const speedDisplay = document.getElementById("speed-display");
 const distDisplay = document.getElementById("dist-display");
 const stateBadge = document.getElementById("state-badge");
 const trickFeed = document.getElementById("trick-feed");
+const valKillBanner = document.getElementById("val-kill-banner");
+const valKillMark = document.getElementById("val-kill-mark");
+const valKillTitle = document.getElementById("val-kill-title");
+const valKillSub = document.getElementById("val-kill-sub");
+const mapSelect = document.getElementById("map-select");
 const crosshair = document.getElementById("crosshair");
 const zipPrompt = document.getElementById("zip-prompt");
 const hudRetryBtn = document.getElementById("hud-retry-btn");
@@ -813,6 +818,55 @@ function playSfx(type) {
   }
 }
 
+
+let valKillTimer = 0;
+let valStreakCount = 0;
+let valLastKillTime = 0;
+
+function playValorantKillSfx(streak = 1) {
+  if (!audioCtx) return;
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  const t = audioCtx.currentTime;
+  const baseFreq = 580 + Math.min(4, streak - 1) * 95;
+  const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5];
+  notes.forEach((freq, idx) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = idx === notes.length - 1 ? "triangle" : "sine";
+    const startT = t + idx * 0.045;
+    osc.frequency.setValueAtTime(freq, startT);
+    osc.frequency.exponentialRampToValueAtTime(freq * 1.08, startT + 0.14);
+    gain.gain.setValueAtTime(0.14, startT);
+    gain.gain.exponentialRampToValueAtTime(0.001, startT + 0.18);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(startT);
+    osc.stop(startT + 0.19);
+  });
+}
+
+function triggerValorantKillEffect(victimName, weaponLabel) {
+  const nowSec = performance.now() / 1000;
+  if (nowSec - valLastKillTime <= 6.5) {
+    valStreakCount += 1;
+  } else {
+    valStreakCount = 1;
+  }
+  valLastKillTime = nowSec;
+  valKillTimer = 1.45;
+
+  playValorantKillSfx(valStreakCount);
+
+  const marks = ["✕", "✕ ✕", "✕ ✕ ✕", "✕ ✕ ✕ ✕", "✕ ✕ ✕ ✕ ✕"];
+  const titles = ["ELIMINATED", "DOUBLE KILL", "TRIPLE KILL", "QUADRA KILL", "ACE"];
+  const markIdx = Math.min(marks.length - 1, valStreakCount - 1);
+
+  if (valKillMark) valKillMark.textContent = marks[markIdx];
+  if (valKillTitle) valKillTitle.textContent = titles[markIdx];
+  if (valKillSub) valKillSub.textContent = `${victimName} • ${weaponLabel}`;
+  if (valKillBanner) valKillBanner.classList.add("active");
+}
+
 let trickTimer = 0;
 function showTrick(text) {
   trickFeed.textContent = text;
@@ -991,168 +1045,278 @@ function addZipline(ax, ay, az, bx, by, bz) {
   ziplines.push({ start, end, length: len });
 }
 
-function buildArena() {
-  addBox(0, -0.5, 0, 360, 1, 360, 0xcbd5e1, { noCast: true, roughness: 0.78, isFloor: true });
-  const grid = new THREE.GridHelper(360, 72, 0x64748b, 0x94a3b8);
-  grid.position.y = 0.02;
-  scene.add(grid);
+let currentMapKey = localStorage.getItem("parkour_fps_map") || "sky_citadel";
+const arenaObjects = [];
 
-  addBox(0, 23, -180, 360, 46, 2.4, 0xe2e8f0, { wallRun: true, isOuterWall: true });
-  addBox(0, 23, 180, 360, 46, 2.4, 0xe2e8f0, { wallRun: true, isOuterWall: true });
-  addBox(-180, 23, 0, 2.4, 46, 360, 0xe2e8f0, { wallRun: true, isOuterWall: true });
-  addBox(180, 23, 0, 2.4, 46, 360, 0xe2e8f0, { wallRun: true, isOuterWall: true });
-
-  // 中央スカイシタデル（地上〜高度54mまで貫く7段立体タワー）
-  addBox(0, 3.0, 0, 22, 6, 22, 0xf8fafc, { wallRun: true });
-  addBox(0, 8.5, 0, 16, 5, 16, 0xe2e8f0, { wallRun: true });
-  addBox(0, 14.0, 0, 12, 6, 12, 0x38bdf8, { wallRun: true });
-  addBox(0, 20.0, 0, 8.5, 6, 8.5, 0x0284c7, { wallRun: true });
-  addBox(0, 24.0, -14, 24, 1.4, 7, 0x7dd3fc, { wallRun: true });
-  addBox(0, 24.0, 14, 24, 1.4, 7, 0x7dd3fc, { wallRun: true });
-  addBox(-14, 24.0, 0, 7, 1.4, 24, 0x7dd3fc, { wallRun: true });
-  addBox(14, 24.0, 0, 7, 1.4, 24, 0x7dd3fc, { wallRun: true });
-  addJumpPad(0, 23.0, 0, 33.5);
-
-  // 最上層・成層圏スカイサンクチュアリ（Y=46m〜54m）
-  addBox(0, 46.0, 0, 26, 1.6, 26, 0xf8fafc, { wallRun: true });
-  addBox(0, 50.5, 0, 9, 7.5, 9, 0x0ea5e9, { wallRun: true });
-  addBox(0, 47.6, -12.2, 16, 1.8, 1.2, 0x38bdf8);
-  addBox(0, 47.6, 12.2, 16, 1.8, 1.2, 0x38bdf8);
-  addBox(-12.2, 47.6, 0, 1.2, 1.8, 16, 0x38bdf8);
-  addBox(12.2, 47.6, 0, 1.2, 1.8, 16, 0x38bdf8);
-  addJumpPad(0, 54.25, 0, 25.0);
-
-  // 4隅の超高層スカイスクレイパー要塞（高さ38m・多層フロア構造）
-  const cornerCoords = [
-    [-122, -122],
-    [122, 122],
-    [122, -122],
-    [-122, 122],
-  ];
-  for (const [cx, cz] of cornerCoords) {
-    addBox(cx, 8.0, cz, 22, 16, 22, 0x3b82f6, { wallRun: true });
-    addBox(cx, 26.0, cz, 13, 20, 13, 0x2563eb, { wallRun: true });
-    addBox(cx, 36.6, cz, 20, 1.4, 20, 0x93c5fd, { wallRun: true });
-    addBox(cx, 38.2, cz + (cz > 0 ? -9.2 : 9.2), 14, 1.8, 1.2, 0xf8fafc);
-    addBox(cx + (cx > 0 ? -9.2 : 9.2), 38.2, cz, 1.2, 1.8, 14, 0xf8fafc);
-    addJumpPad(cx + (cx > 0 ? -15 : 15), 0, cz, 31.0);
-    addJumpPad(cx, 16.0, cz + (cz > 0 ? -8.5 : 8.5), 29.0);
-  }
-
-  // 東西南北の4大立体前線バンカー（2層構造・高さ18m）
-  const outpostBunkers = [
-    [0, 4.5, -108, 32, 9, 14, 0x0d9488],
-    [0, 14.0, -108, 18, 10, 10, 0x14b8a6],
-    [0, 4.5, 108, 32, 9, 14, 0x0d9488],
-    [0, 14.0, 108, 18, 10, 10, 0x14b8a6],
-    [-108, 4.5, 0, 14, 9, 32, 0x0d9488],
-    [-108, 14.0, 0, 10, 10, 18, 0x14b8a6],
-    [108, 4.5, 0, 14, 9, 32, 0x0d9488],
-    [108, 14.0, 0, 10, 10, 18, 0x14b8a6],
-  ];
-
-  // 高層垂直ウォールランパネル（高さ24m〜34m）
-  const wallRunPanels = [
-    [-42, 12.0, -30, 1.8, 24, 38, 0x8b5cf6],
-    [42, 12.0, 30, 1.8, 24, 38, 0x8b5cf6],
-    [30, 12.0, -42, 38, 24, 1.8, 0x8b5cf6],
-    [-30, 12.0, 42, 38, 24, 1.8, 0x8b5cf6],
-
-    [-78, 15.0, -52, 2.0, 30, 48, 0xa855f7],
-    [78, 15.0, 52, 2.0, 30, 48, 0xa855f7],
-    [52, 15.0, -78, 48, 30, 2.0, 0xa855f7],
-    [-52, 15.0, 78, 48, 30, 2.0, 0xa855f7],
-
-    [-152, 17.0, 0, 2.2, 34, 84, 0x9333ea],
-    [152, 17.0, 0, 2.2, 34, 84, 0x9333ea],
-    [0, 17.0, -152, 84, 34, 2.2, 0x9333ea],
-    [0, 17.0, 152, 84, 34, 2.2, 0x9333ea],
-  ];
-
-  // 多層スカイブリッジ・高空浮島・超高層グラップルピラー（高さ48m）
-  const skyPlatforms = [
-    [-64, 10.0, 0, 9, 1.2, 42, 0x38bdf8],
-    [64, 10.0, 0, 9, 1.2, 42, 0x38bdf8],
-    [0, 10.0, -64, 42, 1.2, 9, 0x38bdf8],
-    [0, 10.0, 64, 42, 1.2, 9, 0x38bdf8],
-
-    [-62, 22.0, -62, 13, 1.3, 13, 0x7dd3fc],
-    [62, 22.0, 62, 13, 1.3, 13, 0x7dd3fc],
-    [62, 22.0, -62, 13, 1.3, 13, 0x7dd3fc],
-    [-62, 22.0, 62, 13, 1.3, 13, 0x7dd3fc],
-
-    [-64, 34.0, 0, 12, 1.4, 12, 0xbae6fd],
-    [64, 34.0, 0, 12, 1.4, 12, 0xbae6fd],
-    [0, 34.0, -64, 12, 1.4, 12, 0xbae6fd],
-    [0, 34.0, 64, 12, 1.4, 12, 0xbae6fd],
-
-    [-76, 24.0, -32, 3.6, 48, 3.6, 0x6366f1],
-    [76, 24.0, 32, 3.6, 48, 3.6, 0x6366f1],
-    [32, 24.0, -76, 3.6, 48, 3.6, 0x6366f1],
-    [-32, 24.0, 76, 3.6, 48, 3.6, 0x6366f1],
-    [-132, 24.0, -68, 3.6, 48, 3.6, 0x4f46e5],
-    [132, 24.0, 68, 3.6, 48, 3.6, 0x4f46e5],
-    [68, 24.0, -132, 3.6, 48, 3.6, 0x4f46e5],
-    [-68, 24.0, 132, 3.6, 48, 3.6, 0x4f46e5],
-
-    [-18, 3.0, -68, 2.2, 3.4, 12, 0xf59e0b],
-    [18, 3.0, 68, 2.2, 3.4, 12, 0xf59e0b],
-    [-68, 3.0, 18, 12, 3.4, 2.2, 0xf59e0b],
-    [68, 3.0, -18, 12, 3.4, 2.2, 0xf59e0b],
-    [-130, 3.0, 0, 2.2, 3.4, 14, 0xf59e0b],
-    [130, 3.0, 0, 2.2, 3.4, 14, 0xf59e0b],
-    [0, 3.0, -130, 14, 3.4, 2.2, 0xf59e0b],
-    [0, 3.0, 130, 14, 3.4, 2.2, 0xf59e0b],
-  ];
-
-  for (const list of [outpostBunkers, wallRunPanels, skyPlatforms]) {
-    for (const [x, y, z, w, h, d, color] of list) {
-      addBox(x, y, z, w, h, d, color, { wallRun: true });
+function clearArena() {
+  for (const obj of arenaObjects) {
+    scene.remove(obj);
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+      else obj.material.dispose();
     }
   }
-
-  addJumpPad(-18, 0, -18, 26.5);
-  addJumpPad(18, 0, 18, 26.5);
-  addJumpPad(18, 0, -18, 26.5);
-  addJumpPad(-18, 0, 18, 26.5);
-
-  addJumpPad(-84, 0, 0, 31.5);
-  addJumpPad(84, 0, 0, 31.5);
-  addJumpPad(0, 0, -84, 31.5);
-  addJumpPad(0, 0, 84, 31.5);
-
-  addJumpPad(-62, 22.65, -62, 31.0);
-  addJumpPad(62, 22.65, 62, 31.0);
-  addJumpPad(62, 22.65, -62, 31.0);
-  addJumpPad(-62, 22.65, 62, 31.0);
-
-  addBoostPad(0, 0, 44, 7, 5);
-  addBoostPad(0, 0, -44, 7, 5);
-  addBoostPad(44, 0, 0, 5, 7);
-  addBoostPad(-44, 0, 0, 5, 7);
-  addBoostPad(-160, 0, -36, 6, 10);
-  addBoostPad(160, 0, 36, 6, 10);
-  addBoostPad(-36, 0, -160, 10, 6);
-  addBoostPad(36, 0, 160, 10, 6);
-
-  addZipline(-114, 38.2, -114, 114, 38.2, -114);
-  addZipline(114, 38.2, -114, 114, 38.2, 114);
-  addZipline(114, 38.2, 114, -114, 38.2, 114);
-  addZipline(-114, 38.2, 114, -114, 38.2, -114);
-
-  addZipline(-114, 38.2, -114, -10, 48.0, -10);
-  addZipline(114, 38.2, 114, 10, 48.0, 10);
-  addZipline(114, 38.2, -114, 10, 48.0, -10);
-  addZipline(-114, 38.2, 114, -10, 48.0, 10);
-
-  addZipline(0, 20.2, -102, 0, 20.2, 102);
-  addZipline(-102, 20.2, 0, 102, 20.2, 0);
-
-  addZipline(-64, 11.2, -64, 64, 11.2, 64);
-  addZipline(64, 11.2, -64, -64, 11.2, 64);
+  arenaObjects.length = 0;
+  colliders.length = 0;
+  grappleMeshes.length = 0;
+  worldMeshes.length = 0;
+  jumpPads.length = 0;
+  boostPads.length = 0;
+  ziplines.length = 0;
 }
 
-buildArena();
+function trackArenaObj(obj) {
+  arenaObjects.push(obj);
+  return obj;
+}
+
+function buildArena(mapKey = currentMapKey) {
+  currentMapKey = mapKey === "neon_canyon" ? "neon_canyon" : "sky_citadel";
+  if (mapSelect && mapSelect.value !== currentMapKey) {
+    mapSelect.value = currentMapKey;
+  }
+  clearArena();
+
+  if (currentMapKey === "neon_canyon") {
+    scene.background = new THREE.Color(0x0f172a);
+    scene.fog = new THREE.Fog(0x1e1b4b, 120, 380);
+    hemiLight.color.setHex(0xc084fc);
+    hemiLight.groundColor.setHex(0x0f172a);
+    hemiLight.intensity = 1.25;
+    dirLight.color.setHex(0x38bdf8);
+    dirLight.intensity = 1.5;
+
+    // キャニオン床＆外周ネオン壁
+    const floorMesh = addBox(0, -0.5, 0, 360, 1, 360, 0x1e293b, { noCast: true, roughness: 0.65, isFloor: true });
+    trackArenaObj(floorMesh);
+    const grid = trackArenaObj(new THREE.GridHelper(360, 72, 0xe879f9, 0x0284c7));
+    grid.position.y = 0.02;
+    scene.add(grid);
+
+    addBox(0, 24, -180, 360, 48, 2.4, 0x312e81, { wallRun: true, isOuterWall: true });
+    addBox(0, 24, 180, 360, 48, 2.4, 0x312e81, { wallRun: true, isOuterWall: true });
+    addBox(-180, 24, 0, 2.4, 48, 360, 0x312e81, { wallRun: true, isOuterWall: true });
+    addBox(180, 24, 0, 2.4, 48, 360, 0x312e81, { wallRun: true, isOuterWall: true });
+
+    // 渓谷の両岸ハイウェイ＆高架ブリッジ
+    addBox(-75, 9.0, 0, 28, 18, 250, 0x1e1b4b, { wallRun: true });
+    addBox(75, 9.0, 0, 28, 18, 250, 0x1e1b4b, { wallRun: true });
+    addBox(0, 18.0, 0, 130, 1.5, 16, 0x06b6d4, { wallRun: true });
+    addBox(0, 30.0, -55, 110, 1.5, 14, 0xc084fc, { wallRun: true });
+    addBox(0, 30.0, 55, 110, 1.5, 14, 0xc084fc, { wallRun: true });
+
+    // キャニオン中央のツインウォールランタワー
+    addBox(-16, 16.0, 0, 3.0, 32, 56, 0xa855f7, { wallRun: true });
+    addBox(16, 16.0, 0, 3.0, 32, 56, 0xec4899, { wallRun: true });
+    addBox(0, 40.0, 0, 24, 2.0, 24, 0x38bdf8, { wallRun: true });
+
+    // ジャンプパッド・ブースト床・ジップライン
+    addJumpPad(-75, 18.0, 0, 30.0);
+    addJumpPad(75, 18.0, 0, 30.0);
+    addJumpPad(0, 0, -95, 29.0);
+    addJumpPad(0, 0, 95, 29.0);
+
+    addBoostPad(0, 0, 32, 8, 6);
+    addBoostPad(0, 0, -32, 8, 6);
+    addBoostPad(-75, 18.0, -50, 8, 6);
+    addBoostPad(75, 18.0, 50, 8, 6);
+
+    addZipline(-75, 20.5, -110, 75, 20.5, 110);
+    addZipline(75, 20.5, -110, -75, 20.5, 110);
+    addZipline(0, 42.0, -90, 0, 42.0, 90);
+  } else {
+    scene.background = new THREE.Color(0x7dd3fc);
+    scene.fog = new THREE.Fog(0xbae6fd, 130, 390);
+    hemiLight.color.setHex(0xffffff);
+    hemiLight.groundColor.setHex(0x94a3b8);
+    hemiLight.intensity = 1.35;
+    dirLight.color.setHex(0xfffbeb);
+    dirLight.intensity = 1.45;
+
+    addBox(0, -0.5, 0, 360, 1, 360, 0xcbd5e1, { noCast: true, roughness: 0.78, isFloor: true });
+    const grid = trackArenaObj(new THREE.GridHelper(360, 72, 0x64748b, 0x94a3b8));
+    grid.position.y = 0.02;
+    scene.add(grid);
+
+    addBox(0, 23, -180, 360, 46, 2.4, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+    addBox(0, 23, 180, 360, 46, 2.4, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+    addBox(-180, 23, 0, 2.4, 46, 360, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+    addBox(180, 23, 0, 2.4, 46, 360, 0xe2e8f0, { wallRun: true, isOuterWall: true });
+
+    addBox(0, 3.0, 0, 22, 6, 22, 0xf8fafc, { wallRun: true });
+    addBox(0, 8.5, 0, 16, 5, 16, 0xe2e8f0, { wallRun: true });
+    addBox(0, 14.0, 0, 12, 6, 12, 0x38bdf8, { wallRun: true });
+    addBox(0, 20.0, 0, 8.5, 6, 8.5, 0x0284c7, { wallRun: true });
+    addBox(0, 24.0, -14, 24, 1.4, 7, 0x7dd3fc, { wallRun: true });
+    addBox(0, 24.0, 14, 24, 1.4, 7, 0x7dd3fc, { wallRun: true });
+    addBox(-14, 24.0, 0, 7, 1.4, 24, 0x7dd3fc, { wallRun: true });
+    addBox(14, 24.0, 0, 7, 1.4, 24, 0x7dd3fc, { wallRun: true });
+    addJumpPad(0, 23.0, 0, 33.5);
+
+    addBox(0, 46.0, 0, 26, 1.6, 26, 0xf8fafc, { wallRun: true });
+    addBox(0, 50.5, 0, 9, 7.5, 9, 0x0ea5e9, { wallRun: true });
+    addBox(0, 47.6, -12.2, 16, 1.8, 1.2, 0x38bdf8);
+    addBox(0, 47.6, 12.2, 16, 1.8, 1.2, 0x38bdf8);
+    addBox(-12.2, 47.6, 0, 1.2, 1.8, 16, 0x38bdf8);
+    addBox(12.2, 47.6, 0, 1.2, 1.8, 16, 0x38bdf8);
+    addJumpPad(0, 54.25, 0, 25.0);
+
+    const cornerCoords = [
+      [-122, -122],
+      [122, 122],
+      [122, -122],
+      [-122, 122],
+    ];
+    for (const [cx, cz] of cornerCoords) {
+      addBox(cx, 8.0, cz, 22, 16, 22, 0x3b82f6, { wallRun: true });
+      addBox(cx, 26.0, cz, 13, 20, 13, 0x2563eb, { wallRun: true });
+      addBox(cx, 36.6, cz, 20, 1.4, 20, 0x93c5fd, { wallRun: true });
+      addBox(cx, 38.2, cz + (cz > 0 ? -9.2 : 9.2), 14, 1.8, 1.2, 0xf8fafc);
+      addBox(cx + (cx > 0 ? -9.2 : 9.2), 38.2, cz, 1.2, 1.8, 14, 0xf8fafc);
+      addJumpPad(cx + (cx > 0 ? -15 : 15), 0, cz, 31.0);
+      addJumpPad(cx, 16.0, cz + (cz > 0 ? -8.5 : 8.5), 29.0);
+    }
+
+    const outpostBunkers = [
+      [0, 4.5, -108, 32, 9, 14, 0x0d9488],
+      [0, 14.0, -108, 18, 10, 10, 0x14b8a6],
+      [0, 4.5, 108, 32, 9, 14, 0x0d9488],
+      [0, 14.0, 108, 18, 10, 10, 0x14b8a6],
+      [-108, 4.5, 0, 14, 9, 32, 0x0d9488],
+      [-108, 14.0, 0, 10, 10, 18, 0x14b8a6],
+      [108, 4.5, 0, 14, 9, 32, 0x0d9488],
+      [108, 14.0, 0, 10, 10, 18, 0x14b8a6],
+    ];
+
+    const wallRunPanels = [
+      [-42, 12.0, -30, 1.8, 24, 38, 0x8b5cf6],
+      [42, 12.0, 30, 1.8, 24, 38, 0x8b5cf6],
+      [30, 12.0, -42, 38, 24, 1.8, 0x8b5cf6],
+      [-30, 12.0, 42, 38, 24, 1.8, 0x8b5cf6],
+      [-78, 15.0, -52, 2.0, 30, 48, 0xa855f7],
+      [78, 15.0, 52, 2.0, 30, 48, 0xa855f7],
+      [52, 15.0, -78, 48, 30, 2.0, 0xa855f7],
+      [-52, 15.0, 78, 48, 30, 2.0, 0xa855f7],
+      [-152, 17.0, 0, 2.2, 34, 84, 0x9333ea],
+      [152, 17.0, 0, 2.2, 34, 84, 0x9333ea],
+      [0, 17.0, -152, 84, 34, 2.2, 0x9333ea],
+      [0, 17.0, 152, 84, 34, 2.2, 0x9333ea],
+    ];
+
+    const skyPlatforms = [
+      [-64, 10.0, 0, 9, 1.2, 42, 0x38bdf8],
+      [64, 10.0, 0, 9, 1.2, 42, 0x38bdf8],
+      [0, 10.0, -64, 42, 1.2, 9, 0x38bdf8],
+      [0, 10.0, 64, 42, 1.2, 9, 0x38bdf8],
+      [-62, 22.0, -62, 13, 1.3, 13, 0x7dd3fc],
+      [62, 22.0, 62, 13, 1.3, 13, 0x7dd3fc],
+      [62, 22.0, -62, 13, 1.3, 13, 0x7dd3fc],
+      [-62, 22.0, 62, 13, 1.3, 13, 0x7dd3fc],
+      [-64, 34.0, 0, 12, 1.4, 12, 0xbae6fd],
+      [64, 34.0, 0, 12, 1.4, 12, 0xbae6fd],
+      [0, 34.0, -64, 12, 1.4, 12, 0xbae6fd],
+      [0, 34.0, 64, 12, 1.4, 12, 0xbae6fd],
+      [-76, 24.0, -32, 3.6, 48, 3.6, 0x6366f1],
+      [76, 24.0, 32, 3.6, 48, 3.6, 0x6366f1],
+      [32, 24.0, -76, 3.6, 48, 3.6, 0x6366f1],
+      [-32, 24.0, 76, 3.6, 48, 3.6, 0x6366f1],
+      [-132, 24.0, -68, 3.6, 48, 3.6, 0x4f46e5],
+      [132, 24.0, 68, 3.6, 48, 3.6, 0x4f46e5],
+      [68, 24.0, -132, 3.6, 48, 3.6, 0x4f46e5],
+      [-68, 24.0, 132, 3.6, 48, 3.6, 0x4f46e5],
+      [-18, 3.0, -68, 2.2, 3.4, 12, 0xf59e0b],
+      [18, 3.0, 68, 2.2, 3.4, 12, 0xf59e0b],
+      [-68, 3.0, 18, 12, 3.4, 2.2, 0xf59e0b],
+      [68, 3.0, -18, 12, 3.4, 2.2, 0xf59e0b],
+      [-130, 3.0, 0, 2.2, 3.4, 14, 0xf59e0b],
+      [130, 3.0, 0, 2.2, 3.4, 14, 0xf59e0b],
+      [0, 3.0, -130, 14, 3.4, 2.2, 0xf59e0b],
+      [0, 3.0, 130, 14, 3.4, 2.2, 0xf59e0b],
+    ];
+
+    for (const list of [outpostBunkers, wallRunPanels, skyPlatforms]) {
+      for (const [x, y, z, w, h, d, color] of list) {
+        addBox(x, y, z, w, h, d, color, { wallRun: true });
+      }
+    }
+
+    addJumpPad(-18, 0, -18, 26.5);
+    addJumpPad(18, 0, 18, 26.5);
+    addJumpPad(18, 0, -18, 26.5);
+    addJumpPad(-18, 0, 18, 26.5);
+    addJumpPad(-84, 0, 0, 31.5);
+    addJumpPad(84, 0, 0, 31.5);
+    addJumpPad(0, 0, -84, 31.5);
+    addJumpPad(0, 0, 84, 31.5);
+    addJumpPad(-62, 22.65, -62, 31.0);
+    addJumpPad(62, 22.65, 62, 31.0);
+    addJumpPad(62, 22.65, -62, 31.0);
+    addJumpPad(-62, 22.65, 62, 31.0);
+
+    addBoostPad(0, 0, 44, 7, 5);
+    addBoostPad(0, 0, -44, 7, 5);
+    addBoostPad(44, 0, 0, 5, 7);
+    addBoostPad(-44, 0, 0, 5, 7);
+    addBoostPad(-160, 0, -36, 6, 10);
+    addBoostPad(160, 0, 36, 6, 10);
+    addBoostPad(-36, 0, -160, 10, 6);
+    addBoostPad(36, 0, 160, 10, 6);
+
+    addZipline(-114, 38.2, -114, 114, 38.2, -114);
+    addZipline(114, 38.2, -114, 114, 38.2, 114);
+    addZipline(114, 38.2, 114, -114, 38.2, 114);
+    addZipline(-114, 38.2, 114, -114, 38.2, -114);
+    addZipline(-114, 38.2, -114, -10, 48.0, -10);
+    addZipline(114, 38.2, 114, 10, 48.0, 10);
+    addZipline(114, 38.2, -114, 10, 48.0, -10);
+    addZipline(-114, 38.2, 114, -10, 48.0, 10);
+    addZipline(0, 20.2, -102, 0, 20.2, 102);
+    addZipline(-102, 20.2, 0, 102, 20.2, 0);
+    addZipline(-64, 11.2, -64, 64, 11.2, 64);
+    addZipline(64, 11.2, -64, -64, 11.2, 64);
+  }
+
+  for (const m of worldMeshes) {
+    if (!arenaObjects.includes(m)) trackArenaObj(m);
+  }
+  for (const p of jumpPads) {
+    for (const obj of scene.children) {
+      if (obj.geometry && obj.geometry.type === "CylinderGeometry" && Math.abs(obj.position.x - p.x) < 0.01 && Math.abs(obj.position.z - p.z) < 0.01) {
+        trackArenaObj(obj);
+      }
+    }
+  }
+  for (const b of boostPads) {
+    for (const obj of scene.children) {
+      if (obj.geometry && obj.geometry.type === "BoxGeometry" && Math.abs(obj.position.x - b.x) < 0.01 && Math.abs(obj.position.z - b.z) < 0.01) {
+        trackArenaObj(obj);
+      }
+    }
+  }
+  for (const z of ziplines) {
+    for (const obj of scene.children) {
+      if (obj.geometry && (obj.geometry.type === "CylinderGeometry" || obj.geometry.type === "SphereGeometry")) {
+        const mid = z.start.clone().add(z.end).multiplyScalar(0.5);
+        if (obj.position.distanceTo(mid) <= z.length * 0.6 || obj.position.distanceTo(z.start) < 0.2 || obj.position.distanceTo(z.end) < 0.2) {
+          trackArenaObj(obj);
+        }
+      }
+    }
+  }
+}
+
+buildArena(currentMapKey);
+
+if (mapSelect) {
+  mapSelect.addEventListener("change", () => {
+    const nextMap = mapSelect.value === "neon_canyon" ? "neon_canyon" : "sky_citadel";
+    try { localStorage.setItem("parkour_fps_map", nextMap); } catch {}
+    buildArena(nextMap);
+    resetMatch(false);
+    showTrick(nextMap === "neon_canyon" ? "MAP: NEON CANYON" : "MAP: SKY CITADEL");
+  });
+}
 
 // ==========================================
 // 4人対戦用 敵プレイヤー / BOT エンティティ管理（最大3体の相手）
@@ -1596,6 +1760,7 @@ function handleIncomingNetPacket(senderPeerId, data) {
       game.myKills += 1;
       playSfx("stun");
       const healMsg = applyKillRecoveryToSelf();
+      triggerValorantKillEffect("PLAYER", weaponState.activeSlot === "gun" ? GUNS[profile.equippedGun].shortName : MELEES[profile.equippedMelee].shortName);
       showTrick(`KILL!! (${game.myKills} / ${game.targetKills})${healMsg}`);
       updateScoreAndHpUI();
       if (game.myKills >= game.targetKills) {
@@ -2873,6 +3038,7 @@ function dealDamageToRival(targetRival, totalDmg, weaponShortName) {
       game.myKills += 1;
       playSfx("stun");
       const healMsg = applyKillRecoveryToSelf();
+      triggerValorantKillEffect(targetRival.name, weaponState.activeSlot === "gun" ? GUNS[profile.equippedGun].shortName : MELEES[profile.equippedMelee].shortName);
       showTrick(`${targetRival.name} K.O.!! (${game.myKills} / ${game.targetKills})${healMsg}`);
       updateScoreAndHpUI();
       if (game.myKills >= game.targetKills) {
@@ -5553,7 +5719,7 @@ function triggerMatchEnd(isWin, winnerName = "") {
     document.exitPointerLock();
   }
 
-  const rewardCr = isWin ? (net.connected ? 100 : 40) : (net.connected ? 20 : 10);
+  const rewardCr = isWin ? (net.connected ? 220 : 85) : (net.connected ? 35 : 15);
   addCoins(rewardCr);
 
   const ranking = getAllParticipantsScoreList();
@@ -5613,6 +5779,12 @@ function animate(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
 
+  if (valKillTimer > 0) {
+    valKillTimer -= dt;
+    if (valKillTimer <= 0 && valKillBanner) {
+      valKillBanner.classList.remove("active");
+    }
+  }
   if (trickTimer > 0) {
     trickTimer -= dt;
     if (trickTimer <= 0) trickFeed.classList.remove("show");
