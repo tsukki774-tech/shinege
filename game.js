@@ -332,6 +332,98 @@ const CHARACTERS = {
 };
 
 const CHAR_ORDER = ["hook", "blitz", "vanguard", "spectre", "pyro", "titan"];
+
+// ==========================================
+// v27: カスタムパーク（パッシブ2種選択・保存）
+// ==========================================
+const PERKS = {
+  vampire: {
+    id: "vampire",
+    name: "🩸 バンパイア",
+    desc: "敵をK.O.するたびにHPが追加で +25 即時回復。",
+  },
+  acrobat: {
+    id: "acrobat",
+    name: "🦅 アクロバット",
+    desc: "空中での移動速度＆空中制御が +25% アップし、落下ダメージ完全無効。",
+  },
+  quickdraw: {
+    id: "quickdraw",
+    name: "⚡ クイックドロウ",
+    desc: "武器切り替えが超高速化し、切替直後2.5秒間の初弾ダメージが 1.25倍。",
+  },
+  slidemaster: {
+    id: "slidemaster",
+    name: "💨 スライドマスター",
+    desc: "スライディングの初速・持続時間が大幅アップし、スライド中の射撃精度が向上。",
+  },
+  tacticalvest: {
+    id: "tacticalvest",
+    name: "🛡️ タクティカルベスト",
+    desc: "最大HPが +20 増加し、爆発・範囲ダメージを軽減。",
+  },
+  ninjastep: {
+    id: "ninjastep",
+    name: "🥷 ニンジャステップ",
+    desc: "敵のミニマップに映らなくなり、背後からの近接ダメージが +20 アップ。",
+  },
+};
+
+const PERK_ORDER = ["vampire", "acrobat", "quickdraw", "slidemaster", "tacticalvest", "ninjastep"];
+const PERKS_STORAGE_KEY = "parkour_fps_perks_v27";
+let selectedPerks = ["vampire", "acrobat"];
+
+try {
+  const savedPerks = JSON.parse(localStorage.getItem(PERKS_STORAGE_KEY) || "null");
+  if (Array.isArray(savedPerks)) {
+    const valid = savedPerks.filter((k) => PERKS[k]).slice(0, 2);
+    if (valid.length > 0) selectedPerks = valid;
+  }
+} catch {}
+
+function hasPerk(perkId) {
+  return selectedPerks.includes(perkId);
+}
+
+function savePerks() {
+  try {
+    localStorage.setItem(PERKS_STORAGE_KEY, JSON.stringify(selectedPerks));
+  } catch {}
+}
+
+function renderPerkSelector() {
+  const grid = document.getElementById("perk-grid");
+  const badge = document.getElementById("perk-count-badge");
+  if (badge) badge.textContent = `${selectedPerks.length} / 2`;
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  for (const key of PERK_ORDER) {
+    const pk = PERKS[key];
+    const active = hasPerk(key);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "perk-card" + (active ? " active" : "");
+    btn.innerHTML =
+      `<div class="perk-card-name">${pk.name}</div>` +
+      `<div class="perk-card-desc">${pk.desc}</div>`;
+    btn.addEventListener("click", () => {
+      if (hasPerk(key)) {
+        selectedPerks = selectedPerks.filter((k) => k !== key);
+      } else {
+        if (selectedPerks.length >= 2) {
+          selectedPerks.shift();
+        }
+        selectedPerks.push(key);
+      }
+      savePerks();
+      applyCharacterStatsToPlayer(true);
+      renderPerkSelector();
+    });
+    grid.appendChild(btn);
+  }
+}
+
 let selectedCharKey = localStorage.getItem("parkour_fps_character") || "hook";
 if (!CHARACTERS[selectedCharKey]) selectedCharKey = "hook";
 
@@ -371,6 +463,7 @@ function renderCharacterSelector() {
         applyCharacterStatsToPlayer(true);
         applyLoadoutUI();
         renderCharacterSelector();
+renderPerkSelector();
       });
       characterGrid.appendChild(btn);
     }
@@ -392,7 +485,7 @@ function renderCharacterSelector() {
 
 function applyCharacterStatsToPlayer(refillHp = false) {
   const ch = getSelectedChar();
-  player.maxHp = ch.maxHp;
+  player.maxHp = ch.maxHp + (hasPerk('tacticalvest') ? 20 : 0);
   if (refillHp || player.hp > player.maxHp) {
     player.hp = player.maxHp;
   }
@@ -432,6 +525,7 @@ function applyLoadoutUI() {
 }
 
 renderCharacterSelector();
+renderPerkSelector();
 
 // ==========================================
 // タッチモード判定＆切替
@@ -2399,6 +2493,8 @@ const weaponState = {
   meleeCombo: 0,
   equipAnimTimer: 0,
   equipAnimDuration: 0.55,
+  quickdrawTimer: 0,
+  quickdrawReady: false,
   inspectTimer: 0,
   inspectDuration: 2.8,
   bobTime: 0,
@@ -2875,6 +2971,172 @@ function buildActiveViewModel() {
 }
 
 const activeTracers = [];
+
+// ==========================================
+// v27: フィニッシャー＆ラグドール吹き飛ばし物理演出
+// ==========================================
+const activeRagdolls = [];
+let hitstopTimer = 0;
+let cameraShakeTimer = 0;
+let cameraShakeIntensity = 0;
+let finisherFlashTimer = 0;
+
+function spawnRagdollFinisher(r, impulseDir, power, isMeleeFinish, weaponShortName) {
+  const ch = CHARACTERS[r.charKey] || CHARACTERS.vanguard;
+  const ragGroup = new THREE.Group();
+  ragGroup.position.copy(r.pos);
+  ragGroup.rotation.copy(r.group.rotation);
+
+  const bodyMesh = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.55, 1.0, 8, 16),
+    new THREE.MeshStandardMaterial({
+      color: ch.bodyColor,
+      emissive: isMeleeFinish ? 0xfde047 : ch.emissiveColor,
+      emissiveIntensity: isMeleeFinish ? 0.95 : 0.6,
+      roughness: 0.3,
+    })
+  );
+  bodyMesh.position.y = 1.05;
+  ragGroup.add(bodyMesh);
+
+  const visorMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.64, 0.22, 0.24),
+    new THREE.MeshBasicMaterial({ color: ch.visorColor })
+  );
+  visorMesh.position.set(0, 1.48, 0.45);
+  ragGroup.add(visorMesh);
+
+  scene.add(ragGroup);
+
+  const dir = impulseDir.clone().normalize();
+  const launchVel = new THREE.Vector3(
+    dir.x * power,
+    Math.max(7.5, dir.y * power * 0.55 + power * 0.36),
+    dir.z * power
+  );
+  const angVel = new THREE.Vector3(
+    (Math.random() - 0.5) * 18 + dir.z * 12,
+    (Math.random() - 0.5) * 16,
+    (Math.random() - 0.5) * 18 - dir.x * 12
+  );
+
+  // 火花パーティクル大量発生
+  const sparkCount = isMeleeFinish ? 22 : 14;
+  for (let i = 0; i < sparkCount; i++) {
+    const spColor = isMeleeFinish ? (i % 2 === 0 ? 0xfde047 : 0x38bdf8) : (i % 2 === 0 ? 0xf97316 : 0xfef08a);
+    const spMat = new THREE.MeshBasicMaterial({ color: spColor, transparent: true, opacity: 1.0 });
+    const spMesh = new THREE.Mesh(sharedSparkGeo, spMat);
+    spMesh.position.copy(r.pos).add(new THREE.Vector3(0, 1.1, 0));
+    scene.add(spMesh);
+    const outVel = new THREE.Vector3(
+      dir.x * (6 + Math.random() * 14) + (Math.random() - 0.5) * 12,
+      4 + Math.random() * 12,
+      dir.z * (6 + Math.random() * 14) + (Math.random() - 0.5) * 12
+    );
+    activeRagdolls.push({
+      isParticle: true,
+      mesh: spMesh,
+      mat: spMat,
+      vel: outVel,
+      life: 0.55 + Math.random() * 0.3,
+      maxLife: 0.85,
+    });
+  }
+
+  activeRagdolls.push({
+    isParticle: false,
+    mesh: ragGroup,
+    bodyMesh,
+    visorMesh,
+    vel: launchVel,
+    angVel,
+    bounces: 0,
+    life: 2.35,
+    maxLife: 2.35,
+  });
+
+  // ヒットストップ＆カメラ微振動＆フラッシュ演出
+  hitstopTimer = isMeleeFinish ? 0.055 : 0.035;
+  cameraShakeTimer = isMeleeFinish ? 0.28 : 0.18;
+  cameraShakeIntensity = isMeleeFinish ? 0.24 : 0.14;
+  finisherFlashTimer = isMeleeFinish ? 0.22 : 0.12;
+  const flashEl = document.getElementById("finisher-flash");
+  if (flashEl) flashEl.style.opacity = isMeleeFinish ? "0.95" : "0.55";
+
+  if (isMeleeFinish) {
+    addCoins(10);
+    playSfx("victory");
+    const eyePos = camera.getWorldPosition(new THREE.Vector3());
+    const fwd = getLookDirection();
+    const s1 = eyePos.clone().addScaledVector(fwd, 1.1).add(new THREE.Vector3(-0.45, 0.35, 0));
+    const e1 = eyePos.clone().addScaledVector(fwd, 1.1).add(new THREE.Vector3(0.45, -0.35, 0));
+    const s2 = eyePos.clone().addScaledVector(fwd, 1.1).add(new THREE.Vector3(0.45, 0.35, 0));
+    const e2 = eyePos.clone().addScaledVector(fwd, 1.1).add(new THREE.Vector3(-0.45, -0.35, 0));
+    spawnTracer(s1, e1, 0xfde047);
+    spawnTracer(s2, e2, 0x38bdf8);
+  }
+}
+
+function updateRagdolls(dt) {
+  if (finisherFlashTimer > 0) {
+    finisherFlashTimer = Math.max(0, finisherFlashTimer - dt);
+    if (finisherFlashTimer <= 0) {
+      const flashEl = document.getElementById("finisher-flash");
+      if (flashEl) flashEl.style.opacity = "0";
+    }
+  }
+
+  for (let i = activeRagdolls.length - 1; i >= 0; i--) {
+    const item = activeRagdolls[i];
+    item.life -= dt;
+    if (item.life <= 0) {
+      scene.remove(item.mesh);
+      if (item.isParticle) {
+        item.mat.dispose();
+      } else {
+        item.bodyMesh.geometry.dispose();
+        item.bodyMesh.material.dispose();
+        item.visorMesh.geometry.dispose();
+        item.visorMesh.material.dispose();
+      }
+      activeRagdolls.splice(i, 1);
+      continue;
+    }
+
+    if (item.isParticle) {
+      item.vel.y -= 22 * dt;
+      item.mesh.position.addScaledVector(item.vel, dt);
+      item.mat.opacity = Math.max(0, item.life / item.maxLife);
+      const sc = 0.6 + (item.life / item.maxLife) * 0.9;
+      item.mesh.scale.set(sc, sc, sc);
+    } else {
+      item.vel.y -= CONFIG.gravity * 1.05 * dt;
+      item.mesh.position.addScaledVector(item.vel, dt);
+      item.mesh.rotation.x += item.angVel.x * dt;
+      item.mesh.rotation.y += item.angVel.y * dt;
+      item.mesh.rotation.z += item.angVel.z * dt;
+
+      if (item.mesh.position.y <= 0.55 && item.vel.y < 0) {
+        item.mesh.position.y = 0.55;
+        if (item.bounces < 3 && Math.abs(item.vel.y) > 2.5) {
+          item.vel.y = -item.vel.y * 0.48;
+          item.vel.x *= 0.68;
+          item.vel.z *= 0.68;
+          item.angVel.multiplyScalar(0.62);
+          item.bounces += 1;
+        } else {
+          item.vel.set(0, 0, 0);
+          item.angVel.multiplyScalar(0.82);
+        }
+      }
+      if (item.life < 0.45) {
+        const s = Math.max(0.05, item.life / 0.45);
+        item.mesh.scale.set(s, s, s);
+      }
+    }
+  }
+}
+
 const activeBullets = [];
 const sharedBulletGeo = new THREE.CylinderGeometry(0.035, 0.035, 1.35, 6);
 sharedBulletGeo.rotateX(Math.PI / 2);
@@ -2998,7 +3260,8 @@ function switchWeaponSlot(slot, showNotice = false) {
   weaponState.activeSlot = slot;
   weaponState.reloading = false;
   weaponState.reloadTimer = 0;
-  weaponState.fireCooldown = 0.12;
+  weaponState.fireCooldown = hasPerk('quickdraw') ? 0.03 : 0.12;
+  if (hasPerk('quickdraw')) { weaponState.quickdrawTimer = 2.5; weaponState.quickdrawReady = true; } else { weaponState.quickdrawTimer = 0; weaponState.quickdrawReady = false; }
   weaponState.inspectTimer = 0;
   weaponState.equipAnimTimer = 0;
   buildActiveViewModel();
@@ -3065,9 +3328,17 @@ function checkAimOnRival(maxRange) {
 }
 
 function applyKillRecoveryToSelf() {
-  // 4人モード（3人以上の乱戦）で敵を撃破するとHP回復＆残弾フルチャージ
+  if (player.dead) return "";
+  let extraMsg = "";
+  if (hasPerk('vampire')) {
+    const prevHpV = player.hp;
+    player.hp = Math.min(player.maxHp, player.hp + 25);
+    const vampHeal = Math.max(0, Math.round(player.hp - prevHpV));
+    updateScoreAndHpUI();
+    extraMsg += vampHeal > 0 ? ` / 🩸吸血+${vampHeal}` : " / 🩸HPMAX";
+  }
   const isFourPlayerMatch = net.connected ? (getActiveRivals().length + 1 >= 3) : (matchPlayerCount === 4);
-  if (!isFourPlayerMatch || player.dead) return "";
+  if (!isFourPlayerMatch) return extraMsg;
   const prevHp = player.hp;
   player.hp = Math.min(player.maxHp, player.hp + 45);
   const healed = Math.max(0, Math.round(player.hp - prevHp));
@@ -3075,37 +3346,55 @@ function applyKillRecoveryToSelf() {
   weaponState.reloading = false;
   weaponState.reloadTimer = 0;
   updateWeaponUI();
-  return healed > 0 ? ` / HP+${healed} & 全弾回復!` : " / 全弾回復!";
+  return (healed > 0 ? ` / HP+${healed} & 全弾回復!` : " / 全弾回復!") + extraMsg;
 }
 
 function dealDamageToRival(targetRival, totalDmg, weaponShortName) {
   if (!targetRival || !targetRival.active || targetRival.dead) return;
+  let finalDmg = totalDmg;
+  if (weaponState.quickdrawReady && weaponState.quickdrawTimer > 0) {
+    finalDmg = Math.round(finalDmg * 1.25);
+    weaponState.quickdrawReady = false;
+  }
+
   weaponState.hitmarkerTimer = 0.14;
   hitmarker.classList.remove("hidden");
   targetRival.hitFlashTimer = 0.12;
-  playSfx(weaponState.activeSlot === "melee" ? "melee_hit" : "hit");
+  const isMeleeHit = weaponState.activeSlot === "melee";
+  playSfx(isMeleeHit ? "melee_hit" : "hit");
 
   if (targetRival.isRemotePlayer && net.connected) {
-    targetRival.hp = Math.max(1, targetRival.hp - totalDmg);
+    targetRival.hp = Math.max(1, targetRival.hp - finalDmg);
     updateScoreAndHpUI();
     sendToSpecificPeer(targetRival.peerId, {
       type: "hit",
-      dmg: totalDmg,
+      dmg: finalDmg,
       weaponName: weaponShortName,
     });
   } else {
-    targetRival.hp = Math.max(0, targetRival.hp - totalDmg);
+    targetRival.hp = Math.max(0, targetRival.hp - finalDmg);
     updateScoreAndHpUI();
     if (targetRival.hp <= 0 && !targetRival.dead) {
       targetRival.dead = true;
       targetRival.respawnTimer = 2.5;
       targetRival.respawnAtMs = performance.now() + 2500;
       targetRival.group.visible = false;
+
+      const blowDir = targetRival.pos.clone().sub(player.pos);
+      if (blowDir.lengthSq() < 0.01) blowDir.copy(getLookDirection());
+      let blowPower = 22.0;
+      if (isMeleeHit) blowPower = 34.0;
+      else if (weaponShortName === "SNIPER" || weaponShortName === "PLASMA") blowPower = 38.0;
+      else if (weaponShortName === "SHOTGUN") blowPower = 30.0;
+
+      spawnRagdollFinisher(targetRival, blowDir, blowPower, isMeleeHit, weaponShortName);
+
       game.myKills += 1;
       playSfx("stun");
       const healMsg = applyKillRecoveryToSelf();
-      triggerValorantKillEffect(targetRival.name, weaponState.activeSlot === "gun" ? GUNS[profile.equippedGun].shortName : MELEES[profile.equippedMelee].shortName);
-      showTrick(`${targetRival.name} K.O.!! (${game.myKills} / ${game.targetKills})${healMsg}`);
+      const finisherBonusMsg = isMeleeHit ? " / ⚔️近接フィニッシャー +10 CR!" : "";
+      triggerValorantKillEffect(targetRival.name, isMeleeHit ? MELEES[profile.equippedMelee].shortName : GUNS[profile.equippedGun].shortName);
+      showTrick(`${targetRival.name} K.O.!! (${game.myKills} / ${game.targetKills})${healMsg}${finisherBonusMsg}`);
       updateScoreAndHpUI();
       if (game.myKills >= game.targetKills) {
         triggerMatchEnd(true, "YOU");
@@ -3139,7 +3428,15 @@ function performMeleeAttack() {
 
   const hitTarget = checkAimOnRival(MELEE_COMMON_STATS.range);
   if (hitTarget) {
-    const meleeDmg = MELEE_COMMON_STATS.damage + (getSelectedChar().meleeBonus || 0);
+    let meleeDmg = MELEE_COMMON_STATS.damage + (getSelectedChar().meleeBonus || 0);
+    if (hasPerk('ninjastep')) {
+      const enemyForward = new THREE.Vector3(0, 0, 1).applyQuaternion(hitTarget.group.quaternion);
+      const toEnemy = hitTarget.pos.clone().sub(player.pos).setY(0).normalize();
+      if (enemyForward.dot(toEnemy) > 0.35) {
+        meleeDmg += 20;
+        showTrick("🥷 BACKSTAB! (+20 DMG)");
+      }
+    }
     dealDamageToRival(hitTarget, meleeDmg, m.shortName);
   }
 }
@@ -3178,8 +3475,9 @@ function fireWeapon() {
   const hitCountsByIndex = new Map();
 
   for (let p = 0; p < g.pellets; p++) {
-    const spreadX = (Math.random() - 0.5) * 2 * g.spread;
-    const spreadY = (Math.random() - 0.5) * 2 * g.spread;
+    const slideSpreadMult = (player.isSliding && hasPerk('slidemaster')) ? 0.25 : 1.0;
+    const spreadX = (Math.random() - 0.5) * 2 * g.spread * slideSpreadMult;
+    const spreadY = (Math.random() - 0.5) * 2 * g.spread * slideSpreadMult;
     raycaster.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
     raycaster.far = g.range;
 
@@ -3287,6 +3585,10 @@ function updateWeapon(dt) {
   // クールタイム・リロード・近接スイング更新
   if (weaponState.fireCooldown > 0) {
     weaponState.fireCooldown = Math.max(0, weaponState.fireCooldown - dt);
+  }
+  if (weaponState.quickdrawTimer > 0) {
+    weaponState.quickdrawTimer = Math.max(0, weaponState.quickdrawTimer - dt);
+    if (weaponState.quickdrawTimer <= 0) weaponState.quickdrawReady = false;
   }
   if (weaponState.meleeSwingTimer > 0) {
     weaponState.meleeSwingTimer = Math.max(0, weaponState.meleeSwingTimer - dt);
@@ -4572,7 +4874,9 @@ function respawnSelf() {
 
 function applyDamageToSelf(dmg, weaponName = "WEAPON", attackerId = null) {
   if (player.dead || game.over) return;
-  const mitigatedDmg = skillState.shieldTimer > 0 ? Math.max(1, Math.round(dmg * 0.25)) : dmg;
+  let calcDmg = dmg;
+  if (hasPerk('tacticalvest') && (weaponName.includes('NOVA') || weaponName.includes('PLASMA') || weaponName.includes('SHOTGUN'))) { calcDmg = Math.round(calcDmg * 0.65); }
+  const mitigatedDmg = skillState.shieldTimer > 0 ? Math.max(1, Math.round(calcDmg * 0.25)) : calcDmg;
   player.hp = Math.max(0, player.hp - mitigatedDmg);
   player.damageFlash = 0.35;
   playSfx("hit");
@@ -5029,13 +5333,14 @@ function updatePlayer(dt) {
         currentSpeed > 3.2
       ) {
         player.isSliding = true;
-        player.slideTimer = CONFIG.slideDuration;
+        player.slideTimer = CONFIG.slideDuration * (hasPerk('slidemaster') ? 1.42 : 1.0);
         player.slideCooldown = CONFIG.slideCooldown;
         const dir =
           wishDir.lengthSq() > 0.05 ? wishDir.clone().normalize() : horizVel.clone().normalize();
+        const slideMasterAdd = hasPerk('slidemaster') ? 5.8 : 0;
         const boost = Math.max(
-          currentSpeed + 5.2,
-          (CONFIG.slideBoost + (activeCh.slideBoostAdd || 0)) * charMoveMult
+          currentSpeed + (hasPerk('slidemaster') ? 7.5 : 5.2),
+          (CONFIG.slideBoost + (activeCh.slideBoostAdd || 0) + slideMasterAdd) * charMoveMult
         );
         player.vel.x = dir.x * Math.min(boost, CONFIG.maxSpeed);
         player.vel.z = dir.z * Math.min(boost, CONFIG.maxSpeed);
@@ -5111,14 +5416,16 @@ function updatePlayer(dt) {
             }
           } else if (sp > 6.5) {
             // 通常の空中ストレイフ：カメラ旋回＋左右キーで速度を落とさず綺麗にカーブ
+            const acroMult = hasPerk('acrobat') ? 1.25 : 1.0;
             const curDir = new THREE.Vector3(player.vel.x / sp, 0, player.vel.z / sp);
-            curDir.lerp(wishNorm, Math.min(1, dt * 4.2)).normalize();
-            const boostedAirSp = Math.min(CONFIG.maxSpeed, sp + 2.2 * dt);
+            curDir.lerp(wishNorm, Math.min(1, dt * 4.2 * acroMult)).normalize();
+            const boostedAirSp = Math.min(CONFIG.maxSpeed * (hasPerk('acrobat') ? 1.12 : 1.0), sp + 2.2 * acroMult * dt);
             player.vel.x = curDir.x * boostedAirSp;
             player.vel.z = curDir.z * boostedAirSp;
           } else {
-            player.vel.x += wishDir.x * CONFIG.airAccel * dt;
-            player.vel.z += wishDir.z * CONFIG.airAccel * dt;
+            const acroMult = hasPerk('acrobat') ? 1.25 : 1.0;
+            player.vel.x += wishDir.x * CONFIG.airAccel * acroMult * dt;
+            player.vel.z += wishDir.z * CONFIG.airAccel * acroMult * dt;
             const newSp = Math.hypot(player.vel.x, player.vel.z);
             if (newSp > CONFIG.maxSpeed) {
               player.vel.x *= CONFIG.maxSpeed / newSp;
@@ -5260,11 +5567,18 @@ function updatePlayer(dt) {
   }
   player.wallTilt += (targetTilt - player.wallTilt) * Math.min(1, dt * 10);
 
-  camera.position.set(player.pos.x, player.pos.y + player.currentHeight - 0.15, player.pos.z);
+  let shakeX = 0, shakeY = 0, shakeRoll = 0;
+  if (cameraShakeTimer > 0) {
+    cameraShakeTimer = Math.max(0, cameraShakeTimer - dt);
+    shakeX = (Math.random() - 0.5) * cameraShakeIntensity;
+    shakeY = (Math.random() - 0.5) * cameraShakeIntensity;
+    shakeRoll = (Math.random() - 0.5) * cameraShakeIntensity * 0.45;
+  }
+  camera.position.set(player.pos.x + shakeX, player.pos.y + player.currentHeight - 0.15 + shakeY, player.pos.z);
   camera.rotation.order = "YXZ";
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
-  camera.rotation.z = player.wallTilt;
+  camera.rotation.z = player.wallTilt + shakeRoll;
 
   // グラップルワイヤーのライン更新
   if (player.isGrappling) {
@@ -5899,13 +6213,20 @@ function animate(now) {
     }
   }
 
+  updateRagdolls(dt);
+
+  if (hitstopTimer > 0) {
+    hitstopTimer = Math.max(0, hitstopTimer - dt);
+  }
+
   if (game.active && !game.over) {
-    game.elapsed += dt;
+    const simDt = hitstopTimer > 0 ? dt * 0.12 : dt;
+    game.elapsed += simDt;
     if (!player.dead) {
-      updatePlayer(dt);
+      updatePlayer(simDt);
     }
-    updateRival(dt);
-    updateWeapon(dt);
+    updateRival(simDt);
+    updateWeapon(simDt);
 
   } else if (!game.over && player.dead) {
     for (const r of rivals) {
@@ -5931,7 +6252,7 @@ function animate(now) {
         w: weaponState.activeSlot,
         ch: selectedCharKey,
         sh: skillState.shieldTimer > 0,
-        st: skillState.stealthTimer > 0,
+        st: skillState.stealthTimer > 0 || hasPerk('ninjastep'),
       });
     }
   }
