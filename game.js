@@ -43,6 +43,21 @@
 
   try {
 
+    function safeStorageGet(key) {
+      try {
+        return window.localStorage ? window.localStorage.getItem(key) : null;
+      } catch {
+        return null;
+      }
+    }
+    function safeStorageSet(key, val) {
+      try {
+        if (window.localStorage) window.localStorage.setItem(key, val);
+      } catch {
+        // ignore storage restrictions on iPad/Safari
+      }
+    }
+
     // ==========================================
     // DOM要素
     // ==========================================
@@ -335,7 +350,7 @@
     };
 
     const CHAR_ORDER = ["hook", "blitz", "vanguard", "spectre"];
-    let selectedCharKey = localStorage.getItem("parkour_fps_character") || "hook";
+    let selectedCharKey = safeStorageGet("parkour_fps_character") || "hook";
     if (!CHARACTERS[selectedCharKey]) selectedCharKey = "hook";
 
     function getSelectedChar() {
@@ -646,7 +661,7 @@
     // ==========================================
     let audioCtx = null;
     let noiseBuffer = null;
-    let soundEnabled = localStorage.getItem("parkour_fps_sound") !== "off";
+    let soundEnabled = safeStorageGet("parkour_fps_sound") !== "off";
     let bgmStepIndex = 0;
     let bgmNextNoteTime = 0;
 
@@ -685,7 +700,7 @@
       hudSoundBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         soundEnabled = !soundEnabled;
-        localStorage.setItem("parkour_fps_sound", soundEnabled ? "on" : "off");
+        safeStorageSet("parkour_fps_sound", soundEnabled ? "on" : "off");
         updateSoundButtonUI();
         if (soundEnabled) {
           ensureAudio();
@@ -954,7 +969,12 @@
 
     const camera = new THREE.PerspectiveCamera(78, window.innerWidth / window.innerHeight, 0.1, 460);
     scene.add(camera);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: !isCoarsePointer, powerPreference: "default" });
+    } catch (e1) {
+      renderer = new THREE.WebGLRenderer();
+    }
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -4530,7 +4550,18 @@
       tryRequestPointerLockSafe();
     }
 
-    startBtn.addEventListener("click", startOrResumeGame);
+    let lastStartTriggerMs = 0;
+    function handleStartTrigger(e) {
+      if (e && e.type === "touchend") {
+        e.preventDefault();
+      }
+      const nowMs = Date.now();
+      if (nowMs - lastStartTriggerMs < 350) return;
+      lastStartTriggerMs = nowMs;
+      startOrResumeGame();
+    }
+    startBtn.addEventListener("click", handleStartTrigger);
+    startBtn.addEventListener("touchend", handleStartTrigger, { passive: false });
 
     if (forceRespawnBtn) {
       forceRespawnBtn.addEventListener("click", (e) => {

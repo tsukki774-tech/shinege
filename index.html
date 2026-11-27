@@ -4,7 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>3D キャラコンFPS v29 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
-  <link rel="stylesheet" href="style.css?v=29" />
+  <link rel="stylesheet" href="style.css?v=30" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+  <script>
+    if (!window.THREE) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    if (!window.THREE) {
+      document.write('<script src="https://unpkg.com/three@0.160.0/build/three.min.js"><\/script>');
+    }
+  </script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -382,6 +393,6 @@
       }
     }, 1500);
   </script>
-  <script src="game.js?v=29" onload="window.__gameScriptLoaded = true;"></script>
+  <script src="game.js?v=30" onload="window.__gameScriptLoaded = true;"></script>
 </body>
 </html>
