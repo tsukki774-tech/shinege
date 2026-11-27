@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v26 - BLITZ超加速＆飛翔弾丸・弾道トレイル強化</title>
-  <link rel="stylesheet" href="style.css?v=26" />
+  <title>3D キャラコンFPS v25 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
+  <link rel="stylesheet" href="style.css?v=24" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -23,19 +23,19 @@
       </div>
 
       <div class="panel center-panel">
-        <div class="char-hud-tag" id="hud-char-pill">CHAR: <strong id="hud-char-name">BLITZ</strong></div>
+        <div class="char-hud-tag" id="hud-char-pill">CHAR: <strong id="hud-char-name">HOOK</strong></div>
         <div id="state-badge">RUN</div>
         <div class="speed-wrap">
           <span id="speed-display">0.0</span> <small>m/s</small>
         </div>
         <div class="my-hp-wrap">
-          <span>HP <strong id="my-hp-display">95</strong></span>
+          <span>HP <strong id="my-hp-display">100</strong></span>
           <div class="my-hp-bar"><div id="my-hp-fill"></div></div>
         </div>
       </div>
 
       <div class="panel right-panel">
-        <div>通貨: <strong id="hud-coins-display" class="coin-text">160</strong> CR</div>
+        <div>通貨: <strong id="hud-coins-display" class="coin-text">0</strong> CR</div>
         <div>最近敵: <strong id="dist-display">--</strong>m / 高度:<strong id="alt-display">0</strong>m</div>
         <div class="hud-actions">
           <button id="hud-retry-btn" class="mini-btn" type="button">リセット</button>
@@ -44,6 +44,7 @@
       </div>
     </div>
 
+    <!-- ミニマップ -->
     <div id="minimap-wrap">
       <canvas id="minimap" width="144" height="144"></canvas>
       <div class="minimap-legend">
@@ -56,6 +57,7 @@
     <div id="crosshair"></div>
     <div id="hitmarker" class="hidden"></div>
 
+    <!-- FPS 武器・残弾HUD -->
     <div id="weapon-hud">
       <div class="weapon-hud-top">
         <span id="weapon-name">PULSE RIFLE</span>
@@ -89,59 +91,151 @@
       <button id="force-respawn-btn" class="force-respawn-btn" type="button">今すぐリスポーン [Space / R]</button>
     </div>
 
+    <!-- 試合決着時の大型VICTORY / DEFEATカットイン -->
+    <div id="match-finish-banner" class="hidden">
+      <div id="confetti-layer"></div>
+      <div class="finish-card">
+        <div id="finish-kicker" class="finish-kicker">MATCH POINT DECIDED</div>
+        <div id="finish-main-title" class="finish-main-title">VICTORY!!</div>
+        <div id="finish-score-line" class="finish-score-line">YOU 5 - 2 BOT</div>
+        <div id="finish-reward-line" class="finish-reward-line">+100 CR GET!</div>
+      </div>
+    </div>
+
+    <!-- PC用クールタイム表示 -->
     <div id="pc-ability-bar">
       <div id="pc-dash-chip" class="ability-chip"><strong>Q</strong> DASH: <span id="pc-dash-cd">READY</span></div>
-      <div id="pc-grapple-chip" class="ability-chip"><strong>右クリック/F</strong> <span id="pc-skill-name">OVERDRIVE</span>: <span id="pc-grapple-cd">READY</span></div>
+      <div id="pc-grapple-chip" class="ability-chip"><strong>右クリック/F</strong> <span id="pc-skill-name">WIRE</span>: <span id="pc-grapple-cd">READY</span></div>
       <div id="pc-zip-chip" class="ability-chip"><strong>E</strong> ZIPLINE</div>
     </div>
 
     <div class="hud-bottom">
       <span><strong>WASD</strong> 移動</span>
-      <span><strong>Space</strong> ジャンプ</span>
+      <span><strong>Space</strong> ジャンプ/壁キック</span>
+      <span><strong>Shift/C</strong> スライド</span>
       <span><strong>Q</strong> ダッシュ</span>
       <span><strong>右クリック/F</strong> 固有スキル</span>
       <span><strong>E</strong> ジップライン</span>
       <span><strong>左クリック</strong> 攻撃</span>
+      <span><strong>1/2・ホイール</strong> 銃↔近接切替</span>
+      <span><strong>V / T</strong> 武器を眺める</span>
       <span><strong>R</strong> リロード</span>
     </div>
   </div>
 
+  <!-- スマホ・タブレット用タッチ操作レイヤー -->
+  <div id="touch-layer" class="hidden">
+    <div id="look-zone"></div>
+
+    <div id="joystick-zone">
+      <div id="joystick-base">
+        <div id="joystick-knob"></div>
+      </div>
+    </div>
+
+    <button id="btn-jump" class="action-btn jump-btn" type="button">JUMP</button>
+    <button id="btn-slide" class="action-btn slide-btn" type="button">SLIDE</button>
+    <button id="btn-dash" class="action-btn dash-btn" type="button">
+      <span>DASH</span>
+      <small id="btn-dash-cd"></small>
+    </button>
+    <button id="btn-grapple" class="action-btn grapple-btn" type="button">
+      <span id="btn-skill-label">WIRE</span>
+      <small id="btn-grapple-cd"></small>
+    </button>
+    <button id="btn-zip" class="action-btn zip-btn" type="button">ZIP</button>
+    <button id="btn-fire" class="action-btn fire-btn" type="button">
+      <span>FIRE</span>
+      <small id="btn-fire-sub">AUTO</small>
+    </button>
+    <button id="btn-weapon" class="action-btn weapon-btn" type="button">
+      <span id="btn-weapon-label">RIFLE</span>
+      <small>切替</small>
+    </button>
+    <button id="btn-inspect" class="action-btn inspect-btn" type="button">
+      <span>LOOK</span>
+      <small>眺める</small>
+    </button>
+    <button id="btn-reload" class="action-btn reload-btn" type="button">
+      <span>RELOAD</span>
+      <small>装填</small>
+    </button>
+  </div>
+
+  <!-- ボタン配置編集モード用バー -->
+  <div id="layout-editor-bar" class="hidden">
+    <div class="editor-msg">各ボタン・左スティックをドラッグして好きな位置へ移動</div>
+    <div class="editor-actions">
+      <button id="layout-reset-btn" class="secondary-btn" type="button">初期位置に戻す</button>
+      <button id="layout-save-btn" class="primary-small-btn" type="button">保存して戻る</button>
+    </div>
+  </div>
+
+  <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v26</h1>
+      <h1 id="modal-title">3D キャラコンFPS v25</h1>
       <p id="modal-desc">
-        <strong>BLITZスピード倍率強化</strong>＆<strong>飛翔する光る弾丸・弾道トレイル</strong>を搭載！<br />
-        キャラクター選択や装備を設定して「対戦スタート」を押してください。
+        パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
+        ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
       </p>
 
+      <!-- 所持通貨＆ショップ・ガチャバー -->
       <div class="wallet-bar">
         <div class="wallet-info">
           <span class="wallet-label">所持クレジット</span>
-          <strong id="modal-coins-display" class="coin-val">160 CR</strong>
+          <strong id="modal-coins-display" class="coin-val">0 CR</strong>
         </div>
+        <button id="open-shop-btn" class="shop-open-btn" type="button">ショップ / スキンガチャ</button>
       </div>
 
+      <!-- キャラクター選択（全6キャラ・固有スキル） -->
       <div class="character-select-section">
-        <div class="slots-title">キャラクター選択（全4キャラごとに固有スキル・スピード倍率が変化）</div>
+        <div class="slots-title">キャラクター選択（全6キャラごとに固有スキル・ステータスが変化）</div>
         <div id="character-grid" class="character-grid"></div>
         <div id="selected-char-detail" class="selected-char-detail">
           <div class="char-detail-head">
-            <strong id="char-detail-name">BLITZ（ブリッツ）</strong>
-            <span id="char-detail-skill-badge" class="char-skill-badge">固有スキル: オーバードライブ</span>
+            <strong id="char-detail-name">HOOK（フック）</strong>
+            <span id="char-detail-skill-badge" class="char-skill-badge">固有スキル: ワイヤーグラップル</span>
           </div>
-          <div id="char-detail-desc" class="char-detail-desc">3.2秒間、移動・スライド・連射・リロードを超加速（1.75倍）させるスピードスキル。</div>
+          <div id="char-detail-desc" class="char-detail-desc">建物やタワーへワイヤーを射出して高速スイング＆スリングショット移動する。</div>
         </div>
       </div>
 
+      <!-- 2枠ロードアウト（メイン銃 + 近接武器） -->
+      <div class="loadout-slots-section">
+        <div class="slots-title">バトル装備（試合中に 1 / 2 キー・切替ボタンで持ち替え）</div>
+        <div class="slots-grid">
+          <div class="slot-card">
+            <div class="slot-badge">SLOT 1 : メイン銃</div>
+            <div class="slot-item-name" id="equipped-gun-name">パルスライフル</div>
+            <div class="slot-skin-name" id="equipped-gun-skin">スキン: スタンダード</div>
+          </div>
+          <div class="slot-card melee">
+            <div class="slot-badge">SLOT 2 : 近接武器</div>
+            <div class="slot-item-name" id="equipped-melee-name">コンバットナイフ</div>
+            <div class="slot-skin-name" id="equipped-melee-skin">スキン: スタンダード</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- オンライン対戦ロビー -->
       <div class="multiplayer-section">
         <div class="mp-header">
-          <span class="mp-title">対戦設定</span>
+          <span class="mp-title">対戦モード（2人 1v1 / 4人乱戦 切替）</span>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <div class="mp-goal-wrap">
               <label for="map-select">マップ:</label>
               <select id="map-select">
                 <option value="sky_citadel" selected>スカイシタデル</option>
                 <option value="neon_canyon">ネオンキャニオン</option>
+              </select>
+            </div>
+            <div class="mp-goal-wrap">
+              <label for="player-count-select">人数:</label>
+              <select id="player-count-select">
+                <option value="2">2人モード (1v1)</option>
+                <option value="4" selected>4人モード (乱戦)</option>
               </select>
             </div>
             <div class="mp-goal-wrap">
@@ -154,11 +248,51 @@
             </div>
           </div>
         </div>
-        <div class="mp-panel">
-          <div class="mp-status">BLITZの超高速移動と飛翔する3D弾丸・弾道トレイルを体感できます。</div>
+
+        <div class="mp-tabs">
+          <button id="mp-tab-host" class="mp-tab-btn" type="button">部屋を作る（ホスト）</button>
+          <button id="mp-tab-join" class="mp-tab-btn" type="button">部屋に入る（参加）</button>
+          <button id="mp-tab-solo" class="mp-tab-btn active" type="button">ソロ練習（BOT）</button>
+        </div>
+
+        <!-- ホストパネル -->
+        <div id="mp-host-panel" class="mp-panel hidden">
+          <div class="room-code-box">
+            <span>ルームコード:</span>
+            <strong id="host-room-code">----</strong>
+            <button id="copy-code-btn" class="mini-action-btn" type="button">コピー</button>
+          </div>
+          <div id="host-status-text" class="mp-status">「部屋を作成」を押して最大3人の友達に4桁のコードを伝えてください（2〜4人で対戦可能）</div>
+          <button id="create-room-btn" class="mp-action-btn" type="button">部屋を作成して待機</button>
+        </div>
+
+        <!-- 参加パネル -->
+        <div id="mp-join-panel" class="mp-panel hidden">
+          <div class="join-input-row">
+            <input id="join-code-input" type="text" inputmode="numeric" maxlength="4" placeholder="4桁コード (例: 4821)" />
+            <button id="join-room-btn" class="mp-action-btn" type="button">接続する</button>
+          </div>
+          <div id="join-status-text" class="mp-status">ホストの画面に表示された4桁の数字を入力してください</div>
+        </div>
+
+        <!-- ソロ練習パネル -->
+        <div id="mp-solo-panel" class="mp-panel">
+          <div id="solo-mode-desc" class="mp-status">【4人モード】縦横メガアリーナで3体のBOT（計4人）と乱戦！敵を倒すとHP・残弾が回復します。</div>
         </div>
       </div>
 
+      <!-- キャラコンギミック選択 -->
+      <div class="loadout-section">
+        <div class="loadout-title">キャラコン装備（ギミック選択）</div>
+        <div class="loadout-grid" id="loadout-grid">
+          <button class="loadout-btn active" data-loadout="all" type="button">全部盛り<small>ダッシュ+ワイヤー+ZIP</small></button>
+          <button class="loadout-btn" data-loadout="dash" type="button">空中ダッシュ<small>DASH + ZIP</small></button>
+          <button class="loadout-btn" data-loadout="grapple" type="button">ワイヤー機動<small>WIRE + ZIP</small></button>
+          <button class="loadout-btn" data-loadout="classic" type="button">クラシック<small>基本パルクールのみ</small></button>
+        </div>
+      </div>
+
+      <!-- カメラ感度設定 -->
       <div class="sensitivity-section">
         <div class="sensitivity-header">
           <span class="sensitivity-title">カメラ感度（視点移動）</span>
@@ -175,19 +309,81 @@
         </div>
       </div>
 
+      <!-- 照準オート攻撃設定 -->
       <div class="weapon-settings-section">
         <div class="weapon-settings-row" style="margin-bottom:0;">
-          <span class="weapon-settings-title">照準オート攻撃（照準内にBOTが入ると自動攻撃）</span>
+          <span class="weapon-settings-title">照準オート攻撃（銃・近接の射程内に相手が入ると自動攻撃）</span>
           <button id="autofire-toggle-btn" class="autofire-btn active" type="button">ON</button>
         </div>
       </div>
 
+      <div class="controls-box">
+        <div><strong>【スマホ・iPad】</strong>左画面：スティック ／ 右画面：視点 ／ FIRE・RELOAD(装填)・銃↔近接切替・LOOK(眺める)・JUMP・SLIDE・DASH・WIRE・ZIP</div>
+        <div><strong>【PC】</strong>WASD移動 ／ 左クリック攻撃 ／ 1・2・ホイールで銃↔近接切替 ／ V・T武器を眺める ／ Rリロード ／ Spaceジャンプ ／ Qダッシュ ／ 右クリック・Fワイヤー ／ Eジップ</div>
+        <div><strong>【報酬＆ガチャ】</strong>バトル勝利で <strong>+100 CR</strong>（ソロ練習 +40 CR）獲得！ショップで新武器やカラムビットを買い、ガチャでレアスキンを引こう！</div>
+      </div>
+
       <div class="modal-buttons">
-        <button id="start-btn" type="button">対戦スタート</button>
+        <button id="start-btn" type="button">対戦スタート（ソロ練習）</button>
+        <div class="sub-btn-row">
+          <button id="layout-btn" class="secondary-btn" type="button">ボタン配置を変更</button>
+          <button id="mode-toggle-btn" class="secondary-btn" type="button">操作モード: 読み込み中...</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <script type="module" src="game.js?v=26"></script>
+
+  <!-- ショップ＆スキンガチャ画面 -->
+  <div id="shop-overlay" class="hidden">
+    <div class="modal shop-modal">
+      <div class="shop-top-bar">
+        <h2>アーマリー＆スキンガチャ</h2>
+        <div class="shop-wallet-pill">所持: <strong id="shop-coins-display">0 CR</strong></div>
+        <button id="close-shop-btn" class="mini-btn" type="button">閉じる</button>
+      </div>
+
+      <div class="shop-tabs">
+        <button class="shop-tab-btn active" data-shoptab="guns" type="button">メイン銃</button>
+        <button class="shop-tab-btn" data-shoptab="melee" type="button">近接武器</button>
+        <button class="shop-tab-btn" data-shoptab="gacha" type="button">スキンガチャ</button>
+        <button class="shop-tab-btn" data-shoptab="skins" type="button">所持スキン装備</button>
+      </div>
+
+      <div id="shop-tab-note" class="shop-note">通貨を使って新しいメイン銃を購入・装備できます。</div>
+
+      <!-- ショップアイテム一覧（メイン銃 / 近接武器 / 所持スキン） -->
+      <div id="shop-items-grid" class="shop-items-grid"></div>
+
+      <!-- スキンガチャ専用ビュー -->
+      <div id="gacha-view" class="gacha-view hidden">
+        <div class="gacha-banner">
+          <div class="gacha-banner-title">WEAPON & MELEE SKIN GACHA</div>
+          <div class="gacha-banner-sub">銃＆近接武器のレアスキンがランダムで排出！（重複時は半額CR還元）</div>
+          <div class="gacha-rates">
+            <span class="rate-chip common">COMMON 45%</span>
+            <span class="rate-chip rare">RARE 32%</span>
+            <span class="rate-chip epic">EPIC 16%</span>
+            <span class="rate-chip legend">LEGEND 7%</span>
+          </div>
+        </div>
+
+        <div id="gacha-result-box" class="gacha-result-box">
+          <div class="gacha-placeholder">下のボタンを押してスキンガチャを回そう！</div>
+        </div>
+
+        <div class="gacha-actions">
+          <button id="gacha-pull-1-btn" class="gacha-btn single" type="button">
+            1回引く<strong>80 CR</strong>
+          </button>
+          <button id="gacha-pull-3-btn" class="gacha-btn multi" type="button">
+            3連ガチャ<strong>220 CR</strong>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="game.js?v=24"></script>
 </body>
 </html>
