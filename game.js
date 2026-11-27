@@ -773,6 +773,18 @@ function playSfx(type, volumeScale = 1.0) {
   } else if (type === "shot_lmg") {
     playNoiseBurst(t, 0.11, "bandpass", 1100, 240, 0.13 * v, 1.0);
     playTone(t, "sawtooth", 340, 74, 0.10, 0.10 * v);
+  } else if (type === "shot_burst") {
+    playNoiseBurst(t, 0.08, "bandpass", 2100, 520, 0.11 * v, 1.5);
+    playTone(t, "triangle", 740, 165, 0.075, 0.085 * v);
+    playTone(t, "sine", 1420, 620, 0.06, 0.04 * v);
+  } else if (type === "shot_magnum") {
+    playNoiseBurst(t, 0.24, "lowpass", 1250, 160, 0.19 * v, 0.9);
+    playTone(t, "sawtooth", 360, 52, 0.22, 0.15 * v);
+    playTone(t, "triangle", 980, 210, 0.14, 0.08 * v);
+  } else if (type === "shot_plasma") {
+    playTone(t, "sine", 1360, 220, 0.19, 0.12 * v);
+    playTone(t, "sawtooth", 680, 140, 0.17, 0.08 * v);
+    playNoiseBurst(t, 0.14, "bandpass", 2800, 640, 0.09 * v, 2.4);
   } else if (type === "katana_draw") {
     // 刀の抜刀音：「シャキーン！」（金属擦れ＋高音倍音シマー）
     playNoiseBurst(t, 0.22, "bandpass", 2600, 5200, 0.11 * v, 3.2);
@@ -790,6 +802,29 @@ function playSfx(type, volumeScale = 1.0) {
     playTone(t, "sawtooth", 540, 110, 0.14, 0.13 * v);
     playTone(t, "sine", 1980, 2640, 0.24, 0.095 * v);
     playTone(t, "triangle", 3120, 2840, 0.28, 0.06 * v, 0.02);
+  } else if (type === "butterfly_draw") {
+    // バタフライナイフ：高速フリップの連続金属クリック音「カチャカチャッ！」
+    [0, 0.075, 0.15, 0.23].forEach((d, idx) => {
+      playNoiseBurst(t + d, 0.04, "bandpass", 3200 + idx * 350, 4800, 0.08 * v, 4.0);
+      playTone(t + d, "triangle", 1900 + idx * 240, 2600 + idx * 260, 0.045, 0.055 * v);
+    });
+  } else if (type === "scythe_draw") {
+    // ネオンサイズ：重厚なプラズマ起動＋大鎌展開音
+    playNoiseBurst(t, 0.24, "bandpass", 900, 2600, 0.11 * v, 2.2);
+    playTone(t, "sawtooth", 180, 520, 0.26, 0.08 * v);
+    playTone(t, "sine", 1120, 1680, 0.28, 0.05 * v, 0.04);
+  } else if (type === "scythe_slash") {
+    // ネオンサイズ：大鎌の重低音プラズマ風切り斬撃音
+    playNoiseBurst(t, 0.22, "bandpass", 1500, 240, 0.16 * v, 1.6);
+    playTone(t, "sawtooth", 420, 95, 0.18, 0.11 * v);
+  } else if (type === "hammer_draw") {
+    // グラビティハンマー：重力コア起動の重低音パルス
+    playTone(t, "sine", 95, 210, 0.28, 0.13 * v);
+    playTone(t, "triangle", 280, 140, 0.24, 0.08 * v, 0.04);
+  } else if (type === "hammer_smash") {
+    // グラビティハンマー：衝撃波スマッシュ音
+    playNoiseBurst(t, 0.24, "lowpass", 680, 85, 0.19 * v, 0.9);
+    playTone(t, "sine", 160, 38, 0.24, 0.16 * v);
   } else if (type === "melee_draw") {
     playNoiseBurst(t, 0.12, "bandpass", 1800, 3400, 0.07 * v, 2.5);
     playTone(t, "triangle", 920, 1560, 0.13, 0.065 * v);
@@ -1996,6 +2031,63 @@ const GUNS = {
     recoilPitch: 0.042,
     sfx: "shot_lmg",
   },
+  burst: {
+    key: "burst",
+    name: "ヴァルキリーBR",
+    hudName: "VALKYRIE BR",
+    shortName: "BURST",
+    price: 180,
+    desc: "超高精度の高速タクティカルバトルライフル（24発 / 威力18）",
+    maxAmmo: 24,
+    fireRate: 0.15,
+    reloadTime: 1.25,
+    range: 145,
+    pellets: 1,
+    spread: 0.0035,
+    damage: 18,
+    defaultColor: 0x10b981,
+    recoilZ: 0.058,
+    recoilPitch: 0.048,
+    sfx: "shot_burst",
+  },
+  magnum: {
+    key: "magnum",
+    name: "アペックスマグナム",
+    hudName: "APEX MAGNUM",
+    shortName: "MAGNUM",
+    price: 230,
+    desc: "一撃の重さが光る大口径ハンドキャノン（7発 / 威力42）",
+    maxAmmo: 7,
+    fireRate: 0.42,
+    reloadTime: 1.35,
+    range: 110,
+    pellets: 1,
+    spread: 0.004,
+    damage: 42,
+    defaultColor: 0xf43f5e,
+    recoilZ: 0.125,
+    recoilPitch: 0.115,
+    sfx: "shot_magnum",
+  },
+  plasma: {
+    key: "plasma",
+    name: "ノヴァプラズマ",
+    hudName: "NOVA PLASMA",
+    shortName: "PLASMA",
+    price: 300,
+    desc: "双連電磁コイルから放つ高出力プラズマ砲（12発 / 威力26）",
+    maxAmmo: 12,
+    fireRate: 0.24,
+    reloadTime: 1.55,
+    range: 105,
+    pellets: 1,
+    spread: 0.009,
+    damage: 26,
+    defaultColor: 0x60a5fa,
+    recoilZ: 0.085,
+    recoilPitch: 0.072,
+    sfx: "shot_plasma",
+  },
 };
 
 // 近接武器カタログ（性能は完全共通：威力55 / クールタイム0.48s / リーチ3.6m）
@@ -2041,6 +2133,33 @@ const MELEES = {
     price: 280,
     desc: "エネルギー刃を備えた戦術トマホーク（威力55・共通性能）",
     defaultColor: 0xf59e0b,
+  },
+  butterfly: {
+    key: "butterfly",
+    name: "バタフライナイフ",
+    hudName: "BUTTERFLY",
+    shortName: "BALISONG",
+    price: 240,
+    desc: "華麗な連続フリップ回転を繰り出すバリソン（威力55・共通性能）",
+    defaultColor: 0xa855f7,
+  },
+  scythe: {
+    key: "scythe",
+    name: "ネオンサイズ",
+    hudName: "NEON SCYTHE",
+    shortName: "SCYTHE",
+    price: 320,
+    desc: "巨大な湾曲プラズマ刃を持つ死神の大鎌（威力55・共通性能）",
+    defaultColor: 0xec4899,
+  },
+  hammer: {
+    key: "hammer",
+    name: "グラビティハンマー",
+    hudName: "GRAVITY HAMMER",
+    shortName: "HAMMER",
+    price: 350,
+    desc: "重力コア内蔵の超重厚戦術ウォーハンマー（威力55・共通性能）",
+    defaultColor: 0x22d3ee,
   },
 };
 
@@ -2495,6 +2614,78 @@ function buildActiveViewModel() {
       addPart(weaponRoot, new THREE.BoxGeometry(0.056, 0.125, 0.066), darkTrimMat, [0, -0.095, 0.17], [0.30, 0, 0]);
 
       muzzlePoint.position.set(0, 0.026, -0.71);
+
+    } else if (g.key === "burst") {
+      // 【ヴァルキリーBR】近未来ブルパップ・タクティカルバトルライフル造形
+      addPart(weaponRoot, new THREE.BoxGeometry(0.084, 0.092, 0.54), bodyMat, [0, 0.018, 0.03]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.072, 0.024, 0.48), frameMat, [0, 0.072, -0.02]);
+      // ブルパップ後方マガジン＆チークレスト
+      addPart(weaponRoot, new THREE.BoxGeometry(0.048, 0.145, 0.078), darkTrimMat, [0, -0.082, 0.21], [0.16, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.052, 0.115, 0.016), accentMat, [0, -0.082, 0.21], [0.16, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.076, 0.032, 0.18), chromeMat, [0, 0.068, 0.21]);
+      // フォワードピストルグリップ＆トリガーガードフレーム
+      addPart(weaponRoot, new THREE.BoxGeometry(0.046, 0.12, 0.056), darkTrimMat, [0, -0.088, 0.02], [0.28, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.052, 0.022, 0.18), frameMat, [0, -0.042, -0.05]);
+      // サイド発光スリット＆ロングフルーテッドバレル
+      for (const side of [-1, 1]) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.012, 0.018, 0.34), accentMat, [side * 0.046, 0.022, -0.06]);
+      }
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.015, 0.019, 0.38, 14), chromeMat, [0, 0.024, -0.42], [Math.PI / 2, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.044, 0.046, 0.085), darkTrimMat, [0, 0.024, -0.58]);
+      // 2倍ホロサイト
+      addPart(weaponRoot, new THREE.BoxGeometry(0.054, 0.048, 0.13), darkTrimMat, [0, 0.104, -0.03]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.040, 0.034, 0.010), lensMat, [0, 0.106, -0.08]);
+
+      muzzlePoint.position.set(0, 0.024, -0.64);
+
+    } else if (g.key === "magnum") {
+      // 【アペックスマグナム】超重厚大口径ハンドキャノン・ヘビースライド造形
+      // 大型ベンチレーテッドリブ付きヘビースライド
+      addPart(weaponRoot, new THREE.BoxGeometry(0.074, 0.078, 0.42), chromeMat, [0, 0.036, -0.10]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.078, 0.026, 0.38), darkTrimMat, [0, 0.072, -0.10]);
+      // トップ通気リブ（4スロット）
+      for (let i = 0; i < 4; i++) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.048, 0.012, 0.024), accentMat, [0, 0.086, -0.02 - i * 0.065]);
+      }
+      // アンダーバレルヘビーフレーム＆タクティカルレーザーモジュール
+      addPart(weaponRoot, new THREE.BoxGeometry(0.068, 0.044, 0.34), bodyMat, [0, -0.018, -0.08]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.056, 0.038, 0.13), darkTrimMat, [0, -0.052, -0.18]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.010, 0.010, 0.022, 12), lensMat, [0, -0.052, -0.248], [Math.PI / 2, 0, 0]);
+      // サイド発光ライン＆大口径マズル
+      for (const side of [-1, 1]) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.010, 0.016, 0.30), accentMat, [side * 0.039, 0.032, -0.11]);
+      }
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.022, 0.022, 0.05, 14), darkTrimMat, [0, 0.036, -0.32], [Math.PI / 2, 0, 0]);
+      // エルゴノミック重グリップ
+      addPart(weaponRoot, new THREE.BoxGeometry(0.062, 0.155, 0.078), darkTrimMat, [0, -0.095, 0.06], [0.28, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.066, 0.125, 0.022), bodyMat, [0, -0.095, 0.06], [0.28, 0, 0]);
+      // リフレックスマイクロサイト
+      addPart(weaponRoot, new THREE.BoxGeometry(0.048, 0.032, 0.065), darkTrimMat, [0, 0.096, 0.05]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.036, 0.022, 0.008), lensMat, [0, 0.098, 0.03]);
+
+      muzzlePoint.position.set(0, 0.036, -0.36);
+
+    } else {
+      // 【ノヴァプラズマ】双連電磁加速コイル・高出力プラズマブラスター造形
+      addPart(weaponRoot, new THREE.BoxGeometry(0.118, 0.116, 0.46), bodyMat, [0, 0.012, 0.02]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.126, 0.032, 0.38), frameMat, [0, 0.072, -0.01]);
+      // 中央プラズマリアクターコア（球体＋発光リング）
+      addPart(weaponRoot, new THREE.SphereGeometry(0.044, 16, 16), lensMat, [0, 0.024, -0.12]);
+      addPart(weaponRoot, new THREE.TorusGeometry(0.054, 0.008, 10, 20), chromeMat, [0, 0.024, -0.12]);
+      // 双連プラズマ加速エミッター（上下2段レール＋3連エネルギーリング）
+      addPart(weaponRoot, new THREE.BoxGeometry(0.074, 0.024, 0.36), darkTrimMat, [0, 0.056, -0.34]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.074, 0.024, 0.36), darkTrimMat, [0, -0.012, -0.34]);
+      addPart(weaponRoot, new THREE.CylinderGeometry(0.018, 0.022, 0.38, 14), accentMat, [0, 0.022, -0.35], [Math.PI / 2, 0, 0]);
+      for (let i = 0; i < 3; i++) {
+        addPart(weaponRoot, new THREE.TorusGeometry(0.046, 0.007, 10, 18), accentMat, [0, 0.022, -0.26 - i * 0.11]);
+      }
+      // エネルギーセルマガジン＆ストック
+      addPart(weaponRoot, new THREE.BoxGeometry(0.068, 0.11, 0.11), darkTrimMat, [0, -0.088, -0.04], [0.15, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.074, 0.075, 0.085), accentMat, [0, -0.092, -0.04], [0.15, 0, 0]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.082, 0.10, 0.18), frameMat, [0, -0.005, 0.30]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.052, 0.12, 0.060), darkTrimMat, [0, -0.092, 0.15], [0.30, 0, 0]);
+
+      muzzlePoint.position.set(0, 0.022, -0.56);
     }
 
     muzzleFlashMesh = new THREE.Mesh(
@@ -2685,6 +2876,63 @@ function buildActiveViewModel() {
       // 後方アーマーピアシングスパイク
       addPart(axeGroup, new THREE.ConeGeometry(0.024, 0.11, 4), chromeMat, [0, 0.018, -0.22], [Math.PI / 2, Math.PI / 4, 0]);
       addPart(axeGroup, new THREE.BoxGeometry(0.012, 0.032, 0.075), bladeMat, [0, 0.015, -0.24]);
+
+    } else if (m.key === "butterfly") {
+      // 【バタフライナイフ】二股セーフ＆バイトハンドル＋スケルトンセンターブレード
+      for (const side of [-1, 1]) {
+        addPart(weaponRoot, new THREE.BoxGeometry(0.014, 0.026, 0.195), gripMat, [side * 0.016, side * 0.006, 0.015], [0, side * 0.06, 0]);
+        addPart(weaponRoot, new THREE.BoxGeometry(0.016, 0.010, 0.145), bladeMat, [side * 0.017, side * 0.006, 0.015], [0, side * 0.06, 0]);
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.009, 0.009, 0.022, 12), chromeMat, [side * 0.016, side * 0.006, -0.078], [0, 0, Math.PI / 2]);
+      }
+      addPart(weaponRoot, new THREE.BoxGeometry(0.024, 0.016, 0.028), chromeMat, [0, 0, 0.118]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.010, 0.026, 0.25), steelMat, [0, 0.006, -0.21]);
+      addPart(weaponRoot, new THREE.BoxGeometry(0.007, 0.022, 0.27), bladeMat, [0, -0.008, -0.22]);
+      for (let i = 0; i < 3; i++) {
+        addPart(weaponRoot, new THREE.CylinderGeometry(0.005, 0.005, 0.014, 10), darkMat, [0, 0.006, -0.14 - i * 0.042], [0, 0, Math.PI / 2]);
+      }
+      const bTip = addPart(weaponRoot, new THREE.ConeGeometry(0.021, 0.072, 4), bladeMat, [0, -0.001, -0.375], [-Math.PI / 2, Math.PI / 4, 0]);
+      bTip.scale.set(0.42, 1, 1);
+
+    } else if (m.key === "scythe") {
+      // 【ネオンサイズ】長柄カーボンシャフト＋死神の巨大湾曲エネルギー大鎌
+      const scytheGroup = new THREE.Group();
+      scytheGroup.rotation.set(-0.18, 0.10, -0.16);
+      scytheGroup.position.set(-0.02, -0.03, 0.04);
+      weaponRoot.add(scytheGroup);
+
+      addPart(scytheGroup, new THREE.CylinderGeometry(0.018, 0.022, 0.86, 14), gripMat, [0, 0, -0.20], [-Math.PI / 2, 0, 0]);
+      addPart(scytheGroup, new THREE.ConeGeometry(0.024, 0.09, 6), chromeMat, [0, 0, 0.26], [Math.PI / 2, 0, 0]);
+      for (let i = 0; i < 4; i++) {
+        addPart(scytheGroup, new THREE.CylinderGeometry(0.023, 0.023, 0.018, 14), bladeMat, [0, 0, 0.12 - i * 0.18], [-Math.PI / 2, 0, 0]);
+      }
+      addPart(scytheGroup, new THREE.BoxGeometry(0.046, 0.068, 0.11), darkMat, [0, 0.015, -0.60]);
+      addPart(scytheGroup, new THREE.CylinderGeometry(0.028, 0.028, 0.056, 16), bladeMat, [0, 0.015, -0.60], [0, 0, Math.PI / 2]);
+      addPart(scytheGroup, new THREE.BoxGeometry(0.18, 0.048, 0.016), steelMat, [-0.10, 0.018, -0.61], [0, 0.15, 0.10]);
+      addPart(scytheGroup, new THREE.BoxGeometry(0.22, 0.042, 0.014), steelMat, [-0.27, 0.032, -0.56], [0, 0.48, 0.16]);
+      addPart(scytheGroup, new THREE.BoxGeometry(0.20, 0.034, 0.012), bladeMat, [-0.41, 0.048, -0.45], [0, 0.85, 0.22]);
+      addPart(scytheGroup, new THREE.BoxGeometry(0.36, 0.026, 0.010), bladeMat, [-0.24, 0.022, -0.57], [0, 0.45, 0.14]);
+      const scytheTip = addPart(scytheGroup, new THREE.ConeGeometry(0.024, 0.11, 4), bladeMat, [-0.50, 0.062, -0.33], [0, 0.85, -Math.PI / 2 + 0.22]);
+      scytheTip.scale.set(1, 1, 0.42);
+
+    } else {
+      // 【グラビティハンマー】重力コア内蔵の超重厚戦術ウォーハンマー
+      const hammerGroup = new THREE.Group();
+      hammerGroup.rotation.set(-0.22, 0.08, -0.14);
+      hammerGroup.position.set(0, -0.02, 0.03);
+      weaponRoot.add(hammerGroup);
+
+      addPart(hammerGroup, new THREE.CylinderGeometry(0.026, 0.022, 0.042, 12), chromeMat, [0, 0, 0.18], [-Math.PI / 2, 0, 0]);
+      addPart(hammerGroup, new THREE.CylinderGeometry(0.021, 0.024, 0.66, 14), gripMat, [0, 0, -0.15], [-Math.PI / 2, 0, 0]);
+      for (let i = 0; i < 3; i++) {
+        addPart(hammerGroup, new THREE.CylinderGeometry(0.026, 0.026, 0.022, 14), chromeMat, [0, 0, 0.04 - i * 0.17], [-Math.PI / 2, 0, 0]);
+      }
+      addPart(hammerGroup, new THREE.BoxGeometry(0.115, 0.125, 0.26), darkMat, [0, 0.015, -0.46]);
+      addPart(hammerGroup, new THREE.BoxGeometry(0.125, 0.042, 0.22), chromeMat, [0, 0.015, -0.46]);
+      addPart(hammerGroup, new THREE.CylinderGeometry(0.042, 0.042, 0.132, 16), bladeMat, [0, 0.015, -0.46], [0, 0, Math.PI / 2]);
+      addPart(hammerGroup, new THREE.BoxGeometry(0.135, 0.145, 0.036), chromeMat, [0, 0.015, -0.60]);
+      addPart(hammerGroup, new THREE.BoxGeometry(0.142, 0.152, 0.014), bladeMat, [0, 0.015, -0.62]);
+      addPart(hammerGroup, new THREE.BoxGeometry(0.095, 0.105, 0.036), steelMat, [0, 0.015, -0.32]);
+      addPart(hammerGroup, new THREE.ConeGeometry(0.032, 0.09, 6), bladeMat, [0, 0.015, -0.27], [Math.PI / 2, 0, 0]);
     }
   }
 }
@@ -2756,11 +3004,18 @@ function switchWeaponSlot(slot, showNotice = false) {
     const mKey = profile.equippedMelee;
     const dur =
       mKey === "karambit" ? 0.62 :
+      mKey === "butterfly" ? 0.66 :
       mKey === "knife" ? 0.52 :
-      mKey === "katana" ? 0.68 : 0.64;
+      mKey === "katana" ? 0.68 :
+      mKey === "scythe" ? 0.72 : 0.68;
     weaponState.equipAnimDuration = dur;
     weaponState.equipAnimTimer = dur;
-    playSfx(mKey === "katana" ? "katana_draw" : "melee_draw");
+    const drawSfx =
+      mKey === "katana" ? "katana_draw" :
+      mKey === "butterfly" ? "butterfly_draw" :
+      mKey === "scythe" ? "scythe_draw" :
+      mKey === "hammer" ? "hammer_draw" : "melee_draw";
+    playSfx(drawSfx);
   } else if (slot === "gun" && game.active && !player.dead) {
     playSfx("equip");
   }
@@ -2873,7 +3128,10 @@ function performMeleeAttack() {
   const m = MELEES[profile.equippedMelee];
   const swingDur =
     m.key === "katana" ? 0.28 :
+    m.key === "scythe" ? 0.32 :
+    m.key === "hammer" ? 0.34 :
     m.key === "axe" ? 0.32 :
+    m.key === "butterfly" ? 0.20 :
     m.key === "karambit" ? 0.20 : 0.21;
   weaponState.fireCooldown = MELEE_COMMON_STATS.attackRate;
   weaponState.meleeSwingDuration = swingDur;
@@ -2881,7 +3139,11 @@ function performMeleeAttack() {
   weaponState.meleeCombo = (weaponState.meleeCombo + 1) % 2;
   weaponState.inspectTimer = 0;
   weaponState.equipAnimTimer = 0;
-  playSfx(m.key === "katana" ? "katana_slash" : "melee_swing");
+  const swingSfx =
+    m.key === "katana" ? "katana_slash" :
+    m.key === "scythe" ? "scythe_slash" :
+    m.key === "hammer" ? "hammer_smash" : "melee_swing";
+  playSfx(swingSfx);
 
   const accentHex = getEffectiveAccentColor(m.defaultColor, profile.equippedMeleeSkin);
   const eyePos = camera.getWorldPosition(new THREE.Vector3());
@@ -3107,8 +3369,26 @@ function updateWeapon(dt) {
         weaponBasePos.z + remain * 0.12
       );
       weaponRoot.rotation.set(remain * 0.65, -remain * 0.85, remain * 1.15);
+    } else if (meleeKey === "butterfly") {
+      // バタフライナイフ：手首の返しで2連続スピンオープン抜刀
+      const spin = (1 - easeOut) * Math.PI * 4;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - arc * 0.07,
+        weaponBasePos.y - bobY + arc * 0.08,
+        weaponBasePos.z - arc * 0.02
+      );
+      weaponRoot.rotation.set(spin * 0.5, 0.45 * arc, spin);
+    } else if (meleeKey === "scythe") {
+      // ネオンサイズ：大鎌を後方から大きく弧を描いて展開
+      const remain = 1 - easeOut;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX + remain * 0.18,
+        weaponBasePos.y - bobY + arc * 0.10,
+        weaponBasePos.z + remain * 0.14
+      );
+      weaponRoot.rotation.set(-remain * 0.55, -remain * 1.35, remain * 0.65);
     } else {
-      // プラズマバトルアックス：大きく振り上げて地面へ叩きつけるヘビー構え
+      // アックス／グラビティハンマー：大きく振り上げて叩きつけるヘビー構え
       const remain = 1 - easeOut;
       weaponRoot.position.set(
         weaponBasePos.x + bobX + remain * 0.06,
@@ -3187,8 +3467,35 @@ function updateWeapon(dt) {
           0.95 * env,
           -0.42 * env + flourishSpin
         );
+      } else if (meleeKey === "butterfly") {
+        // バタフライナイフ：連続バタフライフリップ＆空中トスキャッチ
+        const flipWave = Math.sin(progress * Math.PI * 6);
+        const spin360 = Math.min(1, progress * 1.4) * Math.PI * 4;
+        weaponRoot.position.set(
+          weaponBasePos.x - 0.11 * env + bobX * 0.4,
+          weaponBasePos.y + (0.085 + Math.abs(flipWave) * 0.035) * env - bobY * 0.4,
+          weaponBasePos.z + 0.06 * env
+        );
+        weaponRoot.rotation.set(
+          flipWave * 0.85 * env,
+          0.68 * env,
+          spin360 * env
+        );
+      } else if (meleeKey === "scythe") {
+        // ネオンサイズ：大鎌の水平スピン回し＆プラズマ刃チェック
+        const scytheSpin = (1 - Math.pow(1 - Math.min(1, progress * 1.3), 2)) * Math.PI * 2;
+        weaponRoot.position.set(
+          weaponBasePos.x - 0.13 * env + bobX * 0.4,
+          weaponBasePos.y + 0.08 * env - bobY * 0.4,
+          weaponBasePos.z + 0.06 * env
+        );
+        weaponRoot.rotation.set(
+          0.25 * env,
+          0.75 * env + scytheSpin,
+          -0.22 * env
+        );
       } else {
-        // プラズマバトルアックス：両手持ち風の重厚な持ち替えスピン＆刃面点検
+        // アックス／グラビティハンマー：両手持ち風の重厚な持ち替えスピン＆ヘッド点検
         const heavyTurn = Math.sin(progress * Math.PI * 2);
         const flipPhase = Math.min(1, Math.max(0, (progress - 0.2) * 1.8));
         const axeRoll = (1 - Math.pow(1 - flipPhase, 2)) * Math.PI * 2;
@@ -3264,8 +3571,34 @@ function updateWeapon(dt) {
         swingPhase * 1.15 * dir,
         swingPhase * 1.05 * dir
       );
+    } else if (meleeKey === "butterfly") {
+      // バタフライナイフ：高速フリップ斬り＆逆手突き
+      const dir = combo === 0 ? 1 : -1;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - swingPhase * 0.16 * dir,
+        weaponBasePos.y - bobY + swingPhase * 0.03,
+        weaponBasePos.z - swingPhase * 0.18
+      );
+      weaponRoot.rotation.set(
+        -swingPhase * 0.75,
+        swingPhase * 0.90 * dir,
+        swingPhase * 1.55 * dir
+      );
+    } else if (meleeKey === "scythe") {
+      // ネオンサイズ：大鎌による広範囲の横薙ぎ刈り取りスラッシュ
+      const dir = combo === 0 ? 1 : -1;
+      weaponRoot.position.set(
+        weaponBasePos.x + bobX - swingPhase * 0.28 * dir,
+        weaponBasePos.y - bobY - swingPhase * 0.04,
+        weaponBasePos.z - swingPhase * 0.20
+      );
+      weaponRoot.rotation.set(
+        -swingPhase * 0.45,
+        swingPhase * 1.45 * dir,
+        swingPhase * 0.85 * dir
+      );
     } else {
-      // プラズマバトルアックス：頭上から全力で叩き割るオーバーヘッドスマッシュ
+      // アックス／グラビティハンマー：頭上から全力で叩き割るオーバーヘッドスマッシュ
       weaponRoot.position.set(
         weaponBasePos.x + bobX - swingPhase * 0.11,
         weaponBasePos.y - bobY - swingPhase * 0.12,
