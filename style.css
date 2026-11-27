@@ -1,0 +1,2137 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #0f172a;
+  font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  color: #f8fafc;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+canvas {
+  display: block;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ==========================================
+   HUD
+   ========================================== */
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 14px;
+  gap: 8px;
+}
+
+.panel {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  backdrop-filter: blur(4px);
+}
+
+.center-panel {
+  text-align: center;
+  min-width: 126px;
+}
+
+#state-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #38bdf8;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+#state-badge.slide {
+  background: #f59e0b;
+}
+
+#state-badge.wallrun {
+  background: #a855f7;
+  color: #ffffff;
+}
+
+#state-badge.air {
+  background: #22c55e;
+}
+
+#state-badge.grapple {
+  background: #06b6d4;
+  color: #0f172a;
+}
+
+#state-badge.zipline {
+  background: #facc15;
+  color: #0f172a;
+}
+
+#state-badge.dash {
+  background: #ec4899;
+  color: #ffffff;
+}
+
+.speed-wrap {
+  font-size: 1.45rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.speed-wrap small {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.right-panel {
+  text-align: right;
+}
+
+.hud-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+  pointer-events: auto;
+}
+
+.mini-btn {
+  background: rgba(51, 65, 85, 0.9);
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.mini-btn:active {
+  background: #475569;
+}
+
+/* ミニマップ */
+#minimap-wrap {
+  position: fixed;
+  top: 76px;
+  left: 14px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1.5px solid rgba(56, 189, 248, 0.5);
+  border-radius: 10px;
+  padding: 5px;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+#minimap {
+  width: 128px;
+  height: 128px;
+  border-radius: 6px;
+  display: block;
+}
+
+.minimap-legend {
+  display: flex;
+  justify-content: space-around;
+  font-size: 0.62rem;
+  margin-top: 3px;
+  color: #cbd5e1;
+}
+
+.leg-p {
+  color: #38bdf8;
+  font-weight: bold;
+}
+
+.leg-o {
+  color: #f87171;
+  font-weight: bold;
+}
+
+.leg-z {
+  color: #facc15;
+  font-weight: bold;
+}
+
+#crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  transition: transform 0.08s ease, border-color 0.08s ease, box-shadow 0.08s ease;
+}
+
+#crosshair.can-grapple {
+  border-color: #22d3ee;
+  transform: translate(-50%, -50%) scale(1.45);
+  box-shadow: 0 0 10px #22d3ee;
+}
+
+#zip-prompt {
+  position: fixed;
+  top: 57%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(250, 204, 21, 0.92);
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+#trick-feed {
+  position: fixed;
+  top: 21%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fde047;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+#trick-feed.show {
+  opacity: 1;
+}
+
+#pc-ability-bar {
+  position: fixed;
+  bottom: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+}
+
+.ability-chip {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ability-chip.cooldown {
+  opacity: 0.55;
+  border-color: #64748b;
+}
+
+.hud-bottom {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.68);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 0.78rem;
+  color: #e2e8f0;
+  max-width: 96vw;
+}
+
+body.touch-mode .hud-bottom,
+body.touch-mode #pc-ability-bar {
+  display: none;
+}
+
+/* ==========================================
+   スマホ・タブレット用タッチ操作レイヤー
+   ========================================== */
+#touch-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  touch-action: none;
+}
+
+#look-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  touch-action: none;
+}
+
+#joystick-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  touch-action: none;
+}
+
+#joystick-base {
+  position: fixed;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.45);
+  border: 2px solid rgba(56, 189, 248, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 11;
+}
+
+#joystick-knob {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.78);
+  border: 2px solid #e0f2fe;
+  transform: translate(0px, 0px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.action-btn {
+  position: fixed;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  touch-action: none;
+  opacity: 0.88;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.action-btn small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.action-btn.pressed {
+  transform: scale(0.92);
+  opacity: 1;
+}
+
+.action-btn.on-cooldown {
+  opacity: 0.42;
+  filter: grayscale(0.4);
+}
+
+.jump-btn {
+  background: rgba(34, 197, 94, 0.8);
+  border-color: #86efac;
+}
+
+.slide-btn {
+  width: 70px;
+  height: 70px;
+  background: rgba(245, 158, 11, 0.8);
+  border-color: #fde68a;
+  font-size: 0.78rem;
+}
+
+.dash-btn {
+  width: 70px;
+  height: 70px;
+  background: rgba(236, 72, 153, 0.8);
+  border-color: #f9a8d4;
+  font-size: 0.78rem;
+}
+
+.grapple-btn {
+  width: 70px;
+  height: 70px;
+  background: rgba(6, 182, 212, 0.82);
+  border-color: #a5f3fc;
+  font-size: 0.78rem;
+}
+
+.grapple-btn.ready-target {
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.95);
+  border-color: #ffffff;
+}
+
+.zip-btn {
+  width: 66px;
+  height: 66px;
+  background: rgba(234, 179, 8, 0.84);
+  border-color: #fef08a;
+  color: #0f172a;
+  font-size: 0.8rem;
+}
+
+.zip-btn.zip-available {
+  box-shadow: 0 0 20px #fde047;
+  transform: scale(1.08);
+  opacity: 1;
+}
+
+/* ==========================================
+   ボタン配置編集モード
+   ========================================== */
+body.layout-editing #touch-layer {
+  display: block !important;
+  z-index: 35;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+body.layout-editing #joystick-zone {
+  border-right: 2px dashed rgba(56, 189, 248, 0.45);
+}
+
+body.layout-editing #joystick-base,
+body.layout-editing .action-btn {
+  pointer-events: auto;
+  cursor: grab;
+  outline: 2px dashed #fde047;
+  outline-offset: 4px;
+}
+
+body.layout-editing #joystick-base:active,
+body.layout-editing .action-btn:active {
+  cursor: grabbing;
+}
+
+#layout-editor-bar {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  background: rgba(15, 23, 42, 0.94);
+  border: 2px solid #fde047;
+  border-radius: 12px;
+  padding: 10px 16px;
+  text-align: center;
+  width: min(92vw, 460px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.editor-msg {
+  font-size: 0.84rem;
+  font-weight: bold;
+  color: #fde047;
+  margin-bottom: 8px;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.primary-small-btn {
+  background: #38bdf8;
+  color: #0f172a;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* ==========================================
+   モーダル（スタート / ポーズ / リザルト）
+   ========================================== */
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.82);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 30;
+  backdrop-filter: blur(5px);
+  padding: 14px;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.modal {
+  background: #1e293b;
+  border: 2px solid #38bdf8;
+  border-radius: 16px;
+  padding: 20px 22px;
+  max-width: 560px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  max-height: 94vh;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.modal h1 {
+  font-size: 1.45rem;
+  color: #38bdf8;
+  margin-bottom: 8px;
+}
+
+.modal p {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+  margin-bottom: 12px;
+}
+
+.loadout-section {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.loadout-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #93c5fd;
+  margin-bottom: 8px;
+}
+
+.loadout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.loadout-btn {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1.5px solid #475569;
+  border-radius: 8px;
+  color: #e2e8f0;
+  padding: 8px 6px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.loadout-btn small {
+  font-size: 0.68rem;
+  font-weight: normal;
+  color: #94a3b8;
+}
+
+.loadout-btn.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.loadout-btn.active small {
+  color: #bae6fd;
+}
+
+
+.sensitivity-section {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  touch-action: pan-x;
+}
+
+.sensitivity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sensitivity-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #93c5fd;
+}
+
+.sensitivity-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#sens-value {
+  font-size: 0.88rem;
+  color: #38bdf8;
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+}
+
+.sens-reset-btn {
+  background: rgba(51, 65, 85, 0.9);
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sens-reset-btn:active {
+  background: #475569;
+}
+
+#sens-slider {
+  width: 100%;
+  height: 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #334155;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  touch-action: pan-x;
+}
+
+#sens-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #38bdf8;
+  border: 2px solid #e0f2fe;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+#sens-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #38bdf8;
+  border: 2px solid #e0f2fe;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.sensitivity-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  margin-top: 5px;
+}
+
+.controls-box {
+  background: rgba(15, 23, 42, 0.65);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.58;
+  color: #cbd5e1;
+  margin-bottom: 14px;
+}
+
+.modal-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.sub-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+#start-btn {
+  background: #38bdf8;
+  color: #0f172a;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 28px;
+  font-size: 1.02rem;
+  font-weight: 800;
+  cursor: pointer;
+  width: 100%;
+  max-width: 260px;
+}
+
+#start-btn:active {
+  transform: scale(0.98);
+}
+
+.secondary-btn {
+  background: transparent;
+  color: #cbd5e1;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    font-size: 0.76rem;
+    padding: 6px 8px;
+  }
+  .center-panel {
+    min-width: 94px;
+  }
+  .speed-wrap {
+    font-size: 1.15rem;
+  }
+  #minimap-wrap {
+    top: 64px;
+    left: 10px;
+    padding: 4px;
+  }
+  #minimap {
+    width: 96px;
+    height: 96px;
+  }
+  #joystick-base {
+    width: 108px;
+    height: 108px;
+  }
+  #joystick-knob {
+    width: 46px;
+    height: 46px;
+  }
+  .action-btn {
+    width: 68px;
+    height: 68px;
+    font-size: 0.78rem;
+  }
+  .slide-btn, .dash-btn, .grapple-btn {
+    width: 62px;
+    height: 62px;
+    font-size: 0.72rem;
+  }
+  .zip-btn {
+    width: 58px;
+    height: 58px;
+    font-size: 0.74rem;
+  }
+}
+
+
+/* ==========================================
+   FPS クロスヘア・ヒットマーカー・武器HUD
+   ========================================== */
+#crosshair.lock-on {
+  border-color: #ef4444;
+  transform: translate(-50%, -50%) scale(1.6);
+  box-shadow: 0 0 12px #ef4444;
+}
+
+#hitmarker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+#hitmarker::before,
+#hitmarker::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 2.5px;
+  background: #fde047;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+#hitmarker::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+#hitmarker::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+#weapon-hud {
+  position: fixed;
+  right: 14px;
+  bottom: 62px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 158px;
+  text-align: right;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+body.touch-mode #weapon-hud {
+  top: 86px;
+  bottom: auto;
+  right: 14px;
+  min-width: 128px;
+  padding: 6px 9px;
+}
+
+.weapon-hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+#weapon-name {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #93c5fd;
+  letter-spacing: 0.04em;
+}
+
+#autofire-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.88);
+  color: #ffffff;
+}
+
+#autofire-badge.off {
+  background: #475569;
+  color: #cbd5e1;
+}
+
+.weapon-ammo-row {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.weapon-ammo-row small {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-left: 3px;
+}
+
+#reload-status {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #fde047;
+  margin-top: 2px;
+  letter-spacing: 0.06em;
+}
+
+.oni-stun-wrap {
+  margin-top: 6px;
+  text-align: left;
+}
+
+.oni-stun-wrap span {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fca5a5;
+  margin-bottom: 2px;
+}
+
+.oni-stun-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(51, 65, 85, 0.9);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+#oni-stun-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  transition: width 0.08s linear;
+}
+
+#oni-stun-fill.stunned {
+  background: linear-gradient(90deg, #fde047, #38bdf8);
+}
+
+/* タッチ用 FIRE / WEAPON ボタン */
+.fire-btn {
+  width: 76px;
+  height: 76px;
+  background: rgba(239, 68, 68, 0.84);
+  border-color: #fca5a5;
+  font-size: 0.82rem;
+}
+
+.weapon-btn {
+  width: 66px;
+  height: 66px;
+  background: rgba(99, 102, 241, 0.84);
+  border-color: #c7d2fe;
+  font-size: 0.68rem;
+}
+
+/* モーダル内：武器＆オート射撃設定 */
+.weapon-settings-section {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.weapon-settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.weapon-settings-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fca5a5;
+  text-align: left;
+}
+
+.autofire-btn {
+  background: #475569;
+  color: #e2e8f0;
+  border: 1px solid #64748b;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  min-width: 58px;
+}
+
+.autofire-btn.active {
+  background: #ef4444;
+  border-color: #fca5a5;
+  color: #ffffff;
+}
+
+.weapon-select-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.weapon-select-btn {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1.5px solid #475569;
+  border-radius: 8px;
+  color: #e2e8f0;
+  padding: 7px 4px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.weapon-select-btn small {
+  font-size: 0.62rem;
+  font-weight: normal;
+  color: #94a3b8;
+}
+
+.weapon-select-btn.active {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: #f87171;
+  color: #ffffff;
+}
+
+.weapon-select-btn.active small {
+  color: #fecaca;
+}
+
+@media (max-width: 640px) {
+  .fire-btn {
+    width: 68px;
+    height: 68px;
+    font-size: 0.74rem;
+  }
+  .weapon-btn {
+    width: 60px;
+    height: 60px;
+    font-size: 0.64rem;
+  }
+  .weapon-ammo-row {
+    font-size: 1.2rem;
+  }
+}
+
+
+/* ==========================================
+   v7: 1v1 対戦FPS HUD・ロビー・被弾演出
+   ========================================== */
+.score-panel {
+  min-width: 146px;
+}
+
+.score-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.05rem;
+}
+
+.me-tag {
+  font-size: 0.66rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
+.en-tag {
+  font-size: 0.66rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+.vs-sep {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.goal-line {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.net-pill {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.net-pill.solo {
+  background: #334155;
+  color: #cbd5e1;
+}
+
+.net-pill.online {
+  background: rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.5);
+}
+
+.my-hp-wrap {
+  margin-top: 4px;
+  width: 120px;
+}
+
+.my-hp-wrap span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #86efac;
+  margin-bottom: 2px;
+}
+
+.my-hp-bar {
+  width: 100%;
+  height: 7px;
+  background: rgba(30, 41, 59, 0.95);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+#my-hp-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+  transition: width 0.1s ease-out, background 0.15s;
+}
+
+#my-hp-fill.low {
+  background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+#enemy-hp-hud-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  transition: width 0.1s ease-out;
+}
+
+#damage-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle, transparent 52%, rgba(239, 68, 68, 0.62) 100%);
+  transition: opacity 0.12s ease-out;
+  z-index: 6;
+}
+
+#respawn-banner {
+  position: fixed;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 23, 42, 0.94);
+  border: 2px solid #ef4444;
+  border-radius: 14px;
+  padding: 16px 28px;
+  text-align: center;
+  z-index: 25;
+  pointer-events: auto;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+}
+
+.force-respawn-btn {
+  margin-top: 10px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1.5px solid #38bdf8;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45);
+}
+
+.force-respawn-btn:active {
+  transform: scale(0.96);
+}
+
+.respawn-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #fca5a5;
+  margin-bottom: 4px;
+}
+
+.respawn-sub {
+  font-size: 0.9rem;
+  color: #e2e8f0;
+}
+
+/* ロビーUI */
+.multiplayer-section {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.mp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mp-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #38bdf8;
+}
+
+.mp-goal-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+}
+
+#goal-kills-select {
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.mp-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mp-tab-btn {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: #cbd5e1;
+  padding: 6px 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mp-tab-btn.active {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.mp-panel {
+  background: rgba(2, 6, 23, 0.45);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.room-code-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+}
+
+#host-room-code {
+  font-size: 1.45rem;
+  letter-spacing: 0.16em;
+  color: #fde047;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-action-btn {
+  background: #334155;
+  color: #f8fafc;
+  border: 1px solid #64748b;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.join-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+#join-code-input {
+  flex: 1;
+  background: #0f172a;
+  color: #fde047;
+  border: 1.5px solid #38bdf8;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+.mp-action-btn {
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  width: 100%;
+}
+
+.join-input-row .mp-action-btn {
+  width: auto;
+  white-space: nowrap;
+}
+
+.mp-status {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.mp-status.ok {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.mp-status.err {
+  color: #f87171;
+  font-weight: 700;
+}
+
+
+/* ==========================================
+   v8: 通貨・2枠ロードアウト・ショップ＆スキンガチャ
+   ========================================== */
+.coin-text {
+  color: #fde047;
+}
+
+#melee-ready-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #34d399;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+.wallet-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.95));
+  border: 1.5px solid rgba(250, 204, 21, 0.5);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.wallet-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.wallet-label {
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+.coin-val {
+  font-size: 1.15rem;
+  color: #fde047;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-open-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0f172a;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+
+.shop-open-btn:active {
+  transform: scale(0.97);
+}
+
+.loadout-slots-section {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  padding: 9px 10px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.slots-title {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #93c5fd;
+  margin-bottom: 6px;
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.slot-card {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.slot-card.melee {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.slot-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #38bdf8;
+  margin-bottom: 2px;
+}
+
+.slot-card.melee .slot-badge {
+  color: #34d399;
+}
+
+.slot-item-name {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.slot-skin-name {
+  font-size: 0.68rem;
+  color: #cbd5e1;
+  margin-top: 2px;
+}
+
+/* ショップオーバーレイ */
+#shop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  z-index: 30;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.shop-modal {
+  max-width: 620px;
+  width: 100%;
+  text-align: left;
+}
+
+.shop-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.shop-top-bar h2 {
+  font-size: 1.15rem;
+  color: #fde047;
+}
+
+.shop-wallet-pill {
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+}
+
+.shop-wallet-pill strong {
+  color: #fde047;
+}
+
+.shop-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.shop-tab-btn {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: #cbd5e1;
+  padding: 7px 4px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shop-tab-btn.active {
+  background: rgba(250, 204, 21, 0.2);
+  border-color: #fde047;
+  color: #fde047;
+}
+
+.shop-note {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+.shop-items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.shop-card {
+  background: rgba(30, 41, 59, 0.92);
+  border: 1.5px solid #475569;
+  border-radius: 10px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.shop-card.equipped {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.25);
+}
+
+.shop-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.shop-card-name {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.skin-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  flex-shrink: 0;
+}
+
+.shop-card-desc {
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
+.shop-card-btn {
+  width: 100%;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shop-card-btn.buy {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0f172a;
+}
+
+.shop-card-btn.buy:disabled {
+  background: #334155;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.shop-card-btn.equip {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.shop-card-btn.equipped {
+  background: #1e293b;
+  color: #38bdf8;
+  border: 1px solid #38bdf8;
+  cursor: default;
+}
+
+.shop-card-btn.locked-gacha {
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px dashed #475569;
+  cursor: default;
+}
+
+/* スキンガチャUI */
+.gacha-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gacha-banner {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.55), rgba(15, 23, 42, 0.92));
+  border: 1.5px solid rgba(192, 132, 252, 0.55);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.gacha-banner-title {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #e879f9;
+  letter-spacing: 0.05em;
+}
+
+.gacha-banner-sub {
+  font-size: 0.72rem;
+  color: #e2e8f0;
+  margin-top: 3px;
+}
+
+.gacha-rates {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.rate-chip {
+  font-size: 0.64rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.rate-chip.common { background: #334155; color: #cbd5e1; }
+.rate-chip.rare { background: rgba(14, 165, 233, 0.25); color: #38bdf8; }
+.rate-chip.epic { background: rgba(168, 85, 247, 0.28); color: #d8b4fe; }
+.rate-chip.legend { background: rgba(250, 204, 21, 0.25); color: #fde047; }
+
+.gacha-result-box {
+  min-height: 112px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gacha-placeholder {
+  text-align: center;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.gacha-drop-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(30, 41, 59, 0.92);
+  border-left: 4px solid #38bdf8;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
+.gacha-drop-row.RARE { border-left-color: #38bdf8; }
+.gacha-drop-row.EPIC { border-left-color: #c084fc; }
+.gacha-drop-row.LEGEND { border-left-color: #fde047; background: rgba(113, 63, 18, 0.35); }
+
+.gacha-drop-tag {
+  font-size: 0.66rem;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.gacha-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.gacha-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.gacha-btn strong {
+  font-size: 0.95rem;
+}
+
+.gacha-btn.single {
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+}
+
+.gacha-btn.multi {
+  background: linear-gradient(135deg, #c026d3, #7c3aed);
+  color: #ffffff;
+}
+
+.gacha-btn:disabled {
+  background: #334155;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+@media (max-width: 540px) {
+  .shop-items-grid {
+    grid-template-columns: 1fr;
+  }
+  .slots-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ==========================================
+   v10: タッチ用「眺める（INSPECT）」ボタン
+   ========================================== */
+.inspect-btn {
+  width: 56px;
+  height: 56px;
+  background: rgba(168, 85, 247, 0.38);
+  border: 2px solid #d8b4fe;
+  font-size: 0.72rem;
+}
+
+
+/* ==========================================
+   v12: 勝利・敗北の大型カットイン演出＆紙吹雪
+   ========================================== */
+#match-finish-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(250, 204, 21, 0.28), rgba(2, 6, 23, 0.72));
+  animation: finishFadeIn 0.25s ease-out;
+}
+
+#match-finish-banner.defeat {
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.28), rgba(2, 6, 23, 0.78));
+}
+
+#confetti-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -16px;
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: confettiFall linear forwards;
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(108vh) rotate(720deg) scale(0.9);
+    opacity: 0.2;
+  }
+}
+
+.finish-card {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 22px 34px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.94));
+  border: 3px solid #fde047;
+  box-shadow: 0 0 45px rgba(250, 204, 21, 0.55), 0 18px 40px rgba(0, 0, 0, 0.65);
+  animation: finishPop 0.42s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+#match-finish-banner.defeat .finish-card {
+  border-color: #f87171;
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.45), 0 18px 40px rgba(0, 0, 0, 0.65);
+}
+
+.finish-kicker {
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #fde047;
+  margin-bottom: 4px;
+}
+
+#match-finish-banner.defeat .finish-kicker {
+  color: #fca5a5;
+}
+
+.finish-main-title {
+  font-size: clamp(2.4rem, 7vw, 4.2rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+  background: linear-gradient(180deg, #ffffff 10%, #fde047 55%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 14px rgba(245, 158, 11, 0.55));
+}
+
+#match-finish-banner.defeat .finish-main-title {
+  background: linear-gradient(180deg, #ffffff 10%, #fca5a5 55%, #ef4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 14px rgba(239, 68, 68, 0.5));
+}
+
+.finish-score-line {
+  margin-top: 8px;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.finish-reward-line {
+  margin-top: 8px;
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.2);
+  border: 1px solid #fde047;
+  color: #fde047;
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+#match-finish-banner.defeat .finish-reward-line {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: #94a3b8;
+  color: #e2e8f0;
+}
+
+.modal.victory-modal {
+  border: 2.5px solid #fde047;
+  box-shadow: 0 0 36px rgba(250, 204, 21, 0.42), 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.modal.defeat-modal {
+  border: 2.5px solid #f87171;
+  box-shadow: 0 0 32px rgba(239, 68, 68, 0.35), 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+@keyframes finishPop {
+  0% { transform: scale(0.55); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes finishFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+
+/* ==========================================
+   v13: タッチ用RELOADボタン＆HUDリロードチップ＆勝利演出
+   ========================================== */
+.reload-btn {
+  width: 58px;
+  height: 58px;
+  background: rgba(245, 158, 11, 0.42);
+  border: 2px solid #fde047;
+  font-size: 0.68rem;
+}
+
+.hud-reload-chip {
+  pointer-events: auto;
+  background: rgba(245, 158, 11, 0.25);
+  border: 1px solid #fbbf24;
+  color: #fde047;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.hud-reload-chip:active {
+  transform: scale(0.94);
+  background: rgba(245, 158, 11, 0.5);
+}
+
+#match-finish-banner {
+  background: radial-gradient(circle at center, rgba(250, 204, 21, 0.22), rgba(2, 6, 23, 0.48));
+}
+
+
+/* ==========================================
+   v14: キャラクター選択カード＆固有スキル演出
+   ========================================== */
+.char-hud-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #cbd5e1;
+  margin-bottom: 2px;
+}
+
+.character-select-section {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  text-align: left;
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .character-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.char-card {
+  appearance: none;
+  background: rgba(30, 41, 59, 0.85);
+  border: 2px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  padding: 8px 8px;
+  color: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.char-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.char-card.active {
+  background: rgba(15, 23, 42, 0.96);
+  border-color: var(--char-color, #38bdf8);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--char-color, #38bdf8) 45%, transparent);
+}
+
+.char-card-role {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--char-color, #38bdf8);
+}
+
+.char-card-name {
+  font-size: 0.88rem;
+  font-weight: 900;
+  margin-top: 2px;
+}
+
+.char-card-skill {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.char-card-hp {
+  margin-top: 3px;
+  font-size: 0.64rem;
+  color: #94a3b8;
+}
+
+.selected-char-detail {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.6);
+  border-left: 3px solid var(--char-color, #38bdf8);
+}
+
+.char-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.char-skill-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid var(--char-color, #38bdf8);
+  color: var(--char-color, #38bdf8);
+}
+
+.char-detail-desc {
+  margin-top: 4px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: #e2e8f0;
+}
+
+#skill-active-banner {
+  position: fixed;
+  top: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 16;
+  padding: 5px 16px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #0f172a;
+  background: linear-gradient(90deg, #fde047, #38bdf8);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.55);
+  pointer-events: none;
+}
+
+.grapple-btn.skill-hook {
+  background: rgba(2, 132, 199, 0.45);
+  border-color: #38bdf8;
+}
+.grapple-btn.skill-blitz {
+  background: rgba(217, 119, 6, 0.48);
+  border-color: #facc15;
+}
+.grapple-btn.skill-vanguard {
+  background: rgba(5, 150, 105, 0.48);
+  border-color: #34d399;
+}
+.grapple-btn.skill-spectre {
+  background: rgba(126, 34, 206, 0.48);
+  border-color: #c084fc;
+}
+
+
+/* ==========================================
+   v15: 最大4人フリーフォーオールHUD＆高度表示
+   ========================================== */
+.goal-inline {
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+.ffa-scoreboard {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.68rem;
+}
+
+.ffa-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+}
+
+.ffa-row.me {
+  background: rgba(2, 132, 199, 0.35);
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.ffa-row.ko {
+  opacity: 0.55;
+}
