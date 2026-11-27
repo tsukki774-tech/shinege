@@ -288,9 +288,45 @@ const CHARACTERS = {
     skillCooldown: 7.5,
     desc: "近接攻撃威力+20（計75）のアサシン。固有スキル【シャドウステップ】で視線方向へ18m瞬間転移し、2.5秒間ステルス化する。",
   },
+  pyro: {
+    id: "pyro",
+    name: "PYRO",
+    fullName: "PYRO（パイロ）",
+    role: "BLASTER",
+    cssColor: "#fb923c",
+    bodyColor: 0xea580c,
+    emissiveColor: 0x9a3412,
+    visorColor: 0xfed7aa,
+    maxHp: 110,
+    speedMult: 1.03,
+    slideBoostAdd: 1.0,
+    meleeBonus: 5,
+    skillName: "サーマルノヴァ",
+    skillShort: "NOVA",
+    skillCooldown: 8.5,
+    desc: "周囲14mの敵に衝撃波ダメージ(35)＆ノックバックを与え、自身の弾薬を即時フル装填する爆発アタッカー。",
+  },
+  titan: {
+    id: "titan",
+    name: "TITAN",
+    fullName: "TITAN（タイタン）",
+    role: "JUGGERNAUT",
+    cssColor: "#fb7185",
+    bodyColor: 0xe11d48,
+    emissiveColor: 0x881337,
+    visorColor: 0xfecdd3,
+    maxHp: 150,
+    speedMult: 0.94,
+    slideBoostAdd: 0,
+    meleeBonus: 10,
+    skillName: "バーサークラッシュ",
+    skillShort: "RAGE",
+    skillCooldown: 9.5,
+    desc: "最大HP150の超重装型。固有スキル【バーサークラッシュ】で4.5秒間、移動速度とリロード速度が大幅上昇しHPを20回復する。",
+  },
 };
 
-const CHAR_ORDER = ["hook", "blitz", "vanguard", "spectre"];
+const CHAR_ORDER = ["hook", "blitz", "vanguard", "spectre", "pyro", "titan"];
 let selectedCharKey = localStorage.getItem("parkour_fps_character") || "hook";
 if (!CHARACTERS[selectedCharKey]) selectedCharKey = "hook";
 
@@ -366,7 +402,7 @@ function applyCharacterStatsToPlayer(refillHp = false) {
     pcSkillName.textContent = ch.skillShort;
   }
   if (btnGrapple) {
-    btnGrapple.classList.remove("skill-hook", "skill-blitz", "skill-vanguard", "skill-spectre");
+    btnGrapple.classList.remove("skill-hook", "skill-blitz", "skill-vanguard", "skill-spectre", "skill-pyro", "skill-titan");
     btnGrapple.classList.add(`skill-${ch.id}`);
   }
   updateScoreAndHpUI();
@@ -1138,8 +1174,8 @@ const SPAWN_POINTS = [
 
 const BOT_PRESETS = [
   { id: "bot_1", name: "BOT-BLITZ", charKey: "blitz", gunKey: "smg" },
-  { id: "bot_2", name: "BOT-VANGUARD", charKey: "vanguard", gunKey: "rifle" },
-  { id: "bot_3", name: "BOT-SPECTRE", charKey: "spectre", gunKey: "shotgun" },
+  { id: "bot_2", name: "BOT-PYRO", charKey: "pyro", gunKey: "burst" },
+  { id: "bot_3", name: "BOT-TITAN", charKey: "titan", gunKey: "lmg" },
 ];
 
 function createRivalRig(index, preset) {
@@ -1914,6 +1950,44 @@ const GUNS = {
     recoilPitch: 0.042,
     sfx: "shot_rifle",
   },
+  burst: {
+    key: "burst",
+    name: "ファントムバースト",
+    hudName: "PHANTOM AR",
+    shortName: "BURST",
+    price: 180,
+    desc: "高精度3点同時発射のアサルトライフル（24発 / 威力12×3）",
+    maxAmmo: 24,
+    fireRate: 0.24,
+    reloadTime: 1.35,
+    range: 140,
+    pellets: 3,
+    spread: 0.011,
+    damage: 12,
+    defaultColor: 0x34d399,
+    recoilZ: 0.075,
+    recoilPitch: 0.065,
+    sfx: "shot_rifle",
+  },
+  plasma: {
+    key: "plasma",
+    name: "ノヴァプラズマ砲",
+    hudName: "NOVA CANNON",
+    shortName: "PLASMA",
+    price: 320,
+    desc: "超高エネルギー弾を放つ重ランチャー（5発 / 威力54）",
+    maxAmmo: 5,
+    fireRate: 0.78,
+    reloadTime: 1.60,
+    range: 135,
+    pellets: 1,
+    spread: 0.004,
+    damage: 54,
+    defaultColor: 0xf43f5e,
+    recoilZ: 0.14,
+    recoilPitch: 0.14,
+    sfx: "shot_shotgun",
+  },
 };
 
 // 近接武器カタログ（性能は完全共通：威力55 / クールタイム0.48s / リーチ3.6m）
@@ -1959,6 +2033,15 @@ const MELEES = {
     price: 280,
     desc: "エネルギー刃を備えた戦術トマホーク（威力55・共通性能）",
     defaultColor: 0xf59e0b,
+  },
+  scythe: {
+    key: "scythe",
+    name: "エクリプスサイズ",
+    hudName: "ECLIPSE SCYTHE",
+    shortName: "SCYTHE",
+    price: 340,
+    desc: "光刃の大鎌を振るう漆黒のリーパーブレード（威力55・共通性能）",
+    defaultColor: 0xc084fc,
   },
 };
 
@@ -2036,16 +2119,46 @@ const SKINS = {
     metalness: 0.92,
     cssColor: "#fde047",
   },
+  solar_flare: {
+    key: "solar_flare",
+    name: "ソーラーフレア",
+    rarity: "RARE",
+    bodyColor: 0x7c2d12,
+    accentColor: 0xfb923c,
+    metalness: 0.76,
+    cssColor: "#fb923c",
+  },
+  obsidian_blood: {
+    key: "obsidian_blood",
+    name: "オブシディアンブラッド",
+    rarity: "EPIC",
+    bodyColor: 0x090d16,
+    accentColor: 0xf43f5e,
+    metalness: 0.88,
+    cssColor: "#f43f5e",
+  },
+  celestial_aurora: {
+    key: "celestial_aurora",
+    name: "セレスティアルオーロラ",
+    rarity: "LEGEND",
+    bodyColor: 0x0f172a,
+    accentColor: 0x2dd4bf,
+    metalness: 0.95,
+    cssColor: "#2dd4bf",
+  },
 };
 
 const GACHA_POOL = [
-  { skin: "crimson", weight: 23 },
-  { skin: "emerald", weight: 22 },
-  { skin: "arctic", weight: 16 },
-  { skin: "cyber_cyan", weight: 16 },
-  { skin: "violet_void", weight: 8 },
-  { skin: "fade_prism", weight: 8 },
-  { skin: "gold_royal", weight: 7 },
+  { skin: "crimson", weight: 19 },
+  { skin: "emerald", weight: 19 },
+  { skin: "arctic", weight: 12 },
+  { skin: "cyber_cyan", weight: 12 },
+  { skin: "solar_flare", weight: 11 },
+  { skin: "violet_void", weight: 7 },
+  { skin: "fade_prism", weight: 7 },
+  { skin: "obsidian_blood", weight: 6 },
+  { skin: "gold_royal", weight: 4 },
+  { skin: "celestial_aurora", weight: 3 },
 ];
 
 function createDefaultProfile() {
@@ -3580,6 +3693,41 @@ function triggerShadowStepSkill(ch) {
   showTrick("SPECTRE: SHADOW STEP! (ステルス 2.5s)");
 }
 
+function triggerThermalNovaSkill(ch) {
+  if (skillState.cooldown > 0) return;
+  skillState.cooldown = ch.skillCooldown;
+  const center = player.pos.clone().add(new THREE.Vector3(0, 1.1, 0));
+  let hitCount = 0;
+  for (const r of getActiveRivals()) {
+    if (r.dead) continue;
+    const dist = r.pos.distanceTo(player.pos);
+    if (dist <= 14.5) {
+      hitCount++;
+      const pushDir = r.pos.clone().sub(player.pos).setY(0).normalize();
+      r.vel.addScaledVector(pushDir, 18.0);
+      r.vel.y = Math.max(r.vel.y, 8.5);
+      dealDamageToRival(r, 35, "NOVA");
+      spawnTracer(center, r.pos.clone().add(new THREE.Vector3(0, 1.1, 0)), 0xfb923c);
+    }
+  }
+  weaponState.ammo = GUNS[profile.equippedGun].maxAmmo;
+  weaponState.reloading = false;
+  weaponState.reloadTimer = 0;
+  updateWeaponUI();
+  playSfx("shot_shotgun");
+  showTrick(`PYRO: THERMAL NOVA! (${hitCount}体命中 & 弾薬全回復)`);
+}
+
+function triggerBerserkRushSkill(ch) {
+  if (skillState.cooldown > 0) return;
+  skillState.cooldown = ch.skillCooldown;
+  skillState.overdriveTimer = 4.5;
+  player.hp = Math.min(player.maxHp, player.hp + 20);
+  updateScoreAndHpUI();
+  playSfx("boost");
+  showTrick("TITAN: BERSERK RUSH! (+20 HP & 超加速)");
+}
+
 function triggerGrapple() {
   if (!game.active || game.over || player.dead) return;
   const ch = getSelectedChar();
@@ -3591,6 +3739,10 @@ function triggerGrapple() {
     triggerAegisBarrierSkill(ch);
   } else if (ch.id === "spectre") {
     triggerShadowStepSkill(ch);
+  } else if (ch.id === "pyro") {
+    triggerThermalNovaSkill(ch);
+  } else if (ch.id === "titan") {
+    triggerBerserkRushSkill(ch);
   }
 }
 
