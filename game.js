@@ -1,4 +1,4 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+const THREE = window.THREE;
 
 // ==========================================
 // DOM要素
@@ -3974,9 +3974,8 @@ function triggerOverdriveSkill(ch) {
   if (skillState.cooldown > 0) return;
   skillState.cooldown = ch.skillCooldown;
   skillState.overdriveTimer = 5.0;
-    playSfx("skill_overdrive");
   player.dashCooldown = 0;
-  playSfx("boost");
+  playSfx("skill_overdrive");
   showTrick("BLITZ: OVERDRIVE!! (5.0s)");
 }
 
