@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D キャラコンFPS v28 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
-  <link rel="stylesheet" href="style.css?v=28" />
+  <title>3D キャラコンFPS v29 - 縦横メガアリーナ＆最大4人対戦＆武器モデル刷新</title>
+  <link rel="stylesheet" href="style.css?v=29" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -168,7 +168,7 @@
   <!-- スタート / ポーズ / ゲームオーバー画面 -->
   <div id="overlay">
     <div class="modal">
-      <h1 id="modal-title">3D キャラコンFPS v28</h1>
+      <h1 id="modal-title">3D キャラコンFPS v29</h1>
       <p id="modal-desc">
         パルクール＆全ギミックを駆使して友達と撃ち合う<strong>1v1 ハイスピードFPS</strong>！<br />
         ルームコードを共有するだけで、スマホ・PCの垣根なくリアルタイム対戦できます。
@@ -371,6 +371,17 @@
     </div>
   </div>
 
-  <script type="module" src="game.js?v=28"></script>
+  <script>
+    window.__gameScriptLoaded = false;
+    setTimeout(function () {
+      if (!window.__gameScriptLoaded) {
+        var d = document.getElementById("modal-desc");
+        if (d) {
+          d.innerHTML = '<span style="color:#fca5a5;font-weight:700;">game.js が読み込まれていません。</span><br /><small style="color:#cbd5e1;">ZIPを「すべて展開（解凍）」したフォルダから開くか、同梱の <strong>play-standalone.html</strong> を直接開いてください。</small>';
+        }
+      }
+    }, 1500);
+  </script>
+  <script src="game.js?v=29" onload="window.__gameScriptLoaded = true;"></script>
 </body>
 </html>
