@@ -141,7 +141,7 @@ const layoutSaveBtn = document.getElementById("layout-save-btn");
 const CONFIG = {
   gravity: 28,
   baseSpeed: 10.8,
-  maxSpeed: 34.0,
+  maxSpeed: 44.0,
   groundAccel: 78,
   airAccel: 32,
   groundFriction: 9.0,
@@ -249,8 +249,8 @@ const CHARACTERS = {
     emissiveColor: 0x92400e,
     visorColor: 0xfef08a,
     maxHp: 100,
-    speedMult: 1.28,
-    slideBoostAdd: 5.5,
+    speedMult: 1.52,
+    slideBoostAdd: 9.5,
     meleeBonus: 0,
     skillName: "オーバードライブ",
     skillShort: "BOOST",
@@ -5216,7 +5216,7 @@ function updatePlayer(dt) {
   if (player.slideCooldown > 0) player.slideCooldown -= dt;
   if (player.jumpBuffer > 0) player.jumpBuffer -= dt;
   const activeCh = getSelectedChar();
-  const overdriveMult = skillState.overdriveTimer > 0 ? (activeCh.id === "blitz" ? 1.45 : 1.28) : 1.0;
+  const overdriveMult = skillState.overdriveTimer > 0 ? (activeCh.id === "blitz" ? 1.75 : 1.28) : 1.0;
   const charMoveMult = activeCh.speedMult * overdriveMult;
 
   if (player.dashCooldown > 0) player.dashCooldown = Math.max(0, player.dashCooldown - dt);
